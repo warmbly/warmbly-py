@@ -601,7 +601,7 @@ class AsyncGatewayClient:
             self._handle_close(exc)
 
     def _handle_close(self, exc: ConnectionClosed) -> None:
-        code = exc.code
+        code = self._close_code(exc)
         if code in _FATAL_CODES:
             raise FatalDisconnect(
                 f"gateway closed the connection (code {code})", code=code
@@ -611,9 +611,23 @@ class AsyncGatewayClient:
         raise TransientDisconnect(f"gateway closed (code {code})") from exc
 
     @staticmethod
+    def _close_code(exc: ConnectionClosed) -> int:
+        """The close code from the received (or sent) Close frame.
+
+        Uses the modern ``rcvd``/``sent`` frame attributes rather than the
+        deprecated ``ConnectionClosed.code`` shortcut. Falls back to 1006
+        (abnormal closure) when no frame is available.
+        """
+        if exc.rcvd is not None:
+            return exc.rcvd.code
+        if exc.sent is not None:
+            return exc.sent.code
+        return 1006
+
+    @staticmethod
     def _extract_retry_after(exc: ConnectionClosed) -> float | None:
         # The reject body's reason field may be JSON carrying retry_after_ms.
-        reason = exc.reason
+        reason = exc.rcvd.reason if exc.rcvd is not None else ""
         if not reason:
             return None
         try:

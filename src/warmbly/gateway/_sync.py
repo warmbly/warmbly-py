@@ -14,6 +14,8 @@ this module only marshals calls and results across the thread boundary.
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import inspect
 import threading
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, TypeVar, cast
@@ -69,6 +71,7 @@ class GatewayClient:
             base_url: The gateway base URL.
             on_resume_failed: Optional coroutine callback for ``resume_failed``.
         """
+        self._closed = False
         self._loop = asyncio.new_event_loop()
         self._thread = threading.Thread(
             target=self._run_loop, name="warmbly-gateway", daemon=True
@@ -95,7 +98,7 @@ class GatewayClient:
 
     @staticmethod
     def _adapt(handler: SyncHandler) -> Handler:
-        if asyncio.iscoroutinefunction(handler):
+        if inspect.iscoroutinefunction(handler):
             return cast("Handler", handler)
 
         async def _wrapper(topic: str, payload: dict[str, Any]) -> None:
@@ -197,10 +200,14 @@ class GatewayClient:
         Idempotent. Safe to call from any thread, including from inside a
         synchronous handler.
         """
+        if self._closed:
+            return
+        self._closed = True
         try:
             self._call(self._async.close())
         except Exception:
             logger.debug("error during gateway close", exc_info=True)
-        self._loop.call_soon_threadsafe(self._loop.stop)
+        with contextlib.suppress(RuntimeError):
+            self._loop.call_soon_threadsafe(self._loop.stop)
         if self._thread.is_alive() and threading.current_thread() is not self._thread:
             self._thread.join(timeout=5.0)
