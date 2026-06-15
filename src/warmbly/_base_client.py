@@ -28,7 +28,7 @@ from ._exceptions import (
     make_status_error,
 )
 from ._models import construct_type
-from ._pagination import AsyncCursorPage, SyncCursorPage
+from ._pagination import AsyncCursorPage, AsyncPaginator, SyncCursorPage
 from ._types import NOT_GIVEN, NotGiven, Omit, RequestOptions, Timeout
 from ._utils import drop_not_given, logger
 from ._utils._logs import redact, redact_headers
@@ -141,14 +141,22 @@ class BaseClient:
         headers.update(self.auth_headers)
 
         extra = options.get("headers") or {}
+        omitted_idempotency = False
         for key, value in extra.items():
             if isinstance(value, Omit):
                 _pop_header(headers, key)
+                if key.lower() == "idempotency-key":
+                    omitted_idempotency = True
             else:
                 _set_header(headers, key, value)
 
         has_idempotency = _get_header(headers, "idempotency-key") is not None
-        if method == "POST" and not is_form and not has_idempotency:
+        if (
+            method == "POST"
+            and not is_form
+            and not has_idempotency
+            and not omitted_idempotency
+        ):
             idem = options.get("idempotency_key")
             headers["Idempotency-Key"] = idem if idem else str(uuid.uuid4())
             has_idempotency = True
@@ -561,7 +569,7 @@ class AsyncAPIClient(BaseClient):
         model: type[ModelT],
         query: Mapping[str, object] | None = None,
         options: RequestOptions | None = None,
-    ) -> AsyncCursorPage[ModelT]:
+    ) -> AsyncPaginator[ModelT]:
         base_query = dict(query or {})
 
         async def fetch(cursor: str | None) -> AsyncCursorPage[ModelT]:
@@ -579,27 +587,8 @@ class AsyncAPIClient(BaseClient):
                 next_cursor=next_cursor,
                 has_more=has_more,
                 total=total,
-                fetch_next=fetch,
+                fetch_next=lambda c: fetch(c),
             )
 
-        # Returned un-awaited so callers can `async for item in client.x.list()`.
-        return _AwaitableAsyncPage(fetch)  # type: ignore[return-value]
-
-
-class _AwaitableAsyncPage:
-    """Allows ``async for x in client.res.list()`` and ``await client.res.list()``.
-
-    The first page is fetched lazily: iterating or awaiting triggers the request.
-    """
-
-    def __init__(self, fetch: Any) -> None:
-        self._fetch = fetch
-        self._page: AsyncCursorPage[Any] | None = None
-
-    def __await__(self) -> Any:
-        return self._fetch(None).__await__()
-
-    async def __aiter__(self) -> Any:
-        page: AsyncCursorPage[Any] = await self._fetch(None)
-        async for item in page:
-            yield item
+        # Returned un-awaited so callers can both `await` it and `async for` it.
+        return AsyncPaginator(fetch)

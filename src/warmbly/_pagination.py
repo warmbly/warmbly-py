@@ -16,15 +16,23 @@ pagination logic independent of the HTTP transport.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Awaitable, Callable, Iterator, Sequence
+from collections.abc import (
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    Generator,
+    Iterator,
+    Sequence,
+)
 from typing import (
+    Any,
     Generic,
     TypeVar,
 )
 
 from ._exceptions import WarmblyError
 
-__all__ = ["AsyncCursorPage", "SyncCursorPage"]
+__all__ = ["AsyncCursorPage", "AsyncPaginator", "SyncCursorPage"]
 
 ModelT = TypeVar("ModelT")
 
@@ -129,3 +137,25 @@ class AsyncCursorPage(_BasePage[ModelT]):
             if not page.has_next_page() or page._fetch_next is None:
                 return
             page = await page.get_next_page()
+
+
+class AsyncPaginator(Generic[ModelT]):
+    """An awaitable, async-iterable handle to a paginated list endpoint.
+
+    The first request is made lazily. ``await client.x.list()`` returns the
+    first :class:`AsyncCursorPage`; ``async for item in client.x.list()``
+    iterates over every item across all pages.
+    """
+
+    def __init__(
+        self, fetch: Callable[[str | None], Awaitable[AsyncCursorPage[ModelT]]]
+    ) -> None:
+        self._fetch = fetch
+
+    def __await__(self) -> Generator[Any, None, AsyncCursorPage[ModelT]]:
+        return self._fetch(None).__await__()
+
+    async def __aiter__(self) -> AsyncIterator[ModelT]:
+        page = await self._fetch(None)
+        async for item in page:
+            yield item
