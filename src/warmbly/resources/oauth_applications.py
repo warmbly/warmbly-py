@@ -6,6 +6,8 @@ Maps to the ``/v1/oauth/applications`` route group. The plaintext
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from .._models import BaseModel
 from .._pagination import AsyncCursorPage, SyncCursorPage
 from .._resource import AsyncAPIResource, SyncAPIResource
@@ -13,11 +15,11 @@ from .._types import NOT_GIVEN, NotGivenOr, RequestOptions
 from .._utils import drop_not_given
 
 __all__ = [
+    "AsyncOAuthApplications",
     "OAuthApplication",
+    "OAuthApplications",
     "OAuthClientSecret",
     "WebhookSecret",
-    "OAuthApplications",
-    "AsyncOAuthApplications",
 ]
 
 
@@ -33,10 +35,10 @@ class OAuthApplication(BaseModel):
     website_url: str | None = None
     client_id: str | None = None
     client_secret: str | None = None  # present only on create / rotate
-    redirect_uris: list[str] = []
-    allowed_webhook_domains: list[str] = []
+    redirect_uris: Sequence[str] = []
+    allowed_webhook_domains: Sequence[str] = []
     webhook_url: str | None = None
-    webhook_events: list[str] = []
+    webhook_events: Sequence[str] = []
     scopes: int = 0
     status: str | None = None
     created_at: str | None = None
@@ -63,13 +65,13 @@ class OAuthApplications(SyncAPIResource):
         *,
         name: str,
         scopes: int,
-        redirect_uris: list[str],
+        redirect_uris: Sequence[str],
         description: NotGivenOr[str] = NOT_GIVEN,
         logo_url: NotGivenOr[str] = NOT_GIVEN,
         website_url: NotGivenOr[str] = NOT_GIVEN,
-        allowed_webhook_domains: NotGivenOr[list[str]] = NOT_GIVEN,
+        allowed_webhook_domains: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         webhook_url: NotGivenOr[str] = NOT_GIVEN,
-        webhook_events: NotGivenOr[list[str]] = NOT_GIVEN,
+        webhook_events: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> OAuthApplication:
         """Register an OAuth2 application. ``client_secret`` is on the result."""
@@ -123,10 +125,10 @@ class OAuthApplications(SyncAPIResource):
         description: NotGivenOr[str] = NOT_GIVEN,
         logo_url: NotGivenOr[str] = NOT_GIVEN,
         website_url: NotGivenOr[str] = NOT_GIVEN,
-        redirect_uris: NotGivenOr[list[str]] = NOT_GIVEN,
-        allowed_webhook_domains: NotGivenOr[list[str]] = NOT_GIVEN,
+        redirect_uris: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        allowed_webhook_domains: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         webhook_url: NotGivenOr[str] = NOT_GIVEN,
-        webhook_events: NotGivenOr[list[str]] = NOT_GIVEN,
+        webhook_events: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         scopes: NotGivenOr[int] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> OAuthApplication:
@@ -198,13 +200,13 @@ class AsyncOAuthApplications(AsyncAPIResource):
         *,
         name: str,
         scopes: int,
-        redirect_uris: list[str],
+        redirect_uris: Sequence[str],
         description: NotGivenOr[str] = NOT_GIVEN,
         logo_url: NotGivenOr[str] = NOT_GIVEN,
         website_url: NotGivenOr[str] = NOT_GIVEN,
-        allowed_webhook_domains: NotGivenOr[list[str]] = NOT_GIVEN,
+        allowed_webhook_domains: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         webhook_url: NotGivenOr[str] = NOT_GIVEN,
-        webhook_events: NotGivenOr[list[str]] = NOT_GIVEN,
+        webhook_events: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> OAuthApplication:
         """Register an OAuth2 application. ``client_secret`` is on the result."""
@@ -258,10 +260,10 @@ class AsyncOAuthApplications(AsyncAPIResource):
         description: NotGivenOr[str] = NOT_GIVEN,
         logo_url: NotGivenOr[str] = NOT_GIVEN,
         website_url: NotGivenOr[str] = NOT_GIVEN,
-        redirect_uris: NotGivenOr[list[str]] = NOT_GIVEN,
-        allowed_webhook_domains: NotGivenOr[list[str]] = NOT_GIVEN,
+        redirect_uris: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        allowed_webhook_domains: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         webhook_url: NotGivenOr[str] = NOT_GIVEN,
-        webhook_events: NotGivenOr[list[str]] = NOT_GIVEN,
+        webhook_events: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         scopes: NotGivenOr[int] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> OAuthApplication:

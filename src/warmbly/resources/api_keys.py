@@ -7,13 +7,14 @@ retrieved again.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 
 from .._models import BaseModel
+from .._pagination import AsyncCursorPage, SyncCursorPage
 from .._resource import AsyncAPIResource, SyncAPIResource
 from .._types import NOT_GIVEN, NotGivenOr, RequestOptions
 from .._utils import drop_not_given
-from .._pagination import AsyncCursorPage, SyncCursorPage
 
 __all__ = [
     "ApiKey",
@@ -37,8 +38,8 @@ class ApiKey(BaseModel):
     key_suffix: str | None = None
     secret: str | None = None
     permissions: int = 0
-    allowed_ips: list[str] = []
-    allowed_email_accounts: list[str] = []
+    allowed_ips: Sequence[str] = []
+    allowed_email_accounts: Sequence[str] = []
     rate_limit_per_minute: int | None = None
     status: str | None = None
     last_used_at: str | None = None
@@ -66,7 +67,7 @@ class PermissionInfo(BaseModel):
 class ApiKeyPermissions(BaseModel):
     """The catalog of available permissions and convenience presets."""
 
-    permissions: list[PermissionInfo] = []
+    permissions: Sequence[PermissionInfo] = []
     presets: dict[str, int] = {}
 
 
@@ -85,8 +86,8 @@ class ApiKeyUsageAnalytics(BaseModel):
     from_: str | None = None
     to: str | None = None
     interval: str | None = None
-    buckets: list[dict[str, Any]] = []
-    endpoints: list[dict[str, Any]] = []
+    buckets: Sequence[dict[str, Any]] = []
+    endpoints: Sequence[dict[str, Any]] = []
     total: int | None = None
     errors: int | None = None
 
@@ -112,8 +113,8 @@ class ApiKeys(SyncAPIResource):
         name: str,
         permissions: int,
         description: NotGivenOr[str] = NOT_GIVEN,
-        allowed_ips: NotGivenOr[list[str]] = NOT_GIVEN,
-        allowed_email_accounts: NotGivenOr[list[str]] = NOT_GIVEN,
+        allowed_ips: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        allowed_email_accounts: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         rate_limit_per_minute: NotGivenOr[int] = NOT_GIVEN,
         expires_at: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
@@ -158,7 +159,9 @@ class ApiKeys(SyncAPIResource):
             options=options,
         )
 
-    def retrieve(self, api_key_id: str, *, options: RequestOptions | None = None) -> ApiKey:
+    def retrieve(
+        self, api_key_id: str, *, options: RequestOptions | None = None
+    ) -> ApiKey:
         """Retrieve a single API key by id."""
         return self._get(f"/api-keys/{api_key_id}", cast_to=ApiKey, options=options)
 
@@ -169,8 +172,8 @@ class ApiKeys(SyncAPIResource):
         name: NotGivenOr[str] = NOT_GIVEN,
         description: NotGivenOr[str] = NOT_GIVEN,
         permissions: NotGivenOr[int] = NOT_GIVEN,
-        allowed_ips: NotGivenOr[list[str]] = NOT_GIVEN,
-        allowed_email_accounts: NotGivenOr[list[str]] = NOT_GIVEN,
+        allowed_ips: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        allowed_email_accounts: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         rate_limit_per_minute: NotGivenOr[int] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> ApiKey:
@@ -205,7 +208,9 @@ class ApiKeys(SyncAPIResource):
             options=options,
         )
 
-    def permissions(self, *, options: RequestOptions | None = None) -> ApiKeyPermissions:
+    def permissions(
+        self, *, options: RequestOptions | None = None
+    ) -> ApiKeyPermissions:
         """List the available permissions and presets."""
         return self._get(
             "/api-keys/permissions", cast_to=ApiKeyPermissions, options=options
@@ -272,8 +277,8 @@ class AsyncApiKeys(AsyncAPIResource):
         name: str,
         permissions: int,
         description: NotGivenOr[str] = NOT_GIVEN,
-        allowed_ips: NotGivenOr[list[str]] = NOT_GIVEN,
-        allowed_email_accounts: NotGivenOr[list[str]] = NOT_GIVEN,
+        allowed_ips: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        allowed_email_accounts: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         rate_limit_per_minute: NotGivenOr[int] = NOT_GIVEN,
         expires_at: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
@@ -322,8 +327,8 @@ class AsyncApiKeys(AsyncAPIResource):
         name: NotGivenOr[str] = NOT_GIVEN,
         description: NotGivenOr[str] = NOT_GIVEN,
         permissions: NotGivenOr[int] = NOT_GIVEN,
-        allowed_ips: NotGivenOr[list[str]] = NOT_GIVEN,
-        allowed_email_accounts: NotGivenOr[list[str]] = NOT_GIVEN,
+        allowed_ips: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        allowed_email_accounts: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         rate_limit_per_minute: NotGivenOr[int] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> ApiKey:
