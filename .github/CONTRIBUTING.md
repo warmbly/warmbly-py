@@ -7,7 +7,7 @@ everything you need to get a change merged.
 
 This project is governed by our [Code of Conduct](./CODE_OF_CONDUCT.md). By
 participating you are expected to uphold it. Please report unacceptable
-behavior to **conduct@warmbly.com**.
+behavior to **team@warmbly.com**.
 
 ## Development setup
 

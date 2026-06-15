@@ -30,5 +30,5 @@ any other official channel — and whenever someone is representing the project.
 ## Reporting
 
 If something doesn't feel right, please reach out privately to the maintainers
-at **conduct@warmbly.com**. Reports are handled confidentially and taken
+at **team@warmbly.com**. Reports are handled confidentially and taken
 seriously.

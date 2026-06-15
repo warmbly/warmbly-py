@@ -22,7 +22,7 @@ Report privately through GitHub's
 [private vulnerability reporting](https://github.com/warmbly/warmbly-py/security/advisories/new)
 (the "Report a vulnerability" button under the repository's *Security* tab).
 
-If you cannot use that channel, email **security@warmbly.com**.
+If you cannot use that channel, email **team@warmbly.com**.
 
 Please include:
 
