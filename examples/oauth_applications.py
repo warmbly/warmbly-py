@@ -21,7 +21,9 @@ def main() -> None:
         description="Lets Acme launch campaigns on a user's behalf.",
     )
     print("client_id:", app.client_id)
-    print("client_secret (shown once):", app.client_secret)
+    # The client secret is shown only once — store it securely, don't log it.
+    client_secret = app.client_secret  # save to your secrets manager now
+    print("client_secret received:", "yes" if client_secret else "no")
 
     # List the org's registered apps.
     for existing in client.oauth_applications.list():
@@ -38,7 +40,8 @@ def main() -> None:
 
     # Rotate the client secret (invalidates the old one).
     rotated = client.oauth_applications.rotate_secret(app.id)
-    print("new client_secret:", rotated.client_secret)
+    # Persist the rotated secret securely; never log its value.
+    print("client_secret rotated:", "yes" if rotated.client_secret else "no")
 
     # Fetch the webhook signing secret for app-scoped webhooks.
     wh = client.oauth_applications.webhook_secret(app.id)

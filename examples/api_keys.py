@@ -20,7 +20,10 @@ def main() -> None:
         description="Read-only key for the analytics dashboard",
     )
     print("created:", created.id)
-    print("SECRET (shown once):", created.secret)
+    # The plaintext secret is returned only once. Store it in your secrets
+    # manager now — never log or print it.
+    secret = created.secret  # e.g. write to Vault / AWS Secrets Manager / env
+    print("secret received:", "yes" if secret else "no")
 
     # List keys (auto-paginates).
     for key in client.api_keys.list():

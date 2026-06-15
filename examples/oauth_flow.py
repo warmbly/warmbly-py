@@ -47,8 +47,8 @@ def main() -> None:
         state=returned_state,
         expected_state=state,
     )
-    print("access token:", token.access_token)
-    print("expires in:", token.expires_in, "seconds")
+    # Use token.access_token to authenticate; don't log token values.
+    print("got an access token; expires in", token.expires_in, "seconds")
 
     # 4. Use it like any bearer credential.
     client = Warmbly(api_key=token.access_token)
@@ -58,7 +58,7 @@ def main() -> None:
 
     # 5. Refresh later (refresh tokens rotate — persist the new one).
     refreshed = oauth.refresh_token(token.refresh_token)
-    print("refreshed access token:", refreshed.access_token)
+    print("refreshed; new token acquired")
 
     # 6. Revoke when finished.
     oauth.revoke(refreshed.access_token)
