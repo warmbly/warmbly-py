@@ -1,45 +1,34 @@
 # Code of Conduct
 
-## Our commitment
+## Our goal
 
-We want participation in the warmbly-py community to be a welcoming, harassment-free
-experience for everyone, regardless of age, body size, visible or invisible
-disability, ethnicity, sex characteristics, gender identity and expression, level
-of experience, education, socio-economic status, nationality, personal appearance,
-race, religion, or sexual identity and orientation.
+We want warmbly-py to be a friendly, welcoming, and productive project for
+everyone who uses or contributes to it. This document sets out the basic
+expectations for how we work together.
 
-## Expected behavior
+## Be respectful
 
-- Be respectful, patient, and considerate.
-- Welcome newcomers and assume good intent.
-- Give and accept constructive feedback gracefully.
-- Focus on what is best for the community and the project.
-- Show empathy toward other community members.
+- Treat others with kindness, patience, and respect.
+- Assume good intent, and give constructive, helpful feedback.
+- Welcome newcomers and help them get started.
+- Keep discussions focused on the project and on ideas, not on people.
+- Respect differing viewpoints and experiences.
 
-## Unacceptable behavior
+## Not okay
 
-- Harassment, intimidation, or discrimination in any form.
-- Sexualized language or imagery, or unwelcome sexual attention.
-- Trolling, insulting or derogatory comments, and personal or political attacks.
-- Publishing others' private information without explicit permission.
-- Sustained disruption of discussions, issues, or pull requests.
+Behavior that makes the community unwelcoming or unsafe is not acceptable. That
+includes harassment of any kind, personal attacks, deliberate disruption, and
+sharing someone's private information without their permission. Maintainers may
+remove, edit, or reject contributions and may restrict participation when
+needed to keep the project healthy.
 
 ## Scope
 
-This Code of Conduct applies in all project spaces — the repository, issues, pull
-requests, discussions, and any other official channel — and when an individual is
-representing the project in public spaces.
+This applies to all project spaces — issues, pull requests, discussions, and
+any other official channel — and whenever someone is representing the project.
 
 ## Reporting
 
-If you experience or witness unacceptable behavior, please report it privately to
-the maintainers at **conduct@warmbly.com**. All reports will be reviewed and
-investigated promptly and confidentially. We are committed to protecting the
-privacy and safety of anyone who reports an incident.
-
-## Enforcement
-
-Maintainers are responsible for clarifying and enforcing this Code of Conduct and
-may take any action they deem appropriate, including warnings, temporary bans, or
-permanent removal from the community, for behavior they consider inappropriate,
-threatening, offensive, or harmful.
+If something doesn't feel right, please reach out privately to the maintainers
+at **conduct@warmbly.com**. Reports are handled confidentially and taken
+seriously.
