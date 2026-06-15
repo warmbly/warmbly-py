@@ -1,0 +1,10 @@
+# Default owners for everything in the repo.
+*                       @warmbly/maintainers
+
+# Release-critical paths.
+/.github/workflows/     @warmbly/release-team
+/pyproject.toml         @warmbly/release-team
+
+# Security-sensitive subsystems.
+/src/warmbly/oauth/     @warmbly/maintainers
+/src/warmbly/_base_client.py  @warmbly/maintainers
