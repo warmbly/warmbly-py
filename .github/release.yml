@@ -1,0 +1,14 @@
+changelog:
+  categories:
+    - title: Added
+      labels: ["feature", "enhancement"]
+    - title: Fixed
+      labels: ["bug", "bugfix"]
+    - title: Changed
+      labels: ["change", "refactor"]
+    - title: Documentation
+      labels: ["docs", "documentation"]
+    - title: Other Changes
+      labels: ["*"]
+  exclude:
+    labels: ["skip-changelog", "dependencies"]
