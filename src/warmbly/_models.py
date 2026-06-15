@@ -72,7 +72,7 @@ def construct_type(
         for arg in get_args(cast_to):
             try:
                 return construct_type(arg, data, request_id=request_id)  # type: ignore[no-any-return]
-            except Exception:  # noqa: BLE001 - lenient on purpose
+            except Exception:
                 continue
         return data  # type: ignore[return-value]
 
@@ -89,12 +89,16 @@ def construct_type(
             model = cast_to.model_validate(data)
         except pydantic.ValidationError:
             # Forward-compat: never crash on an unexpected payload shape.
-            model = cast_to.model_construct(**data) if isinstance(data, dict) else cast_to.model_construct()
+            model = (
+                cast_to.model_construct(**data)
+                if isinstance(data, dict)
+                else cast_to.model_construct()
+            )
         model._request_id = request_id
-        return model  # type: ignore[return-value]
+        return model
 
     if isinstance(cast_to, type) and issubclass(cast_to, pydantic.BaseModel):
-        return cast_to.model_validate(data)  # type: ignore[return-value]
+        return cast_to.model_validate(data)
 
     # Primitives / dict / Any: pass through unchanged.
     return data  # type: ignore[return-value]

@@ -15,9 +15,10 @@ import email.utils
 import random
 import time
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
 from importlib.metadata import PackageNotFoundError, version
-from typing import TYPE_CHECKING, Any, Mapping, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import httpx
 
@@ -28,7 +29,7 @@ from ._exceptions import (
 )
 from ._models import construct_type
 from ._pagination import AsyncCursorPage, SyncCursorPage
-from ._types import NOT_GIVEN, Omit, RequestOptions, Timeout
+from ._types import NOT_GIVEN, NotGiven, Omit, RequestOptions, Timeout
 from ._utils import drop_not_given, logger
 from ._utils._logs import redact, redact_headers
 
@@ -74,11 +75,13 @@ def _parse_retry_after(
     try:
         return float(raw)
     except ValueError:
+        pass
+    try:
         parsed = email.utils.parsedate_to_datetime(raw)
-        if parsed is None:  # pragma: no cover - malformed header
-            return None
-        delta = parsed.timestamp() - time.time()
-        return max(delta, 0.0)
+    except (ValueError, TypeError):  # pragma: no cover - malformed header
+        return None
+    delta = parsed.timestamp() - time.time()
+    return max(delta, 0.0)
 
 
 @dataclass
@@ -188,7 +191,7 @@ class BaseClient:
             drop_not_given(json_body) if isinstance(json_body, Mapping) else json_body
         )
         timeout = options.get("timeout", NOT_GIVEN)
-        resolved_timeout = self._timeout if isinstance(timeout, type(NOT_GIVEN)) else timeout
+        resolved_timeout = self._timeout if isinstance(timeout, NotGiven) else timeout
         prepared = _PreparedRequest(
             method=method,
             url=self._build_url(path),
@@ -224,7 +227,7 @@ class BaseClient:
             if server is not None and 0 < server <= MAX_SERVER_RETRY_AFTER:
                 return server
         base = min(INITIAL_RETRY_DELAY * 2.0**attempt, MAX_RETRY_DELAY)
-        return base * (1 - 0.25 * random.random())  # 0.75x–1.0x jitter
+        return base * (1 - 0.25 * random.random())  # 0.75x-1.0x jitter
 
     # -- response handling --------------------------------------------------
     def _parse_response(self, response: httpx.Response, cast_to: type[_T]) -> _T:
@@ -279,7 +282,7 @@ class BaseClient:
 def _safe_json(response: httpx.Response) -> Any:
     try:
         return response.json()
-    except Exception:  # noqa: BLE001 - non-JSON body
+    except Exception:
         return response.text or None
 
 
@@ -324,7 +327,9 @@ class SyncAPIClient(BaseClient):
             custom_headers=custom_headers,
         )
         self._http = http_client or httpx.Client(
-            timeout=self._timeout, limits=DEFAULT_CONNECTION_LIMITS, follow_redirects=True
+            timeout=self._timeout,
+            limits=DEFAULT_CONNECTION_LIMITS,
+            follow_redirects=True,
         )
 
     def close(self) -> None:
@@ -463,7 +468,9 @@ class AsyncAPIClient(BaseClient):
             custom_headers=custom_headers,
         )
         self._http = http_client or httpx.AsyncClient(
-            timeout=self._timeout, limits=DEFAULT_CONNECTION_LIMITS, follow_redirects=True
+            timeout=self._timeout,
+            limits=DEFAULT_CONNECTION_LIMITS,
+            follow_redirects=True,
         )
 
     async def close(self) -> None:
