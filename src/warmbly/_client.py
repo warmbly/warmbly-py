@@ -2,7 +2,7 @@
 
 A single client object owns all configuration and a shared connection pool, and
 exposes each API resource group as a lazily-instantiated attribute
-(``client.api_keys``, ``client.oauth_applications``, ...). Swap ``Warmbly`` for
+(``client.api_keys``, ``client.campaigns``, ...). Swap ``Warmbly`` for
 ``AsyncWarmbly`` and ``await`` the methods for the async variant.
 """
 
@@ -22,13 +22,37 @@ from ._base_client import (
 from ._exceptions import WarmblyError
 from ._types import Timeout
 from .resources import (
+    Analytics,
     ApiKeys,
+    AsyncAnalytics,
     AsyncApiKeys,
+    AsyncCampaigns,
+    AsyncContacts,
+    AsyncCrm,
+    AsyncEmails,
+    AsyncIntegrations,
     AsyncOAuthApplications,
+    AsyncPlans,
+    AsyncTeams,
+    AsyncTemplates,
+    AsyncTimezones,
+    AsyncUnibox,
+    AsyncWebhooks,
+    Campaigns,
+    Contacts,
+    Crm,
+    Emails,
+    Integrations,
     OAuthApplications,
+    Plans,
+    Teams,
+    Templates,
+    Timezones,
+    Unibox,
+    Webhooks,
 )
 
-__all__ = ["Warmbly", "AsyncWarmbly", "PRODUCTION_BASE_URL"]
+__all__ = ["PRODUCTION_BASE_URL", "AsyncWarmbly", "Warmbly"]
 
 PRODUCTION_BASE_URL = "https://api.warmbly.com/v1"
 
@@ -92,6 +116,54 @@ class Warmbly(SyncAPIClient):
     def oauth_applications(self) -> OAuthApplications:
         return OAuthApplications(self)
 
+    @cached_property
+    def campaigns(self) -> Campaigns:
+        return Campaigns(self)
+
+    @cached_property
+    def emails(self) -> Emails:
+        return Emails(self)
+
+    @cached_property
+    def contacts(self) -> Contacts:
+        return Contacts(self)
+
+    @cached_property
+    def webhooks(self) -> Webhooks:
+        return Webhooks(self)
+
+    @cached_property
+    def analytics(self) -> Analytics:
+        return Analytics(self)
+
+    @cached_property
+    def integrations(self) -> Integrations:
+        return Integrations(self)
+
+    @cached_property
+    def templates(self) -> Templates:
+        return Templates(self)
+
+    @cached_property
+    def crm(self) -> Crm:
+        return Crm(self)
+
+    @cached_property
+    def teams(self) -> Teams:
+        return Teams(self)
+
+    @cached_property
+    def plans(self) -> Plans:
+        return Plans(self)
+
+    @cached_property
+    def timezones(self) -> Timezones:
+        return Timezones(self)
+
+    @cached_property
+    def unibox(self) -> Unibox:
+        return Unibox(self)
+
 
 class AsyncWarmbly(AsyncAPIClient):
     """Asynchronous Warmbly API client.
@@ -130,3 +202,51 @@ class AsyncWarmbly(AsyncAPIClient):
     @cached_property
     def oauth_applications(self) -> AsyncOAuthApplications:
         return AsyncOAuthApplications(self)
+
+    @cached_property
+    def campaigns(self) -> AsyncCampaigns:
+        return AsyncCampaigns(self)
+
+    @cached_property
+    def emails(self) -> AsyncEmails:
+        return AsyncEmails(self)
+
+    @cached_property
+    def contacts(self) -> AsyncContacts:
+        return AsyncContacts(self)
+
+    @cached_property
+    def webhooks(self) -> AsyncWebhooks:
+        return AsyncWebhooks(self)
+
+    @cached_property
+    def analytics(self) -> AsyncAnalytics:
+        return AsyncAnalytics(self)
+
+    @cached_property
+    def integrations(self) -> AsyncIntegrations:
+        return AsyncIntegrations(self)
+
+    @cached_property
+    def templates(self) -> AsyncTemplates:
+        return AsyncTemplates(self)
+
+    @cached_property
+    def crm(self) -> AsyncCrm:
+        return AsyncCrm(self)
+
+    @cached_property
+    def teams(self) -> AsyncTeams:
+        return AsyncTeams(self)
+
+    @cached_property
+    def plans(self) -> AsyncPlans:
+        return AsyncPlans(self)
+
+    @cached_property
+    def timezones(self) -> AsyncTimezones:
+        return AsyncTimezones(self)
+
+    @cached_property
+    def unibox(self) -> AsyncUnibox:
+        return AsyncUnibox(self)
