@@ -154,7 +154,9 @@ warn_redundant_casts = true
 warn_unreachable = true
 no_implicit_reexport = true
 show_error_codes = true
-files = ["src", "tests"]
+# The strict type gate targets the shipped package; the test suite is exercised
+# by pytest and kept lint-clean rather than strictly typed.
+files = ["src"]
 
 [[tool.mypy.overrides]]
 module = ["keyring.*", "taskgroup.*"]

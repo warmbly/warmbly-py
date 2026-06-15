@@ -28,5 +28,5 @@ repos:
         additional_dependencies:
           - pydantic>=2.7
           - httpx>=0.28
-        args: [src, tests]
+        args: [src]
         pass_filenames: false

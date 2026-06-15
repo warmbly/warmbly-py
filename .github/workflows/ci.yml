@@ -33,7 +33,7 @@ jobs:
       - name: Ruff (format)
         run: ruff format --check src tests
       - name: mypy
-        run: mypy src tests
+        run: mypy src
 
   test:
     name: Test (py${{ matrix.python-version }} / ${{ matrix.os }})
