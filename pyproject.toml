@@ -1,0 +1,239 @@
+[build-system]
+requires = ["hatchling>=1.27", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "warmbly"
+dynamic = ["version"]
+description = "Official Python SDK for the Warmbly API (REST, OAuth2, and realtime gateway)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Warmbly", email = "support@warmbly.com" }]
+maintainers = [{ name = "Warmbly", email = "support@warmbly.com" }]
+keywords = [
+  "warmbly",
+  "sdk",
+  "api",
+  "client",
+  "email",
+  "deliverability",
+  "outreach",
+  "oauth2",
+  "websocket",
+  "realtime",
+  "asyncio",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: Communications :: Email",
+  "Typing :: Typed",
+]
+dependencies = [
+  "httpx>=0.28,<0.29",
+  "pydantic>=2.7,<3",
+  "websockets>=13",
+  "typing-extensions>=4.10; python_version < '3.12'",
+  "exceptiongroup>=1.2; python_version < '3.11'",
+  "taskgroup>=0.2; python_version < '3.11'",
+]
+
+[project.optional-dependencies]
+# Interactive OAuth2 flows + secure on-disk token storage.
+oauth = ["authlib>=1.3", "keyring>=24"]
+# Optional convenience CLI.
+cli = ["rich>=13", "click>=8.1"]
+# Test dependencies (used by nox/CI).
+test = [
+  "pytest>=8",
+  "pytest-cov>=5",
+  "anyio>=4",
+  "respx>=0.21",
+  "hypothesis>=6",
+  "trustme>=1.1",
+]
+# Everything a contributor needs locally.
+dev = [
+  "warmbly[oauth,cli,test]",
+  "ruff>=0.6",
+  "mypy>=1.11",
+  "pre-commit>=3.7",
+  "nox>=2024.4.15",
+  "towncrier>=24",
+  "build>=1.2",
+  "twine>=5",
+]
+docs = [
+  "mkdocs>=1.6",
+  "mkdocs-material>=9.5",
+  "mkdocstrings[python]>=0.26",
+]
+
+[project.urls]
+Homepage = "https://github.com/warmbly/warmbly-py"
+Documentation = "https://warmbly-py.readthedocs.io"
+Source = "https://github.com/warmbly/warmbly-py"
+Issues = "https://github.com/warmbly/warmbly-py/issues"
+Changelog = "https://github.com/warmbly/warmbly-py/blob/main/CHANGELOG.md"
+
+# ---------------------------------------------------------------------------
+# Build backend / versioning
+# ---------------------------------------------------------------------------
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/warmbly/_version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/warmbly"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/warmbly", "README.md", "LICENSE", "CHANGELOG.md"]
+
+# ---------------------------------------------------------------------------
+# Ruff (lint + format) — replaces black + isort + flake8
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+  "E",    # pycodestyle errors
+  "W",    # pycodestyle warnings
+  "F",    # pyflakes
+  "I",    # isort
+  "UP",   # pyupgrade
+  "B",    # flake8-bugbear
+  "C4",   # flake8-comprehensions
+  "SIM",  # flake8-simplify
+  "RET",  # flake8-return
+  "PTH",  # flake8-use-pathlib
+  "TCH",  # flake8-type-checking
+  "ICN",  # flake8-import-conventions
+  "ASYNC",# flake8-async
+  "RUF",  # ruff-specific rules
+]
+ignore = [
+  "E501",  # line length is handled by the formatter
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "B011"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["warmbly"]
+
+[tool.ruff.format]
+quote-style = "double"
+docstring-code-format = true
+
+# ---------------------------------------------------------------------------
+# mypy (strict type gate)
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unreachable = true
+no_implicit_reexport = true
+show_error_codes = true
+files = ["src", "tests"]
+
+[[tool.mypy.overrides]]
+module = ["authlib.*", "keyring.*", "taskgroup.*"]
+ignore_missing_imports = true
+
+# ---------------------------------------------------------------------------
+# pytest
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = "-ra --strict-markers --strict-config"
+xfail_strict = true
+filterwarnings = ["error"]
+markers = [
+  "anyio: mark a test as an anyio (async) test",
+]
+
+# ---------------------------------------------------------------------------
+# coverage
+# ---------------------------------------------------------------------------
+[tool.coverage.run]
+branch = true
+source = ["warmbly"]
+parallel = true
+omit = ["src/warmbly/_version.py"]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+skip_covered = true
+exclude_also = [
+  "if TYPE_CHECKING:",
+  "raise NotImplementedError",
+  "@(abc\\.)?abstractmethod",
+  "if __name__ == .__main__.:",
+  "\\.\\.\\.",
+]
+
+# ---------------------------------------------------------------------------
+# towncrier (changelog assembled at release time)
+# ---------------------------------------------------------------------------
+[tool.towncrier]
+package = "warmbly"
+package_dir = "src"
+directory = "changelog"
+filename = "CHANGELOG.md"
+title_format = "## [{version}] - {project_date}"
+issue_format = "[#{issue}](https://github.com/warmbly/warmbly-py/issues/{issue})"
+start_string = "<!-- towncrier release notes start -->\n"
+
+[[tool.towncrier.type]]
+directory = "feature"
+name = "Added"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "change"
+name = "Changed"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "deprecation"
+name = "Deprecated"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "removal"
+name = "Removed"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "bugfix"
+name = "Fixed"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "security"
+name = "Security"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "doc"
+name = "Documentation"
+showcontent = true
