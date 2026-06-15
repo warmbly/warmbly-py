@@ -8,7 +8,7 @@ one-off sends can reference.
 from __future__ import annotations
 
 from .._models import BaseModel
-from .._pagination import AsyncCursorPage, SyncCursorPage
+from .._pagination import AsyncPaginator, SyncCursorPage
 from .._resource import AsyncAPIResource, SyncAPIResource
 from .._types import NOT_GIVEN, NotGivenOr, RequestOptions
 from .._utils import drop_not_given
@@ -133,7 +133,7 @@ class AsyncTemplates(AsyncAPIResource):
         limit: NotGivenOr[int] = NOT_GIVEN,
         cursor: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
-    ) -> AsyncCursorPage[Template]:
+    ) -> AsyncPaginator[Template]:
         """List templates (auto-paginating)."""
         return self._get_api_list(
             "/templates",

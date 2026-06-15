@@ -19,7 +19,7 @@ from typing import Any
 
 from .._exceptions import WarmblyError
 from .._models import BaseModel
-from .._pagination import AsyncCursorPage, SyncCursorPage
+from .._pagination import AsyncPaginator, SyncCursorPage
 from .._resource import AsyncAPIResource, SyncAPIResource
 from .._types import NOT_GIVEN, NotGivenOr, RequestOptions
 from .._utils import drop_not_given
@@ -349,7 +349,7 @@ class AsyncWebhooks(AsyncAPIResource):
         limit: NotGivenOr[int] = NOT_GIVEN,
         cursor: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
-    ) -> AsyncCursorPage[WebhookEndpoint]:
+    ) -> AsyncPaginator[WebhookEndpoint]:
         """List webhook endpoints (auto-paginating)."""
         return self._get_api_list(
             "/webhooks",
@@ -360,7 +360,7 @@ class AsyncWebhooks(AsyncAPIResource):
 
     def event_types(
         self, *, options: RequestOptions | None = None
-    ) -> AsyncCursorPage[WebhookEventType]:
+    ) -> AsyncPaginator[WebhookEventType]:
         """List the event types endpoints may subscribe to (auto-paginating)."""
         return self._get_api_list(
             "/webhooks/event-types",
@@ -374,7 +374,7 @@ class AsyncWebhooks(AsyncAPIResource):
         limit: NotGivenOr[int] = NOT_GIVEN,
         cursor: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
-    ) -> AsyncCursorPage[WebhookDelivery]:
+    ) -> AsyncPaginator[WebhookDelivery]:
         """List delivery attempts across all endpoints (auto-paginating)."""
         return self._get_api_list(
             "/webhooks/deliveries",
@@ -399,7 +399,7 @@ class AsyncWebhooks(AsyncAPIResource):
         limit: NotGivenOr[int] = NOT_GIVEN,
         cursor: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
-    ) -> AsyncCursorPage[WebhookThrottleDrop]:
+    ) -> AsyncPaginator[WebhookThrottleDrop]:
         """List events dropped due to endpoint throttling (auto-paginating)."""
         return self._get_api_list(
             "/webhooks/throttle-drops",
@@ -469,7 +469,7 @@ class AsyncWebhooks(AsyncAPIResource):
         limit: NotGivenOr[int] = NOT_GIVEN,
         cursor: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
-    ) -> AsyncCursorPage[WebhookDelivery]:
+    ) -> AsyncPaginator[WebhookDelivery]:
         """List delivery attempts for a single endpoint (auto-paginating)."""
         return self._get_api_list(
             f"/webhooks/{webhook_id}/deliveries",

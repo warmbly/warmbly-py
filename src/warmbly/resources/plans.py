@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 from .._models import BaseModel
-from .._pagination import AsyncCursorPage, SyncCursorPage
+from .._pagination import AsyncPaginator, SyncCursorPage
 from .._resource import AsyncAPIResource, SyncAPIResource
 from .._types import NOT_GIVEN, NotGivenOr, RequestOptions
 
@@ -86,7 +86,7 @@ class AsyncPlans(AsyncAPIResource):
         limit: NotGivenOr[int] = NOT_GIVEN,
         cursor: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
-    ) -> AsyncCursorPage[Plan]:
+    ) -> AsyncPaginator[Plan]:
         """List the available billing plans (auto-paginating).
 
         Args:

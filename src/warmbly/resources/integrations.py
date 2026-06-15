@@ -17,7 +17,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from .._models import BaseModel
-from .._pagination import AsyncCursorPage, SyncCursorPage
+from .._pagination import AsyncPaginator, SyncCursorPage
 from .._resource import AsyncAPIResource, SyncAPIResource
 from .._types import NOT_GIVEN, NotGivenOr, RequestOptions
 from .._utils import drop_not_given
@@ -474,7 +474,7 @@ class AsyncIntegrations(AsyncAPIResource):
 
     def catalog(
         self, *, options: RequestOptions | None = None
-    ) -> AsyncCursorPage[IntegrationCatalogEntry]:
+    ) -> AsyncPaginator[IntegrationCatalogEntry]:
         """List providers available to connect (auto-paginating)."""
         return self._get_api_list(
             "/integrations/catalog",
@@ -490,7 +490,7 @@ class AsyncIntegrations(AsyncAPIResource):
         provider: NotGivenOr[str] = NOT_GIVEN,
         status: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
-    ) -> AsyncCursorPage[IntegrationConnection]:
+    ) -> AsyncPaginator[IntegrationConnection]:
         """List configured connections (auto-paginating)."""
         return self._get_api_list(
             "/integrations/connections",
@@ -584,7 +584,7 @@ class AsyncIntegrations(AsyncAPIResource):
         limit: NotGivenOr[int] = NOT_GIVEN,
         cursor: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
-    ) -> AsyncCursorPage[IntegrationEvent]:
+    ) -> AsyncPaginator[IntegrationEvent]:
         """List a connection's event subscriptions (auto-paginating)."""
         return self._get_api_list(
             f"/integrations/connections/{connection_id}/events",
@@ -677,7 +677,7 @@ class AsyncIntegrations(AsyncAPIResource):
         cursor: NotGivenOr[str] = NOT_GIVEN,
         status: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
-    ) -> AsyncCursorPage[IntegrationRun]:
+    ) -> AsyncPaginator[IntegrationRun]:
         """List a connection's sync runs (auto-paginating)."""
         return self._get_api_list(
             f"/integrations/connections/{connection_id}/runs",
@@ -749,7 +749,7 @@ class AsyncIntegrations(AsyncAPIResource):
         from_: NotGivenOr[str] = NOT_GIVEN,
         to: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
-    ) -> AsyncCursorPage[IntegrationBooking]:
+    ) -> AsyncPaginator[IntegrationBooking]:
         """List booked meetings from calendar/scheduling integrations.
 
         Args:

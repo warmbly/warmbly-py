@@ -13,7 +13,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from .._models import BaseModel
-from .._pagination import AsyncCursorPage, SyncCursorPage
+from .._pagination import AsyncPaginator, SyncCursorPage
 from .._resource import AsyncAPIResource, SyncAPIResource
 from .._types import NOT_GIVEN, NotGivenOr, RequestOptions
 from .._utils import drop_not_given
@@ -243,7 +243,7 @@ class AsyncCrm(AsyncAPIResource):
         limit: NotGivenOr[int] = NOT_GIVEN,
         cursor: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
-    ) -> AsyncCursorPage[Deal]:
+    ) -> AsyncPaginator[Deal]:
         """List deals (auto-paginating)."""
         return self._get_api_list(
             "/crm/deals",
@@ -330,7 +330,7 @@ class AsyncCrm(AsyncAPIResource):
         limit: NotGivenOr[int] = NOT_GIVEN,
         cursor: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
-    ) -> AsyncCursorPage[Pipeline]:
+    ) -> AsyncPaginator[Pipeline]:
         """List pipelines (auto-paginating)."""
         return self._get_api_list(
             "/crm/pipelines",
@@ -345,7 +345,7 @@ class AsyncCrm(AsyncAPIResource):
         limit: NotGivenOr[int] = NOT_GIVEN,
         cursor: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
-    ) -> AsyncCursorPage[CrmTask]:
+    ) -> AsyncPaginator[CrmTask]:
         """List CRM tasks (auto-paginating)."""
         return self._get_api_list(
             "/crm/tasks",

@@ -13,7 +13,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from .._models import BaseModel
-from .._pagination import AsyncCursorPage, SyncCursorPage
+from .._pagination import AsyncPaginator, SyncCursorPage
 from .._resource import AsyncAPIResource, SyncAPIResource
 from .._types import NOT_GIVEN, NotGivenOr, RequestOptions
 from .._utils import drop_not_given
@@ -906,7 +906,7 @@ class AsyncContacts(AsyncAPIResource):
         limit: NotGivenOr[int] = NOT_GIVEN,
         cursor: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
-    ) -> AsyncCursorPage[ContactEmail]:
+    ) -> AsyncPaginator[ContactEmail]:
         """List emails exchanged with a contact (auto-paginating)."""
         return self._get_api_list(
             f"/contacts/{contact_id}/emails",
@@ -922,7 +922,7 @@ class AsyncContacts(AsyncAPIResource):
         limit: NotGivenOr[int] = NOT_GIVEN,
         cursor: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
-    ) -> AsyncCursorPage[ContactTimelineEntry]:
+    ) -> AsyncPaginator[ContactTimelineEntry]:
         """List a contact's timeline entries (auto-paginating)."""
         return self._get_api_list(
             f"/contacts/{contact_id}/timeline",
@@ -938,7 +938,7 @@ class AsyncContacts(AsyncAPIResource):
         limit: NotGivenOr[int] = NOT_GIVEN,
         cursor: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
-    ) -> AsyncCursorPage[ContactNote]:
+    ) -> AsyncPaginator[ContactNote]:
         """List a contact's notes (auto-paginating)."""
         return self._get_api_list(
             f"/contacts/{contact_id}/notes",
@@ -1012,7 +1012,7 @@ class AsyncContacts(AsyncAPIResource):
         limit: NotGivenOr[int] = NOT_GIVEN,
         cursor: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
-    ) -> AsyncCursorPage[ContactActivity]:
+    ) -> AsyncPaginator[ContactActivity]:
         """List a contact's activity records (auto-paginating)."""
         return self._get_api_list(
             f"/contacts/{contact_id}/activities",
@@ -1028,7 +1028,7 @@ class AsyncContacts(AsyncAPIResource):
         limit: NotGivenOr[int] = NOT_GIVEN,
         cursor: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
-    ) -> AsyncCursorPage[ContactDeal]:
+    ) -> AsyncPaginator[ContactDeal]:
         """List the CRM deals linked to a contact (auto-paginating)."""
         return self._get_api_list(
             f"/contacts/{contact_id}/deals",

@@ -11,7 +11,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from .._models import BaseModel
-from .._pagination import AsyncCursorPage, SyncCursorPage
+from .._pagination import AsyncPaginator, SyncCursorPage
 from .._resource import AsyncAPIResource, SyncAPIResource
 from .._types import NOT_GIVEN, NotGivenOr, RequestOptions
 from .._utils import drop_not_given
@@ -303,7 +303,7 @@ class AsyncApiKeys(AsyncAPIResource):
         limit: NotGivenOr[int] = NOT_GIVEN,
         cursor: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
-    ) -> AsyncCursorPage[ApiKey]:
+    ) -> AsyncPaginator[ApiKey]:
         """List API keys (auto-paginating)."""
         return self._get_api_list(
             "/api-keys",
@@ -413,7 +413,7 @@ class AsyncApiKeys(AsyncAPIResource):
         limit: NotGivenOr[int] = NOT_GIVEN,
         cursor: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
-    ) -> AsyncCursorPage[ApiKeyUsageLog]:
+    ) -> AsyncPaginator[ApiKeyUsageLog]:
         """Raw per-key request logs (auto-paginating)."""
         return self._get_api_list(
             f"/api-keys/{api_key_id}/logs",

@@ -12,7 +12,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from .._models import BaseModel
-from .._pagination import AsyncCursorPage, SyncCursorPage
+from .._pagination import AsyncPaginator, SyncCursorPage
 from .._resource import AsyncAPIResource, SyncAPIResource
 from .._types import NOT_GIVEN, NotGivenOr, RequestOptions
 from .._utils import drop_not_given
@@ -721,7 +721,7 @@ class AsyncCampaigns(AsyncAPIResource):
         cursor: NotGivenOr[str] = NOT_GIVEN,
         status: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
-    ) -> AsyncCursorPage[Campaign]:
+    ) -> AsyncPaginator[Campaign]:
         """List campaigns (auto-paginating)."""
         return self._get_api_list(
             "/campaigns",
@@ -818,7 +818,7 @@ class AsyncCampaigns(AsyncAPIResource):
         limit: NotGivenOr[int] = NOT_GIVEN,
         cursor: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
-    ) -> AsyncCursorPage[CampaignABVariant]:
+    ) -> AsyncPaginator[CampaignABVariant]:
         """List a campaign's A/B variants (auto-paginating)."""
         return self._get_api_list(
             f"/campaigns/{campaign_id}/ab-variants",
@@ -911,7 +911,7 @@ class AsyncCampaigns(AsyncAPIResource):
         limit: NotGivenOr[int] = NOT_GIVEN,
         cursor: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
-    ) -> AsyncCursorPage[CampaignAttachment]:
+    ) -> AsyncPaginator[CampaignAttachment]:
         """List a campaign's attachments (auto-paginating)."""
         return self._get_api_list(
             f"/campaigns/{campaign_id}/attachments",
@@ -1034,7 +1034,7 @@ class AsyncCampaigns(AsyncAPIResource):
         limit: NotGivenOr[int] = NOT_GIVEN,
         cursor: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
-    ) -> AsyncCursorPage[CampaignLog]:
+    ) -> AsyncPaginator[CampaignLog]:
         """List a campaign's activity logs (auto-paginating)."""
         return self._get_api_list(
             f"/campaigns/{campaign_id}/logs",
@@ -1099,7 +1099,7 @@ class AsyncCampaigns(AsyncAPIResource):
         limit: NotGivenOr[int] = NOT_GIVEN,
         cursor: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
-    ) -> AsyncCursorPage[CampaignStep]:
+    ) -> AsyncPaginator[CampaignStep]:
         """List a campaign's sequence steps (auto-paginating)."""
         return self._get_api_list(
             f"/campaigns/{campaign_id}/steps",
