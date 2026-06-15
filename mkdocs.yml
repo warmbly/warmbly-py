@@ -1,0 +1,74 @@
+site_name: warmbly-py
+site_description: Official Python SDK for the Warmbly API (REST, OAuth2, and realtime gateway).
+site_url: https://warmbly-py.readthedocs.io
+repo_url: https://github.com/warmbly/warmbly-py
+repo_name: warmbly/warmbly-py
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep orange
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep orange
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - content.code.annotate
+    - search.suggest
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            separate_signature: true
+            show_signature_annotations: true
+            members_order: source
+            show_root_heading: true
+            show_source: false
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Install: getting-started/install.md
+      - Quickstart: getting-started/quickstart.md
+  - Guides:
+      - Authentication: guides/auth.md
+      - OAuth2: guides/oauth.md
+      - Async: guides/async.md
+      - Pagination: guides/pagination.md
+      - Errors: guides/errors.md
+      - Retries: guides/retries.md
+      - Realtime gateway: guides/realtime.md
+      - Webhooks: guides/webhooks.md
+  - API Reference:
+      - Client: reference/client.md
+      - Resources: reference/resources.md
+      - Gateway: reference/gateway.md
+      - OAuth: reference/oauth.md
+      - Exceptions: reference/exceptions.md
+  - Changelog: changelog.md
