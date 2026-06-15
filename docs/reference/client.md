@@ -31,3 +31,19 @@ asyncio.run(main())
 ## AsyncWarmbly
 
 ::: warmbly.AsyncWarmbly
+
+## Utilities
+
+Top-level helpers re-exported from the `warmbly` package.
+
+### scopes_to_mask
+
+::: warmbly.scopes_to_mask
+
+### mask_to_scopes
+
+::: warmbly.mask_to_scopes
+
+### verify_webhook_signature
+
+::: warmbly.verify_webhook_signature

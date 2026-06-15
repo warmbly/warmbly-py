@@ -2,7 +2,7 @@
 
 Use OAuth2 when your application needs to act **on behalf of another Warmbly
 user or organization** rather than as itself. The
-[`warmbly.oauth`][warmbly.oauth] subsystem implements the RFC 9700-sanctioned
+`warmbly.oauth` subsystem implements the RFC 9700-sanctioned
 grants against Warmbly's authorization server:
 
 - **authorization_code + PKCE (S256)** — the interactive browser flow.
@@ -63,7 +63,7 @@ with OAuth2Client(client_id="wmcid_...", client_secret="wmcs_...",
 
 ### 1. Build the authorization URL
 
-[`authorization_url`][warmbly.oauth.OAuth2Client.authorization_url] generates a
+[`OAuth2Client.authorization_url`][warmbly.oauth.OAuth2Client] generates a
 fresh PKCE `S256` pair and a random CSRF `state`, and returns the URL plus the
 two values you must keep:
 
