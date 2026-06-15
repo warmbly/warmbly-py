@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Mapping
+from collections.abc import Mapping
 
 __all__ = ["logger", "redact", "redact_headers"]
 

@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from ._base_client import AsyncAPIClient, SyncAPIClient
 
-__all__ = ["SyncAPIResource", "AsyncAPIResource"]
+__all__ = ["AsyncAPIResource", "SyncAPIResource"]
 
 
 class SyncAPIResource:

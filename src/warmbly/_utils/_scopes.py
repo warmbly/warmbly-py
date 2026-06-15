@@ -9,9 +9,10 @@ while the API receives the integer mask it expects.
 
 from __future__ import annotations
 
-from typing import Iterable, Literal
+from collections.abc import Iterable
+from typing import Literal
 
-__all__ = ["SCOPES", "Scope", "scopes_to_mask", "mask_to_scopes", "ALL_SCOPES"]
+__all__ = ["ALL_SCOPES", "SCOPES", "Scope", "mask_to_scopes", "scopes_to_mask"]
 
 # The 22 permission bits, in declaration order (matches the backend bitmask).
 SCOPES: dict[str, int] = {

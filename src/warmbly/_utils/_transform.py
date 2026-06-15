@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Mapping
+from collections.abc import Mapping
 
 from .._types import NotGiven
 
@@ -17,7 +17,5 @@ def drop_not_given(data: Mapping[str, object]) -> dict[str, object]:
     serialized, while preserving keys whose value is an explicit ``None``.
     """
     return {
-        key: value
-        for key, value in data.items()
-        if not isinstance(value, NotGiven)
+        key: value for key, value in data.items() if not isinstance(value, NotGiven)
     }

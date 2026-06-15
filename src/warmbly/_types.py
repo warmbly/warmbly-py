@@ -8,10 +8,10 @@ underlying transport can be swapped without breaking user code.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import (
     TYPE_CHECKING,
     Literal,
-    Mapping,
     TypeAlias,
     TypedDict,
     TypeVar,
@@ -25,15 +25,15 @@ if TYPE_CHECKING:
 
 __all__ = [
     "NOT_GIVEN",
+    "Body",
+    "Headers",
     "NotGiven",
     "NotGivenOr",
     "Omit",
-    "is_given",
-    "Headers",
     "Query",
-    "Body",
-    "Timeout",
     "RequestOptions",
+    "Timeout",
+    "is_given",
 ]
 
 _T = TypeVar("_T")
@@ -60,7 +60,7 @@ class NotGiven:
 NOT_GIVEN = NotGiven()
 """The singleton :class:`NotGiven` sentinel."""
 
-NotGivenOr: TypeAlias = Union[_T, NotGiven]
+NotGivenOr: TypeAlias = _T | NotGiven
 """``NotGivenOr[T]`` is ``T`` or the :data:`NOT_GIVEN` sentinel."""
 
 
@@ -99,6 +99,6 @@ class RequestOptions(TypedDict, total=False):
     headers: Headers
     query: Query
     max_retries: int
-    timeout: "float | Timeout | None"
+    timeout: float | Timeout | None
     idempotency_key: str
-    extra_body: "Mapping[str, Any]"
+    extra_body: Mapping[str, Any]

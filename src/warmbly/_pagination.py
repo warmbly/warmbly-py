@@ -16,19 +16,15 @@ pagination logic independent of the HTTP transport.
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator, Sequence
 from typing import (
-    AsyncIterator,
-    Awaitable,
-    Callable,
     Generic,
-    Iterator,
-    Sequence,
     TypeVar,
 )
 
 from ._exceptions import WarmblyError
 
-__all__ = ["SyncCursorPage", "AsyncCursorPage"]
+__all__ = ["AsyncCursorPage", "SyncCursorPage"]
 
 ModelT = TypeVar("ModelT")
 

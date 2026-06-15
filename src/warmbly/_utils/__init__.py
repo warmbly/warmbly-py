@@ -12,11 +12,11 @@ from ._scopes import (
 from ._transform import drop_not_given
 
 __all__ = [
-    "logger",
-    "redact",
     "SCOPES",
     "Scope",
-    "mask_to_scopes",
-    "scopes_to_mask",
     "drop_not_given",
+    "logger",
+    "mask_to_scopes",
+    "redact",
+    "scopes_to_mask",
 ]

@@ -11,25 +11,25 @@ before constructing them, which keeps the underlying HTTP client swappable.
 
 from __future__ import annotations
 
-from typing import Mapping
+from collections.abc import Mapping
 
 __all__ = [
-    "WarmblyError",
-    "APIError",
     "APIConnectionError",
-    "APITimeoutError",
+    "APIError",
     "APIResponseValidationError",
     "APIStatusError",
-    "BadRequestError",
+    "APITimeoutError",
     "AuthenticationError",
-    "PermissionDeniedError",
-    "NotFoundError",
+    "BadRequestError",
     "ConflictError",
-    "UnprocessableEntityError",
-    "RateLimitError",
-    "InternalServerError",
-    "OAuthError",
     "GatewayError",
+    "InternalServerError",
+    "NotFoundError",
+    "OAuthError",
+    "PermissionDeniedError",
+    "RateLimitError",
+    "UnprocessableEntityError",
+    "WarmblyError",
     "make_status_error",
 ]
 
