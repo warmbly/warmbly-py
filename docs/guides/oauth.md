@@ -5,9 +5,9 @@ user or organization** rather than as itself. The
 `warmbly.oauth` subsystem implements the RFC 9700-sanctioned
 grants against Warmbly's authorization server:
 
-- **authorization_code + PKCE (S256)** — the interactive browser flow.
-- **refresh_token** — exchange a (rotating) refresh token for a fresh token set.
-- **client_credentials** — machine-to-machine, with no user present.
+- **authorization_code + PKCE (S256)**: the interactive browser flow.
+- **refresh_token**: exchange a (rotating) refresh token for a fresh token set.
+- **client_credentials**: machine-to-machine, with no user present.
 
 It also provides token revocation, pluggable token storage, and an
 auto-refreshing token manager.
@@ -22,8 +22,8 @@ code) and `.error_description`.
 
 ## Creating the client
 
-Construct an `OAuth2Client` with your application's `client_id`, and — for a
-*confidential* client — its `client_secret`. *Public* clients (for example a
+Construct an `OAuth2Client` with your application's `client_id`, and (for a
+*confidential* client) its `client_secret`. *Public* clients (for example a
 desktop or single-page app that cannot keep a secret) omit `client_secret` and
 rely on PKCE alone.
 
@@ -75,9 +75,9 @@ url, state, verifier = oauth.authorization_url(
 
 It returns a `(url, state, code_verifier)` tuple:
 
-- **`url`** — redirect the user's browser here.
-- **`state`** — store it (e.g. in the user's session) to validate the callback.
-- **`code_verifier`** — store it too; you need it to redeem the code.
+- **`url`**: redirect the user's browser here.
+- **`state`**: store it (e.g. in the user's session) to validate the callback.
+- **`code_verifier`**: store it too; you need it to redeem the code.
 
 The `scopes` list uses the same scope strings described in the
 [Authentication guide](auth.md#scopes-and-permission-bitmasks). You may also
@@ -119,7 +119,7 @@ The returned [`OAuth2Token`][warmbly.oauth.OAuth2Token] exposes
 ### 4. Use the access token
 
 Hand the access token to a regular API client (it goes in the same `api_key`
-slot — see [Authentication](auth.md)):
+slot; see [Authentication](auth.md)):
 
 ```python
 from warmbly import Warmbly
@@ -215,7 +215,7 @@ available: it loads the stored token, refreshes ahead of expiry, serializes
 concurrent refreshes behind a lock (so rotating refresh tokens do not race), and
 persists the rotated token back to storage.
 
-Wire it with a storage backend and a refresh function — `oauth.refresh_token`
+Wire it with a storage backend and a refresh function. `oauth.refresh_token`
 fits the required signature directly:
 
 ```python
@@ -268,7 +268,7 @@ To use OAuth2 you first register an *application* (an OAuth client). You can do
 that programmatically through the `oauth_applications` resource on an
 authenticated API client (an API key with the `api_keys` permission, for
 example). The plaintext `client_secret` is returned **only** on create and
-`rotate_secret` — store it immediately.
+`rotate_secret`. Store it immediately.
 
 ### Create an application
 
@@ -285,8 +285,8 @@ app = client.oauth_applications.create(
     website_url="https://example.com",
 )
 
-print(app.client_id)        # wmcid_... — use this in OAuth2Client
-print(app.client_secret)    # wmcs_... — shown ONCE; store it now
+print(app.client_id)        # wmcid_..., use this in OAuth2Client
+print(app.client_secret)    # wmcs_...; shown ONCE; store it now
 ```
 
 Note that `scopes` is the integer bitmask
@@ -315,7 +315,7 @@ If a secret is leaked, rotate it. The new secret is returned once:
 
 ```python
 result = client.oauth_applications.rotate_secret("app_123")
-print(result.client_secret)   # the new wmcs_... — store it now
+print(result.client_secret)   # the new wmcs_...; store it now
 ```
 
 ### Webhook signing secret

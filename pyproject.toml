@@ -102,7 +102,7 @@ packages = ["src/warmbly"]
 include = ["src/warmbly", "README.md", "LICENSE", "CHANGELOG.md"]
 
 # ---------------------------------------------------------------------------
-# Ruff (lint + format) — replaces black + isort + flake8
+# Ruff (lint + format) replaces black + isort + flake8
 # ---------------------------------------------------------------------------
 [tool.ruff]
 line-length = 88

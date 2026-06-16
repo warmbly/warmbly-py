@@ -45,7 +45,7 @@ def handle_delivery(raw_body: bytes, signature_header: str, secret: str) -> None
             secret=secret,
         )
     except WarmblyError:
-        # Signature mismatch — reject (e.g. return HTTP 400).
+        # Signature mismatch; reject (e.g. return HTTP 400).
         print("invalid signature; rejecting")
         return
 

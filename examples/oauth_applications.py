@@ -21,7 +21,7 @@ def main() -> None:
         description="Lets Acme launch campaigns on a user's behalf.",
     )
     print("client_id:", app.client_id)
-    # The client secret is shown only once — store it securely, don't log it.
+    # The client secret is shown only once. Store it securely, don't log it.
     client_secret = app.client_secret  # save to your secrets manager now
     print("client_secret received:", "yes" if client_secret else "no")
 

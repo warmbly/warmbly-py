@@ -1,4 +1,4 @@
-"""The ``teams`` resource — members, invitations, and roles.
+"""The ``teams`` resource: members, invitations, and roles.
 
 Maps to the ``/v1/teams`` route group. Members are managed via
 ``/teams/members`` and ``/teams/invitations``; the available roles are listed

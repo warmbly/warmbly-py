@@ -1,4 +1,4 @@
-"""The ``webhooks`` resource — register endpoints and inspect deliveries.
+"""The ``webhooks`` resource: register endpoints and inspect deliveries.
 
 Maps to the ``/v1/webhooks`` route group. Outbound webhook requests are signed
 with HMAC-SHA256 and carry the signature in the ``X-Warmbly-Signature`` header

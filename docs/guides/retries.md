@@ -10,14 +10,14 @@ A request is retried when **both** of the following hold:
 
 1. **The method is safe to retry.** `GET`, `HEAD`, `OPTIONS`, `PUT`, and
    `DELETE` are always considered retry-safe. `POST` is retried **only** when it
-   carries an `Idempotency-Key` — which the SDK adds automatically for you (see
+   carries an `Idempotency-Key`, which the SDK adds automatically for you (see
    [Idempotency keys](#idempotency-keys) below), so writes are safely retried in
    practice.
 2. **The failure looks transient**, i.e. one of:
     - a connection error that never reached the server, or a timeout;
     - an HTTP status of **408**, **409**, **429**, or any **5xx** (`>= 500`).
 
-Anything else — `400`, `401`, `403`, `404`, `422`, and other 4xx — is **not**
+Anything else (`400`, `401`, `403`, `404`, `422`, and other 4xx) is **not**
 retried and surfaces immediately as the corresponding
 [exception](errors.md).
 
@@ -35,8 +35,8 @@ retried and surfaces immediately as the corresponding
 !!! note "POST without an idempotency key is not retried"
     Retrying a non-idempotent write could duplicate side effects. Since the SDK
     auto-attaches an `Idempotency-Key` to every JSON `POST`, your `create(...)`
-    calls are retry-eligible by default. (Form-encoded POSTs — used internally
-    by the OAuth token endpoint — do not get an idempotency key and are not
+    calls are retry-eligible by default. (Form-encoded POSTs, used internally
+    by the OAuth token endpoint, do not get an idempotency key and are not
     retried.)
 
 ## Backoff and jitter
@@ -44,7 +44,7 @@ retried and surfaces immediately as the corresponding
 Between attempts the client sleeps for an exponentially growing delay with
 randomized jitter, so concurrent clients don't retry in lockstep:
 
-- Base delay: `min(0.5 * 2 ** attempt, 8.0)` seconds — i.e. it doubles each
+- Base delay: `min(0.5 * 2 ** attempt, 8.0)` seconds, i.e. it doubles each
   attempt, starting at **0.5 s**, capped at **8 s**.
 - Jitter: the base delay is multiplied by a random factor between **0.75** and
   **1.0**.
@@ -55,7 +55,7 @@ so on, never exceeding ~8 s.
 ### `Retry-After` takes priority
 
 For responses that carry a `Retry-After` header (typically on `429`), the SDK
-uses the server's value instead of the computed backoff — as long as it's a
+uses the server's value instead of the computed backoff, as long as it's a
 positive duration no greater than **60 s**. Values outside that window fall back
 to the normal backoff schedule. Both numeric-seconds and HTTP-date forms of
 `Retry-After` are understood.
@@ -71,7 +71,7 @@ from warmbly import Warmbly
 # Retry up to 5 times per request.
 client = Warmbly(api_key="wmbly_...", max_retries=5)
 
-# Disable retries entirely — fail fast.
+# Disable retries entirely. Fail fast.
 client = Warmbly(api_key="wmbly_...", max_retries=0)
 ```
 
@@ -93,7 +93,7 @@ client.api_keys.list(options={"max_retries": 0})
 When retries are exhausted, the last failure is raised: a connection problem
 becomes [`APIConnectionError`][warmbly.APIConnectionError] (or
 [`APITimeoutError`][warmbly.APITimeoutError]); a bad status becomes the matching
-[`APIStatusError`][warmbly.APIStatusError] subclass — for example a persistent
+[`APIStatusError`][warmbly.APIStatusError] subclass, for example a persistent
 `429` ultimately raises [`RateLimitError`][warmbly.RateLimitError].
 
 ## Idempotency keys
@@ -136,7 +136,7 @@ client.campaigns.create(
 
 The default timeout is an `httpx.Timeout` of **60 s** overall with a **5 s**
 connect timeout. A request that exceeds its timeout raises
-[`APITimeoutError`][warmbly.APITimeoutError] — but only after the retry budget is
+[`APITimeoutError`][warmbly.APITimeoutError], but only after the retry budget is
 exhausted, since timeouts are themselves retried.
 
 Configure the timeout on the client. Pass either a single number of seconds or
@@ -179,6 +179,6 @@ client.campaigns.create(
 )
 ```
 
-The async client behaves identically — the same `options` keys apply, and the
+The async client behaves identically: the same `options` keys apply, and the
 backoff between retries uses non-blocking `await asyncio.sleep(...)` instead of
 `time.sleep(...)`.

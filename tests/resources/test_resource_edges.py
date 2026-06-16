@@ -53,7 +53,7 @@ def _page(
 
 
 # ===========================================================================
-# _pagination — sync multi-page auto-iteration follows the cursor
+# _pagination: sync multi-page auto-iteration follows the cursor
 # ===========================================================================
 @respx.mock
 def test_sync_pagination_follows_cursor(client: Warmbly) -> None:
@@ -152,7 +152,7 @@ async def test_async_get_next_page_raises_when_no_next() -> None:
 
 
 # ===========================================================================
-# _pagination — async paginator (async for AND await-then-iterate-pages)
+# _pagination: async paginator (async for AND await-then-iterate-pages)
 # ===========================================================================
 @pytest.mark.anyio
 @respx.mock
@@ -258,7 +258,7 @@ async def test_async_pagination_await_then_aiter_page(
 
 
 # ===========================================================================
-# timezones — _wrap_bare_list accepts a bare list AND a {"data": [...]} envelope
+# timezones: _wrap_bare_list accepts a bare list AND a {"data": [...]} envelope
 # ===========================================================================
 @respx.mock
 def test_timezones_bare_list(client: Warmbly) -> None:
@@ -312,7 +312,7 @@ async def test_timezones_async_both_shapes(aclient: AsyncWarmbly) -> None:
 
 
 # ===========================================================================
-# oauth_applications — retrieve (sync) + list (sync)
+# oauth_applications: retrieve (sync) + list (sync)
 # ===========================================================================
 @respx.mock
 def test_oauth_applications_sync_retrieve(client: Warmbly) -> None:

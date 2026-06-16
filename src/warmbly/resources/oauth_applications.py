@@ -1,4 +1,4 @@
-"""The ``oauth_applications`` resource — register and manage OAuth2 clients.
+"""The ``oauth_applications`` resource: register and manage OAuth2 clients.
 
 Maps to the ``/v1/oauth/applications`` route group. The plaintext
 ``client_secret`` is returned **only** on create and ``rotate_secret``.

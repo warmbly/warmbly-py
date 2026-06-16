@@ -118,8 +118,8 @@ def decode(raw: str | bytes) -> Frame:
 class PhoenixCodec:
     """Stateful helper that mints references and builds outbound frames.
 
-    Holds the two monotonic counters the protocol relies on — a per-message
-    ``ref`` and a per-join ``join_ref`` — and offers convenience builders for
+    Holds the two monotonic counters the protocol relies on (a per-message
+    ``ref`` and a per-join ``join_ref``) and offers convenience builders for
     the join, leave, push, and heartbeat frames. It is pure and side-effect
     free apart from advancing its internal counters.
     """

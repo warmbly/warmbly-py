@@ -1,4 +1,4 @@
-"""The ``emails`` resource — manage email accounts (mailboxes).
+"""The ``emails`` resource: manage email accounts (mailboxes).
 
 Maps to the ``/v1/emails`` route group. An :class:`EmailAccount` is a connected
 mailbox (Gmail, Outlook, or SMTP/IMAP) that campaigns send from and that the

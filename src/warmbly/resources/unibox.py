@@ -1,4 +1,4 @@
-"""The ``unibox`` resource — unified inbox threads and replies.
+"""The ``unibox`` resource: unified inbox threads and replies.
 
 Maps to the ``/v1/unibox`` route group. A thread groups related messages; you
 can list threads, fetch a single thread, reply to a thread, and mark a thread

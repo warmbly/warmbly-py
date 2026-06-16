@@ -26,7 +26,7 @@ from warmbly.gateway._resume import ResumeTracker
 
 
 # ===========================================================================
-# PendingReplies.fail_all — the 141->140 branch (already-done future skipped)
+# PendingReplies.fail_all: the 141->140 branch (already-done future skipped)
 # ===========================================================================
 @pytest.mark.anyio
 async def test_fail_all_skips_already_done_future() -> None:
@@ -93,7 +93,7 @@ async def test_pending_resolve_done_ref_returns_true_without_clobbering() -> Non
 
 
 # ===========================================================================
-# EventDispatcher.fail_waiters — the 189->188 branch (done waiter skipped)
+# EventDispatcher.fail_waiters: the 189->188 branch (done waiter skipped)
 # ===========================================================================
 @pytest.mark.anyio
 async def test_fail_waiters_skips_already_done_waiter() -> None:
@@ -116,7 +116,7 @@ async def test_fail_waiters_skips_already_done_waiter() -> None:
 
 
 # ===========================================================================
-# Channel state machine — full transition sweep
+# Channel state machine: full transition sweep
 # ===========================================================================
 def test_channel_transitions_and_join_ref() -> None:
     ch = Channel("org:o", {"intents": []}, resume=False)

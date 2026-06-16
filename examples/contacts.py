@@ -8,7 +8,7 @@ from warmbly import Warmbly
 def main() -> None:
     client = Warmbly()
 
-    # Search (this is the "list" for contacts — it's a POST that supports
+    # Search (this is the "list" for contacts: it's a POST that supports
     # free-text, filters, and cursor pagination).
     results = client.contacts.search(query="acme.com", limit=25)
     print("matches:", len(results.data))

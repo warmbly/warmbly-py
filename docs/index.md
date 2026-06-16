@@ -1,6 +1,6 @@
 # warmbly-py
 
-The official Python SDK for the [Warmbly](https://warmbly.com) API — REST
+The official Python SDK for the [Warmbly](https://warmbly.com) API: REST
 resources, OAuth2, and a realtime gateway, with first-class **sync** and
 **async** support.
 
@@ -28,7 +28,7 @@ your code runs.
 |---|---|---|
 | **API key** | `Warmbly(api_key="wmbly_...")` or set `WARMBLY_API_KEY` | Server-side scripts and backends you control. |
 | **OAuth2 access token** | `Warmbly(api_key="wmat_...")` | You already hold a user's access token (any bearer token works). |
-| **OAuth2 flow** | `from warmbly.oauth import OAuth2Client` | Apps that act on behalf of other users — PKCE, refresh, and storage are handled for you. |
+| **OAuth2 flow** | `from warmbly.oauth import OAuth2Client` | Apps that act on behalf of other users: PKCE, refresh, and storage are handled for you. |
 
 See the [Authentication guide](guides/auth.md) for the full picture and the
 [OAuth2 guide](guides/oauth.md) for the interactive flow.
@@ -36,7 +36,7 @@ See the [Authentication guide](guides/auth.md) for the full picture and the
 ## Feature highlights
 
 - **Sync and async, same API.** Every method on `Warmbly` has an `await`-able
-  twin on [`AsyncWarmbly`](reference/client.md) — no second mental model.
+  twin on [`AsyncWarmbly`](reference/client.md). No second mental model.
 - **OAuth2 done right.** [`warmbly.oauth`](reference/oauth.md) ships PKCE,
   authorization-code and client-credentials grants, token refresh, revocation,
   and pluggable storage (memory, encrypted file, OS keyring).
@@ -56,9 +56,9 @@ See the [Authentication guide](guides/auth.md) for the full picture and the
 
 ## Get started
 
-- [Install](getting-started/install.md) — `pip install warmbly`, the `[oauth]`
+- [Install](getting-started/install.md): `pip install warmbly`, the `[oauth]`
   extra, and verifying your setup.
-- [Quickstart](getting-started/quickstart.md) — a 60-second tour of the client.
+- [Quickstart](getting-started/quickstart.md): a 60-second tour of the client.
 
 ## Guides
 

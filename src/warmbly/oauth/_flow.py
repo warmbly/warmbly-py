@@ -3,9 +3,9 @@
 :class:`OAuth2Client` (sync) and :class:`AsyncOAuth2Client` (async) drive the
 RFC 9700-sanctioned grants against Warmbly's authorization server:
 
-* **authorization_code + PKCE (S256)** — the interactive browser flow.
-* **refresh_token** — exchange a (rotating) refresh token for a fresh token set.
-* **client_credentials** — machine-to-machine, no user.
+* **authorization_code + PKCE (S256)**: the interactive browser flow.
+* **refresh_token**: exchange a (rotating) refresh token for a fresh token set.
+* **client_credentials**: machine-to-machine, no user.
 
 This module uses ``httpx`` directly (the OAuth subsystem is permitted to), but
 never lets an ``httpx`` exception escape: transport failures and RFC 6749 error

@@ -2,11 +2,11 @@
 
 Three backends are provided:
 
-* :class:`MemoryTokenStorage` — process-local, non-persistent (good for tests
+* :class:`MemoryTokenStorage`: process-local, non-persistent (good for tests
   and short-lived scripts).
-* :class:`FileTokenStorage` — a JSON file written with ``0600`` permissions so
+* :class:`FileTokenStorage`: a JSON file written with ``0600`` permissions so
   only the owning user can read the stored secrets.
-* :class:`KeyringTokenStorage` — the OS secret store (Keychain / Credential
+* :class:`KeyringTokenStorage`: the OS secret store (Keychain / Credential
   Locker / Secret Service) via the optional ``keyring`` dependency, falling back
   to a :class:`FileTokenStorage` when ``keyring`` is not installed.
 

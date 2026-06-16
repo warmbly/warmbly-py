@@ -21,8 +21,8 @@ async def main():
 asyncio.run(main())
 ```
 
-The constructor takes the same arguments as the sync client — `api_key`,
-`base_url`, `timeout`, `max_retries` — and reads `WARMBLY_API_KEY` /
+The constructor takes the same arguments as the sync client (`api_key`,
+`base_url`, `timeout`, `max_retries`) and reads `WARMBLY_API_KEY` /
 `WARMBLY_BASE_URL` from the environment in the same way. See
 [Authentication](auth.md) for the details.
 
@@ -40,7 +40,7 @@ await client.campaigns.delete(campaign.id)
 ```
 
 Calling such a method without `await` returns an un-awaited coroutine and does
-no work — a common first mistake.
+no work, a common first mistake.
 
 ## Paginating with `async for`
 
@@ -60,7 +60,7 @@ it directly with `async for`. If you only want the first page, you may also
 ```python
 page = await client.campaigns.list(limit=50)
 print(page.total, page.has_more)
-for campaign in page.data:          # page.data is a plain list — use `for`
+for campaign in page.data:          # page.data is a plain list; use `for`
     print(campaign.id)
 
 # Fetch the next page manually:
@@ -73,7 +73,7 @@ See the [Pagination guide](pagination.md) for the full page API.
 ## Closing the client
 
 The async client owns an `httpx.AsyncClient` connection pool that must be closed.
-Either `await client.close()` explicitly, or — preferably — use the client as an
+Either `await client.close()` explicitly, or (preferably) use the client as an
 `async with` context manager so it is closed automatically, even on error:
 
 ```python
@@ -156,8 +156,8 @@ for cid, result in zip(ids, results):
     campaigns = await asyncio.gather(*(fetch(cid) for cid in ids))
     ```
 
-Reuse a single `AsyncWarmbly` instance across all the concurrent tasks — it is
-designed to share one pooled HTTP client — rather than creating a client per
+Reuse a single `AsyncWarmbly` instance across all the concurrent tasks (it is
+designed to share one pooled HTTP client) rather than creating a client per
 request.
 
 ## Async OAuth2

@@ -23,8 +23,8 @@ client = Warmbly(api_key="wmat_...")           # an OAuth2 access token
 ```
 
 Pick an **API key** when your code acts as itself. Pick an **OAuth2 access
-token** when your application acts on behalf of a user who granted you access —
-that token is short-lived (one hour) and should be kept fresh with the helpers
+token** when your application acts on behalf of a user who granted you access.
+That token is short-lived (one hour) and should be kept fresh with the helpers
 described in the [OAuth2 guide](oauth.md).
 
 ## Passing the credential explicitly
@@ -40,7 +40,7 @@ for key in client.api_keys.list():
     print(key.id)
 ```
 
-The same argument name is used regardless of credential type — an OAuth2 access
+The same argument name is used regardless of credential type. An OAuth2 access
 token goes in the very same slot:
 
 ```python
@@ -49,7 +49,7 @@ client = Warmbly(api_key=access_token)  # access_token is a wmat_... string
 
 !!! tip "Keep secrets out of source"
     Never hard-code a credential in code that lands in version control. Prefer
-    the environment variable below, a secrets manager, or — for OAuth2 — the
+    the environment variable below, a secrets manager, or (for OAuth2) the
     [token storage backends](oauth.md#token-storage).
 
 ## Using the `WARMBLY_API_KEY` environment variable
@@ -81,7 +81,7 @@ variable.
 ## Overriding the base URL
 
 By default the client talks to production at `https://api.warmbly.com/v1`. You
-can point it elsewhere — a staging environment, a local mock, or a proxy — with
+can point it elsewhere (a staging environment, a local mock, or a proxy) with
 the `base_url` argument:
 
 ```python
@@ -138,9 +138,9 @@ Warmbly expresses permissions both as readable scope strings (such as
 registration and API-key creation both expect the **integer** form, so the SDK
 ships two converters:
 
-- [`scopes_to_mask(names)`][warmbly.scopes_to_mask] — turn a list of scope
+- [`scopes_to_mask(names)`][warmbly.scopes_to_mask]: turn a list of scope
   strings into the bitmask.
-- [`mask_to_scopes(mask)`][warmbly.mask_to_scopes] — turn a bitmask back into
+- [`mask_to_scopes(mask)`][warmbly.mask_to_scopes]: turn a bitmask back into
   the list of scope names it grants.
 
 ```python
@@ -153,7 +153,7 @@ mask_to_scopes(mask)
 # ['read_campaigns', 'write_campaigns', 'send_campaigns']
 ```
 
-Use the mask wherever the API wants an integer — for example, creating an API
+Use the mask wherever the API wants an integer, for example, creating an API
 key with `client.api_keys.create(..., permissions=...)`:
 
 ```python
@@ -178,5 +178,5 @@ write_templates    read_crm          write_crm         read_audit_logs
 integrations       warmup_routing
 ```
 
-The same scope strings are used when requesting OAuth2 authorization — see the
+The same scope strings are used when requesting OAuth2 authorization. See the
 [OAuth2 guide](oauth.md).

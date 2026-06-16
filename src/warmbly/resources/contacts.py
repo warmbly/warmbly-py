@@ -1,4 +1,4 @@
-"""The ``contacts`` resource — search, manage, import/export, and enrich contacts.
+"""The ``contacts`` resource: search, manage, import/export, and enrich contacts.
 
 Maps to the ``/v1/contacts`` route group. The collection is queried via
 ``POST /contacts/search`` (not a plain ``GET``), so the listing entrypoint is

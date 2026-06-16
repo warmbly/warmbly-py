@@ -191,7 +191,7 @@ def test_require_redirect_uri_none_anywhere_raises() -> None:
 
 
 # ---------------------------------------------------------------------------
-# exchange_code (sync) — body, client auth, override redirect_uri
+# exchange_code (sync): body, client auth, override redirect_uri
 # ---------------------------------------------------------------------------
 @respx.mock
 def test_sync_exchange_code_public_body() -> None:

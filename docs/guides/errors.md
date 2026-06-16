@@ -14,7 +14,7 @@ subclasses that carry the request id, status code, headers, and parsed body.
 ## The exception tree
 
 ```text
-WarmblyError                     # base — catches everything below
+WarmblyError                     # base: catches everything below
 ├── APIError                     # any error from an API interaction
 │   ├── APIConnectionError       # could not reach the server
 │   │   └── APITimeoutError      # request exceeded the timeout
@@ -68,7 +68,7 @@ no dedicated class become `InternalServerError` (5xx) or the generic
 | 404 | `NotFoundError` | The resource does not exist. |
 | 409 | `ConflictError` | State conflict (e.g. duplicate / version mismatch). |
 | 422 | `UnprocessableEntityError` | Semantically invalid request. |
-| 429 | `RateLimitError` | Rate limit exceeded — see `.retry_after`. |
+| 429 | `RateLimitError` | Rate limit exceeded; see `.retry_after`. |
 | 5xx | `InternalServerError` | Server-side failure. |
 | other non-2xx | `APIStatusError` | Anything without a dedicated subclass. |
 
@@ -124,7 +124,7 @@ try:
 except APIStatusError as exc:
     print(exc.status_code)  # int, e.g. 422
     print(exc.message)      # human-readable message from the error envelope
-    print(exc.request_id)   # X-Request-Id header — quote this to support
+    print(exc.request_id)   # X-Request-Id header, quote this to support
     print(exc.code)         # machine-readable "code" from the body, if any
     print(exc.body)         # parsed response body (dict, or raw text)
     print(exc.headers)      # response headers as a plain mapping
@@ -148,7 +148,7 @@ The backend error envelope looks like `{"error", "message", "code",
 ## Rate limits and `retry_after`
 
 A 429 raises [`RateLimitError`][warmbly.RateLimitError], which adds a
-`retry_after` attribute — the number of seconds to wait before trying again. It
+`retry_after` attribute: the number of seconds to wait before trying again. It
 is parsed from the `Retry-After` response header (numeric seconds or an
 HTTP-date) or from a `retry_after` field in the body, and is `None` when neither
 is provided.

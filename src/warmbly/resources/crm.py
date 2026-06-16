@@ -1,4 +1,4 @@
-"""The ``crm`` resource — deals, pipelines, and tasks.
+"""The ``crm`` resource: deals, pipelines, and tasks.
 
 Maps to the ``/v1/crm`` route group. The contract documents the route groups
 (``/crm/deals``, ``/crm/pipelines``, ``/crm/tasks``) but does not enumerate

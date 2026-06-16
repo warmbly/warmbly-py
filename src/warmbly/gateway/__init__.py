@@ -8,8 +8,8 @@ version ``2.0.0``).
 
 Two clients are provided with identical surfaces:
 
-* :class:`AsyncGatewayClient` — the native ``asyncio`` client.
-* :class:`GatewayClient` — a blocking facade that runs the async client on a
+* :class:`AsyncGatewayClient`: the native ``asyncio`` client.
+* :class:`GatewayClient`: a blocking facade that runs the async client on a
   background event loop, for use from ordinary synchronous code.
 
 Register handlers with the ``on``/``on_event`` decorators, wait for a single

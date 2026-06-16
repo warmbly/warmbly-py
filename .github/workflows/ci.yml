@@ -70,6 +70,6 @@ jobs:
       - name: Run tests (with coverage gate)
         if: matrix.os != 'windows-latest'
         run: pytest --cov --cov-report=term-missing
-      - name: Run tests (Windows — no coverage gate)
+      - name: Run tests (Windows, no coverage gate)
         if: matrix.os == 'windows-latest'
         run: pytest

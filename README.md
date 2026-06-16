@@ -1,6 +1,6 @@
 # warmbly-py
 
-The official Python SDK for the [Warmbly](https://warmbly.com) API — REST resources, OAuth2, and a realtime gateway, with first-class sync **and** async support.
+The official Python SDK for the [Warmbly](https://warmbly.com) API: REST resources, OAuth2, and a realtime gateway, with first-class sync **and** async support.
 
 [![PyPI version](https://img.shields.io/pypi/v/warmbly.svg)](https://pypi.org/project/warmbly/)
 [![Python versions](https://img.shields.io/pypi/pyversions/warmbly.svg)](https://pypi.org/project/warmbly/)
@@ -46,7 +46,7 @@ can also just write `client = Warmbly()`.
 
 ### Async
 
-Every method has an `await`-able twin on `AsyncWarmbly` — swap the class, add
+Every method has an `await`-able twin on `AsyncWarmbly`: swap the class, add
 `await`, and iterate with `async for`:
 
 ```python
@@ -77,7 +77,7 @@ The SDK supports all three Warmbly auth modes; each is sent as a bearer token.
 |---|---|
 | **API key** | `Warmbly(api_key="wmbly_...")` or `WARMBLY_API_KEY` env var |
 | **OAuth2 access token** | `Warmbly(api_key="wmat_...")` (any bearer token works) |
-| **OAuth2 flow** | `from warmbly.oauth import OAuth2Client` — see the [OAuth guide](https://warmbly-py.readthedocs.io/guides/oauth) |
+| **OAuth2 flow** | `from warmbly.oauth import OAuth2Client`: see the [OAuth guide](https://warmbly-py.readthedocs.io/guides/oauth) |
 
 ### OAuth2 in three lines
 

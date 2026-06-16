@@ -1,4 +1,4 @@
-"""The ``integrations`` resource — third-party connections and lead sync.
+"""The ``integrations`` resource: third-party connections and lead sync.
 
 Maps to the ``/v1/integrations`` route group. Covers the catalog of available
 providers, the connections an organization has configured, their event

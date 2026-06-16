@@ -25,7 +25,7 @@ pip install "warmbly[oauth]"
 
 The extra adds [`keyring`](https://pypi.org/project/keyring/), which powers
 `warmbly.oauth.KeyringTokenStorage`. Without it, in-memory and encrypted-file
-token storage (`MemoryTokenStorage` / `FileTokenStorage`) still work — see the
+token storage (`MemoryTokenStorage` / `FileTokenStorage`) still work. See the
 [OAuth2 guide](../guides/oauth.md).
 
 !!! tip "Use a virtual environment"

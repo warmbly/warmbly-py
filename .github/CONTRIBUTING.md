@@ -56,7 +56,7 @@ pre-commit install
 5. **Run the hooks**: `pre-commit run --all-files`.
 6. **Open a PR.** The PR title must follow
    [Conventional Commits](https://www.conventionalcommits.org/) (e.g.
-   `feat: add contacts.export`) — it becomes the squash-merge commit message.
+   `feat: add contacts.export`). It becomes the squash-merge commit message.
 
 ## Changelog fragments (towncrier)
 
