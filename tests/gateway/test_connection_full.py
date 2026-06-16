@@ -13,8 +13,10 @@ tiny values to keep the suite fast, and every awaited rendezvous is bounded.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import sys
+import time
 from typing import Any
 
 import pytest
@@ -467,8 +469,11 @@ async def test_fatal_close_via_connect_records_fatal(
     server: ConfigurableGateway,
     tiny_timing: None,
 ) -> None:
-    # connect() may win the ready-vs-fatal race and return, but the supervisor
-    # still records the fatal and stops; close() then drains it cleanly.
+    # connect() may win the ready-vs-fatal race and return, or surface the
+    # FatalDisconnect directly (the outcome differs by interpreter); either way
+    # the supervisor records the fatal and stops. The supervisor task ends *with*
+    # that exception, so the test must retrieve it or asyncio reports it as a
+    # never-retrieved task exception at loop teardown.
     server.close_on_connect_code = 4004
     client = _new_client(server)
     try:
@@ -476,7 +481,6 @@ async def test_fatal_close_via_connect_records_fatal(
             await asyncio.wait_for(client.connect(), timeout=_TIMEOUT)
         except FatalDisconnect as exc:
             assert exc.code == 4004
-        # Either way, the supervisor must have recorded the fatal and stopped.
         await _wait_until(
             lambda: (
                 isinstance(client._fatal, FatalDisconnect)
@@ -484,7 +488,14 @@ async def test_fatal_close_via_connect_records_fatal(
                 and client._supervisor.done()
             )
         )
-        await asyncio.sleep(0.05)
+        assert isinstance(client._fatal, FatalDisconnect)
+        assert client._fatal.code == 4004
+        # Retrieve the supervisor's terminal exception so it is not flagged as
+        # unretrieved when the event loop closes.
+        supervisor = client._supervisor
+        assert supervisor is not None
+        with contextlib.suppress(FatalDisconnect, asyncio.CancelledError):
+            await supervisor
         assert server.accept_count == 1
     finally:
         await client.close()
@@ -1507,6 +1518,37 @@ async def test_heartbeat_loop_raises_transient_on_send_close(
             client._heartbeat_loop(_SendClosesWS()),  # type: ignore[arg-type]
             timeout=_TIMEOUT,
         )
+    await client.close()
+
+
+@pytest.mark.anyio
+async def test_heartbeat_loop_zombie_timeout_raises_transient(
+    anyio_backend: str, tiny_timing: None
+) -> None:
+    # A connection whose heartbeats are never acked is detected as a zombie: the
+    # loop closes it with code 4000 and raises TransientDisconnect. Drive it with
+    # liveness timestamps forced far into the past so the branch fires on the
+    # first iteration, deterministically, without relying on wall-clock timing
+    # (which is what makes the integration-level zombie test flaky across runners).
+    client = AsyncGatewayClient(token="t")
+    client._last_heartbeat_sent = time.monotonic() - 1_000_000.0
+    client._last_heartbeat_ack = client._last_heartbeat_sent - 1.0
+
+    closed: dict[str, int] = {}
+
+    class _NeverAcksWS:
+        async def send(self, frame: str) -> None:  # pragma: no cover - unreached
+            raise AssertionError("zombie must be detected before the next send")
+
+        async def close(self, code: int = 1000) -> None:
+            closed["code"] = code
+
+    with pytest.raises(TransientDisconnect, match="heartbeat timeout"):
+        await asyncio.wait_for(
+            client._heartbeat_loop(_NeverAcksWS()),  # type: ignore[arg-type]
+            timeout=_TIMEOUT,
+        )
+    assert closed["code"] == 4000  # _CLOSE_ZOMBIE
     await client.close()
 
 
