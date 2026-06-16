@@ -6,7 +6,6 @@ The official Python SDK for the [Warmbly](https://warmbly.com) API — REST reso
 [![Python versions](https://img.shields.io/pypi/pyversions/warmbly.svg)](https://pypi.org/project/warmbly/)
 [![Downloads](https://static.pepy.tech/badge/warmbly/month)](https://pepy.tech/project/warmbly)
 [![CI](https://img.shields.io/github/actions/workflow/status/warmbly/warmbly-py/ci.yml?branch=main&logo=github&label=CI)](https://github.com/warmbly/warmbly-py/actions?query=branch%3Amain)
-[![Coverage](https://img.shields.io/codecov/c/github/warmbly/warmbly-py?logo=codecov)](https://codecov.io/gh/warmbly/warmbly-py)
 [![License](https://img.shields.io/pypi/l/warmbly.svg)](https://github.com/warmbly/warmbly-py/blob/main/LICENSE)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Docs](https://img.shields.io/readthedocs/warmbly-py)](https://warmbly-py.readthedocs.io)
