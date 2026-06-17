@@ -132,11 +132,11 @@ class BadRequestError(APIStatusError):
 
 
 class AuthenticationError(APIStatusError):
-    """HTTP 401 — missing or invalid credentials."""
+    """HTTP 401: missing or invalid credentials."""
 
 
 class PermissionDeniedError(APIStatusError):
-    """HTTP 403 — authenticated but not allowed (named to avoid shadowing the builtin)."""
+    """HTTP 403: authenticated but not allowed (named to avoid shadowing the builtin)."""
 
 
 class NotFoundError(APIStatusError):
@@ -148,11 +148,11 @@ class ConflictError(APIStatusError):
 
 
 class UnprocessableEntityError(APIStatusError):
-    """HTTP 422 — semantically invalid request."""
+    """HTTP 422: semantically invalid request."""
 
 
 class RateLimitError(APIStatusError):
-    """HTTP 429 — too many requests.
+    """HTTP 429: too many requests.
 
     Attributes:
         retry_after: Seconds to wait before retrying, parsed from the
@@ -182,7 +182,7 @@ class RateLimitError(APIStatusError):
 
 
 class InternalServerError(APIStatusError):
-    """HTTP 5xx — server-side failure."""
+    """HTTP 5xx: server-side failure."""
 
 
 class OAuthError(WarmblyError):

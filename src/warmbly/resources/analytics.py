@@ -1,4 +1,4 @@
-"""The ``analytics`` resource — read-only reporting endpoints.
+"""The ``analytics`` resource: read-only reporting endpoints.
 
 Maps to the ``/v1/analytics`` route group. Every method is a ``GET`` and most
 accept an optional date range (``from_`` / ``to``, RFC3339). Results are

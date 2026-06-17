@@ -11,7 +11,7 @@ when the matching ``phx_reply`` arrives. A reply with ``status == "ok"``
 resolves the future with its ``response`` object; ``status == "error"`` fails it
 with a :class:`~warmbly._exceptions.GatewayError` carrying the payload.
 
-These objects are protocol state only — sending and receiving happen in the
+These objects are protocol state only. Sending and receiving happen in the
 connection layer.
 """
 

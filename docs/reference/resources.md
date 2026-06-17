@@ -1,6 +1,6 @@
 # Resources
 
-Each resource group is reachable as an attribute on the client — for example
+Each resource group is reachable as an attribute on the client, for example
 `client.campaigns` or `client.api_keys`. Every group provides the standard
 `create`/`list`/`retrieve`/`update`/`delete` operations where the underlying
 endpoint supports them, plus resource-specific actions. List operations return a

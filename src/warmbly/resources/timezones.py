@@ -1,4 +1,4 @@
-"""The ``timezones`` resource — read-only IANA timezone catalog.
+"""The ``timezones`` resource: read-only IANA timezone catalog.
 
 Maps to ``GET /v1/timezones``. The endpoint returns a flat list of supported
 timezones (used when scheduling campaign sends). It is modelled as a permissive

@@ -1,4 +1,4 @@
-"""PKCE (Proof Key for Code Exchange) helpers — RFC 7636, S256 only.
+"""PKCE (Proof Key for Code Exchange) helpers: RFC 7636, S256 only.
 
 Public clients must protect the authorization code with a PKCE pair: a random
 ``code_verifier`` and its ``code_challenge`` (the base64url-encoded SHA-256 of

@@ -1,12 +1,11 @@
 # warmbly-py
 
-The official Python SDK for the [Warmbly](https://warmbly.com) API — REST resources, OAuth2, and a realtime gateway, with first-class sync **and** async support.
+The official Python SDK for the [Warmbly](https://warmbly.com) API: REST resources, OAuth2, and a realtime gateway, with first-class sync **and** async support.
 
 [![PyPI version](https://img.shields.io/pypi/v/warmbly.svg)](https://pypi.org/project/warmbly/)
 [![Python versions](https://img.shields.io/pypi/pyversions/warmbly.svg)](https://pypi.org/project/warmbly/)
 [![Downloads](https://static.pepy.tech/badge/warmbly/month)](https://pepy.tech/project/warmbly)
 [![CI](https://img.shields.io/github/actions/workflow/status/warmbly/warmbly-py/ci.yml?branch=main&logo=github&label=CI)](https://github.com/warmbly/warmbly-py/actions?query=branch%3Amain)
-[![Coverage](https://img.shields.io/codecov/c/github/warmbly/warmbly-py?logo=codecov)](https://codecov.io/gh/warmbly/warmbly-py)
 [![License](https://img.shields.io/pypi/l/warmbly.svg)](https://github.com/warmbly/warmbly-py/blob/main/LICENSE)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Docs](https://img.shields.io/readthedocs/warmbly-py)](https://warmbly-py.readthedocs.io)
@@ -47,7 +46,7 @@ can also just write `client = Warmbly()`.
 
 ### Async
 
-Every method has an `await`-able twin on `AsyncWarmbly` — swap the class, add
+Every method has an `await`-able twin on `AsyncWarmbly`: swap the class, add
 `await`, and iterate with `async for`:
 
 ```python
@@ -78,7 +77,7 @@ The SDK supports all three Warmbly auth modes; each is sent as a bearer token.
 |---|---|
 | **API key** | `Warmbly(api_key="wmbly_...")` or `WARMBLY_API_KEY` env var |
 | **OAuth2 access token** | `Warmbly(api_key="wmat_...")` (any bearer token works) |
-| **OAuth2 flow** | `from warmbly.oauth import OAuth2Client` — see the [OAuth guide](https://warmbly-py.readthedocs.io/guides/oauth) |
+| **OAuth2 flow** | `from warmbly.oauth import OAuth2Client`: see the [OAuth guide](https://warmbly-py.readthedocs.io/guides/oauth) |
 
 ### OAuth2 in three lines
 

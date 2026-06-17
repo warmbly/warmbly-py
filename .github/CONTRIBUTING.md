@@ -48,14 +48,15 @@ pre-commit install
 
 1. **Branch** off `main`: `git switch -c feat/short-description`.
 2. **Write code and tests.** New behavior needs tests; bug fixes need a
-   regression test. We aim for 90% branch coverage.
+   regression test. The shipped package is held at 100% statement and branch
+   coverage (`fail_under = 100`), so CI fails on any uncovered line.
 3. **Keep types honest.** The SDK ships `py.typed`; everything must pass
    `mypy --strict`. No `httpx` type may appear in a public signature.
 4. **Add a changelog fragment** (see below).
 5. **Run the hooks**: `pre-commit run --all-files`.
 6. **Open a PR.** The PR title must follow
    [Conventional Commits](https://www.conventionalcommits.org/) (e.g.
-   `feat: add contacts.export`) — it becomes the squash-merge commit message.
+   `feat: add contacts.export`). It becomes the squash-merge commit message.
 
 ## Changelog fragments (towncrier)
 

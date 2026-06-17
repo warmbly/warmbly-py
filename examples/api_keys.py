@@ -1,6 +1,6 @@
 """Create, manage, and audit API keys.
 
-The plaintext ``secret`` is returned ONLY on the create response — store it
+The plaintext ``secret`` is returned ONLY on the create response. Store it
 immediately, because it cannot be retrieved again.
 """
 
@@ -21,7 +21,7 @@ def main() -> None:
     )
     print("created:", created.id)
     # The plaintext secret is returned only once. Store it in your secrets
-    # manager now — never log or print it.
+    # manager now. Never log or print it.
     secret = created.secret  # e.g. write to Vault / AWS Secrets Manager / env
     print("secret received:", "yes" if secret else "no")
 

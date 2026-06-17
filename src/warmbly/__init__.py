@@ -1,4 +1,4 @@
-"""warmbly — the official Python SDK for the Warmbly API.
+"""warmbly: the official Python SDK for the Warmbly API.
 
 Exposes synchronous and asynchronous clients, the shared response
 :class:`BaseModel`, the exception hierarchy, scope helpers, the realtime

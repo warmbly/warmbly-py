@@ -1,6 +1,6 @@
 """Build a campaign end to end: create, add sequence steps, start, inspect.
 
-Note: ``start()`` actually begins sending mail — run against a test org.
+Note: ``start()`` actually begins sending mail, so run against a test org.
 """
 
 from __future__ import annotations

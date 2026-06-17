@@ -1,16 +1,16 @@
 # Realtime gateway
 
-The **Warmbly realtime gateway** streams live events — campaign progress, email
-activity, contact changes, account/warmup status, and bulk-operation updates —
+The **Warmbly realtime gateway** streams live events (campaign progress, email
+activity, contact changes, account/warmup status, and bulk-operation updates)
 over a single resilient WebSocket connection. The SDK ships a fully managed
 client that handles heartbeats, automatic reconnection, session resume, and
 event dispatch for you.
 
 Two clients with identical surfaces are provided:
 
-- [`AsyncGatewayClient`][warmbly.AsyncGatewayClient] — the native `asyncio`
+- [`AsyncGatewayClient`][warmbly.AsyncGatewayClient]: the native `asyncio`
   client. Use this from async code.
-- [`GatewayClient`][warmbly.GatewayClient] — a blocking facade that runs the
+- [`GatewayClient`][warmbly.GatewayClient]: a blocking facade that runs the
   async client on a background thread, for use from ordinary synchronous code.
 
 Both live in `warmbly` (and `warmbly.gateway`):
@@ -21,7 +21,7 @@ from warmbly import AsyncGatewayClient, GatewayClient, GatewayEvent
 
 ## Authentication and the `realtime_subscribe` scope
 
-The gateway authenticates with a bearer credential passed as `token` — an API
+The gateway authenticates with a bearer credential passed as `token`: an API
 key, an OAuth2 access token, or a session JWT. **The credential must carry the
 `realtime_subscribe` scope.** The token is sent in the connection query string
 and is never logged.
@@ -67,7 +67,7 @@ asyncio.run(main())
 
 `connect()` returns once the socket is open and ready, so any `subscribe()`,
 `push()`, or `wait_for()` calls made afterward work immediately. If you only need
-to wait for a few events and then stop, you can skip `run_forever()` entirely —
+to wait for a few events and then stop, you can skip `run_forever()` entirely.
 `connect()` already starts the background supervisor that keeps the connection
 alive.
 
@@ -98,7 +98,7 @@ for example because you are not a member of the organization.
 
 ### Filtering org events with `intents`
 
-For `org:*` topics you can narrow the firehose with `intents` — a list of
+For `org:*` topics you can narrow the firehose with `intents`: a list of
 substring filters applied to event types server-side. This reduces the events
 delivered to your client:
 
@@ -118,7 +118,7 @@ state.
 
 ## Handling events
 
-### `@on_event` — match an event on any topic
+### `@on_event`: match an event on any topic
 
 Register a handler for an event name regardless of which topic delivered it.
 Handlers receive `(topic, payload)`:
@@ -129,7 +129,7 @@ async def on_open(topic: str, payload: dict) -> None:
     print(f"{payload['email_account_id']} opened on {topic}")
 ```
 
-### `@on` — match an exact `(topic, event)` pair
+### `@on`: match an exact `(topic, event)` pair
 
 When you only care about one event on one specific topic, register against the
 exact tuple:
@@ -148,13 +148,13 @@ Exceptions raised inside a handler are logged, not propagated.
 ### Event-name constants
 
 [`GatewayEvent`][warmbly.gateway.GatewayEvent] collects the common event names as
-constants so you avoid stringly-typed keys — `GatewayEvent.CAMPAIGN_STARTED`,
+constants so you avoid stringly-typed keys: `GatewayEvent.CAMPAIGN_STARTED`,
 `GatewayEvent.EMAIL_OPENED`, `GatewayEvent.CONTACT_CREATED`,
 `GatewayEvent.BULK_PROGRESS`, and so on. The set is not exhaustive; unknown event
 names still reach `on_event` handlers and `wait_for`, so you can pass any string
 the server emits.
 
-### `wait_for` — await a single event
+### `wait_for`: await a single event
 
 Instead of a long-lived handler, you can suspend until the next matching event
 arrives. This is handy for request/response-style flows. `wait_for` returns the
@@ -229,7 +229,7 @@ starts the supervisor, the client:
   dead connection is noticed and recycled.
 - **Reconnects** on transient drops using exponential backoff with jitter,
   honoring any `retry_after` hint the server sends after rate-limiting.
-- **Re-joins** every subscribed topic automatically after a reconnect — your
+- **Re-joins** every subscribed topic automatically after a reconnect. Your
   handlers stay registered across the gap.
 
 ### Sequence-based resume
@@ -260,7 +260,7 @@ gateway = AsyncGatewayClient(token="wmbly_...", on_resume_failed=resync)
 ### Fatal vs. transient failures
 
 Not every failure is retried. Authentication and permission rejections are
-**fatal** — the supervisor will not loop on them, because they require you to fix
+**fatal**: the supervisor will not loop on them, because they require you to fix
 the credential and reconnect deliberately. These surface as
 `FatalDisconnect` from `connect()` or
 `run_forever()`:
@@ -337,8 +337,8 @@ gateway.subscribe("org:org_123")
 gateway.run_forever()  # blocks until close() is called from another thread
 ```
 
-Every method — `connect`, `subscribe`, `unsubscribe`, `push`, `wait_for`,
-`presence`, `run_forever`, and `close` — mirrors the async client but blocks
+Every method (`connect`, `subscribe`, `unsubscribe`, `push`, `wait_for`,
+`presence`, `run_forever`, and `close`) mirrors the async client but blocks
 until it completes. `close()` is safe to call from any thread, including from
 inside a synchronous handler, which makes it easy to stop `run_forever()` in
 response to an event:
@@ -351,7 +351,7 @@ def stop(topic: str, payload: dict) -> None:
 
 ## See also
 
-- [Webhooks](webhooks.md) — for server-to-server delivery when you'd rather
+- [Webhooks](webhooks.md): for server-to-server delivery when you'd rather
   receive a signed HTTP POST than hold a connection open.
-- [Gateway API reference](../reference/gateway.md) — full signatures and the
+- [Gateway API reference](../reference/gateway.md): full signatures and the
   [`GatewayEvent`][warmbly.gateway.GatewayEvent] constant catalog.

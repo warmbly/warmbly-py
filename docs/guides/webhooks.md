@@ -7,10 +7,10 @@ open with the [realtime gateway](realtime.md).
 There are two halves to working with webhooks:
 
 1. **Verifying inbound deliveries** so you can trust a payload before acting on
-   it — with the `verify_webhook_signature`
+   it, with the `verify_webhook_signature`
    helper.
-2. **Managing endpoints** — registering, listing, updating, and inspecting them
-   — via `client.webhooks`.
+2. **Managing endpoints** (registering, listing, updating, and inspecting them)
+   via `client.webhooks`.
 
 ## Verifying inbound signatures
 
@@ -19,7 +19,7 @@ body**, using your endpoint's signing secret. The signature travels in the
 `X-Warmbly-Signature` header in the form `sha256=<hexdigest>`.
 
 `verify_webhook_signature` recomputes the
-digest, compares it against the header in constant time, and — on success —
+digest, compares it against the header in constant time, and (on success)
 returns the parsed JSON body as a `dict`. On a mismatch it raises
 [`WarmblyError`][warmbly.WarmblyError].
 
@@ -41,7 +41,7 @@ print(event["event_type"], event["id"])
     `dict` that `verify_webhook_signature` returns.
 
 The `signature` argument accepts the header value with or without the `sha256=`
-prefix — both work, since the prefix is stripped before comparison.
+prefix, both work, since the prefix is stripped before comparison.
 
 It's available as a top-level import (no client instance needed):
 
@@ -112,7 +112,7 @@ same on `Warmbly` and `AsyncWarmbly` (add `await` for the async client).
 ### Register an endpoint
 
 `create()` returns a `WebhookEndpoint`. The plaintext signing **`secret` is
-returned only here (and on rotate-secret)** — store it immediately, because it
+returned only here (and on rotate-secret)**. Store it immediately, because it
 can't be retrieved again.
 
 ```python
@@ -123,7 +123,7 @@ endpoint = client.webhooks.create(
 )
 
 print(endpoint.id)
-secret = endpoint.secret  # save this securely — shown only once
+secret = endpoint.secret  # save this securely; shown only once
 ```
 
 To discover which event types you can subscribe to, list them:
@@ -135,7 +135,7 @@ for et in client.webhooks.event_types():
 
 ### List endpoints
 
-`list()` returns an auto-paginating cursor page — iterate it directly to walk
+`list()` returns an auto-paginating cursor page: iterate it directly to walk
 every page:
 
 ```python
@@ -242,13 +242,13 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
-Note that `verify_webhook_signature` is a synchronous, pure-computation helper —
-there's no async variant, because verifying a signature does no I/O. Call it the
+Note that `verify_webhook_signature` is a synchronous, pure-computation helper.
+There's no async variant, because verifying a signature does no I/O. Call it the
 same way regardless of which client you use.
 
 ## See also
 
-- [Realtime gateway](realtime.md) — for a persistent WebSocket stream of events
+- [Realtime gateway](realtime.md): for a persistent WebSocket stream of events
   instead of HTTP callbacks.
-- [Pagination](pagination.md) — how the cursor pages returned by the list
+- [Pagination](pagination.md): how the cursor pages returned by the list
   methods work.

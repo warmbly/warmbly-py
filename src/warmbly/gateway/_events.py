@@ -6,7 +6,7 @@ event catalog as constants so callers can avoid stringly-typed handler keys.
 :class:`EventDispatcher` is the registry behind the ``on``/``on_event``
 decorators and ``wait_for``. Handlers are stored in plain ``dict`` maps keyed
 either by ``(topic, event)`` (exact) or by ``event`` alone (any topic). The
-dispatcher itself performs no I/O and schedules nothing — the connection layer
+dispatcher itself performs no I/O and schedules nothing. The connection layer
 calls :meth:`EventDispatcher.handlers_for` and runs each handler as its own
 task so a single misbehaving handler cannot stall the receive loop.
 """
@@ -31,8 +31,8 @@ class GatewayEvent:
     """Realtime event-name constants from the gateway event catalog.
 
     These mirror the server's event names verbatim. The set is intentionally
-    not exhaustive of every possible event — unknown events are still
-    delivered to ``on_event`` handlers and ``wait_for`` — but it covers the
+    not exhaustive of every possible event (unknown events are still
+    delivered to ``on_event`` handlers and ``wait_for``) but it covers the
     common campaign, email, contact, account/warmup, bulk, presence, and
     membership events.
     """

@@ -102,7 +102,7 @@ packages = ["src/warmbly"]
 include = ["src/warmbly", "README.md", "LICENSE", "CHANGELOG.md"]
 
 # ---------------------------------------------------------------------------
-# Ruff (lint + format) — replaces black + isort + flake8
+# Ruff (lint + format) replaces black + isort + flake8
 # ---------------------------------------------------------------------------
 [tool.ruff]
 line-length = 88
@@ -187,7 +187,10 @@ parallel = true
 omit = ["src/warmbly/_version.py"]
 
 [tool.coverage.report]
-fail_under = 90
+# The suite covers every statement and branch of the shipped package. CI fails
+# the build (via pytest-cov's exit code) if a change drops below this floor, so
+# coverage is gated entirely in-repo with no external service.
+fail_under = 100
 show_missing = true
 skip_covered = true
 exclude_also = [

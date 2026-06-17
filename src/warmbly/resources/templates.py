@@ -1,4 +1,4 @@
-"""The ``templates`` resource — manage reusable email templates.
+"""The ``templates`` resource: manage reusable email templates.
 
 Maps to the ``/v1/templates`` route group. A template bundles a reusable
 ``subject`` and ``body`` (and a human-readable ``name``) that campaigns and

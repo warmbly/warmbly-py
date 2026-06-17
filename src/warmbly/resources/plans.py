@@ -1,4 +1,4 @@
-"""The ``plans`` resource — read-only billing plan catalog.
+"""The ``plans`` resource: read-only billing plan catalog.
 
 Maps to the ``/v1/plans`` route group. Both methods are ``GET``. Plan objects
 are permissive :class:`~warmbly._models.BaseModel` subclasses so additional

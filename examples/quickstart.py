@@ -18,7 +18,7 @@ def main() -> None:
     print(f"created campaign {campaign.id!r} (status={campaign.status})")
     print("request id:", campaign.request_id)  # handy for support tickets
 
-    # Read a list — iterating transparently walks every page.
+    # Read a list. Iterating transparently walks every page.
     print("\nyour API keys:")
     for key in client.api_keys.list():
         print(f"  - {key.name}: {key.key_prefix}…{key.key_suffix} ({key.status})")

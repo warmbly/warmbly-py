@@ -7,7 +7,7 @@ passes ``{"resume": {"last_seq": N}}`` in the join params. The server then
 replays the buffered events and reports the outcome via a ``resumed`` or
 ``resume_failed`` event.
 
-This module is pure state and small helpers — no I/O. When a resume fails the
+This module is pure state and small helpers, no I/O. When a resume fails the
 caller is expected to fall back to a full re-sync over the REST API.
 """
 

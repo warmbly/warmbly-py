@@ -56,7 +56,7 @@ def main() -> None:
         print(" campaign:", campaign.name)
     client.close()
 
-    # 5. Refresh later (refresh tokens rotate — persist the new one).
+    # 5. Refresh later (refresh tokens rotate, so persist the new one).
     refreshed = oauth.refresh_token(token.refresh_token)
     print("refreshed; new token acquired")
 

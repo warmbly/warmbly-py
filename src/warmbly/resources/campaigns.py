@@ -1,4 +1,4 @@
-"""The ``campaigns`` resource — create, configure, and run email campaigns.
+"""The ``campaigns`` resource: create, configure, and run email campaigns.
 
 Maps to the ``/v1/campaigns`` route group. Covers campaign CRUD, advanced
 settings, A/B variants and analysis, attachments, sequence steps, senders,

@@ -1,7 +1,7 @@
 # Quickstart
 
 A 60-second tour. By the end you'll have created a client, made a write call,
-and iterated a paginated list — in both the sync and async styles.
+and iterated a paginated list, in both the sync and async styles.
 
 !!! note "Prerequisites"
     [Install warmbly](install.md) and have a Warmbly API key handy. Export it
@@ -45,7 +45,7 @@ print("request id:", campaign.request_id)
 ## Iterate your API keys
 
 List endpoints return a cursor page that transparently fetches every page as
-you iterate — just use a normal `for` loop:
+you iterate. Just use a normal `for` loop:
 
 ```python
 for key in client.api_keys.list():
@@ -108,7 +108,7 @@ asyncio.run(main())
 
 ## Next steps
 
-- [Authentication](../guides/auth.md) — API keys, access tokens, and OAuth2.
-- [Async](../guides/async.md) — the full async story.
+- [Authentication](../guides/auth.md): API keys, access tokens, and OAuth2.
+- [Async](../guides/async.md): the full async story.
 - [Errors](../guides/errors.md) and [Retries](../guides/retries.md).
-- [Realtime gateway](../guides/realtime.md) — subscribe to live events.
+- [Realtime gateway](../guides/realtime.md): subscribe to live events.

@@ -1,4 +1,4 @@
-"""The ``api_keys`` resource — create, manage, and audit API keys.
+"""The ``api_keys`` resource: create, manage, and audit API keys.
 
 Maps to the ``/v1/api-keys`` route group. The plaintext ``secret`` is returned
 **only** on the create response; store it immediately, as it cannot be

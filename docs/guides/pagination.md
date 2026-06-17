@@ -26,13 +26,13 @@ from warmbly import Warmbly
 
 client = Warmbly(api_key="wmbly_...")
 
-# Iterates across all pages — one network round-trip per page, lazily.
+# Iterates across all pages, one network round-trip per page, lazily.
 for key in client.api_keys.list():
     print(key.id, key.name)
 ```
 
 `list()` accepts the usual filters plus `limit` (page size). You never pass a
-`cursor` yourself when auto-iterating — the SDK threads it through for you:
+`cursor` yourself when auto-iterating. The SDK threads it through for you:
 
 ```python
 for contact in client.contacts.list(limit=100):
@@ -52,8 +52,8 @@ for contact in client.contacts.list(limit=100):
 
 ## Working a page at a time
 
-When you want to control fetching yourself — for example to render results page
-by page in a UI, or to checkpoint the `next_cursor` to a database — use the page
+When you want to control fetching yourself, for example to render results page
+by page in a UI, or to checkpoint the `next_cursor` to a database, use the page
 attributes directly instead of iterating.
 
 A page exposes:
@@ -105,7 +105,7 @@ page = client.contacts.list(limit=100, cursor=load_cursor())
 
 ## Async pagination
 
-The asynchronous client mirrors the sync one — swap `Warmbly` for
+The asynchronous client mirrors the sync one: swap `Warmbly` for
 [`AsyncWarmbly`][warmbly.AsyncWarmbly] and iterate with `async for`:
 
 ```python
@@ -136,11 +136,11 @@ async with AsyncWarmbly(api_key="wmbly_...") as client:
             print(contact.id)
 ```
 
-!!! note "`list()` is not a coroutine — the request is lazy"
+!!! note "`list()` is not a coroutine: the request is lazy"
     On the async client, `client.x.list(...)` returns immediately without
     sending a request. The HTTP call happens the first time you `await` it or
     start an `async for` over it. This is why you don't write
-    `async for ... in await client.x.list()` — iterate the return value
+    `async for ... in await client.x.list()`. Iterate the return value
     directly.
 
 ## Sync vs. async at a glance

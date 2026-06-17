@@ -60,11 +60,16 @@ jobs:
           cache: pip
       - name: Install
         run: python -m pip install -e ".[oauth,test]"
-      - name: Run tests
-        run: pytest --cov --cov-report=xml --cov-report=term-missing
-      - name: Upload coverage
-        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
-        uses: codecov/codecov-action@v5
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: false
+      # Coverage is gated by `fail_under` in pyproject.toml: pytest-cov exits
+      # non-zero if total coverage drops below the threshold, so the build fails
+      # on a coverage regression without any external service. The gateway
+      # integration tests are skipped on Windows (the in-process websocket server
+      # is flaky on the ProactorEventLoop), so coverage there is incomplete by
+      # design; the 100% gate runs on Linux and macOS, which execute the full
+      # suite, while Windows still runs every other test for correctness.
+      - name: Run tests (with coverage gate)
+        if: matrix.os != 'windows-latest'
+        run: pytest --cov --cov-report=term-missing
+      - name: Run tests (Windows, no coverage gate)
+        if: matrix.os == 'windows-latest'
+        run: pytest

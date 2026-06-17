@@ -24,8 +24,8 @@ needed to keep the project healthy.
 
 ## Scope
 
-This applies to all project spaces — issues, pull requests, discussions, and
-any other official channel — and whenever someone is representing the project.
+This applies to all project spaces (issues, pull requests, discussions, and
+any other official channel) and whenever someone is representing the project.
 
 ## Reporting
 
