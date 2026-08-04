@@ -9,7 +9,7 @@ assembled from news fragments in `changelog/` by
 
 <!-- towncrier release notes start -->
 
-## [v0.1.0] - 2026-08-04
+## [v0.2.0] - 2026-08-04
 
 First release: synchronous and asynchronous clients, API-key and OAuth2
 authentication, the REST resource surface, an OAuth2 client subsystem (PKCE,
