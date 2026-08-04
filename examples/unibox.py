@@ -9,7 +9,7 @@ Note: ``reply()`` and ``compose()`` send real mail, so run against a test org.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from warmbly import PaymentRequiredError, Warmbly
 
@@ -62,7 +62,7 @@ def main() -> None:
     print("queued:", sent.task_id)
 
     # Or schedule a brand-new email, letting the server pick the best mailbox.
-    tomorrow = (datetime.now(UTC) + timedelta(days=1)).isoformat()
+    tomorrow = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
     composed = client.unibox.compose(
         to=["lead@example.com"],
         subject="Following up",

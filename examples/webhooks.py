@@ -10,6 +10,11 @@ from __future__ import annotations
 from warmbly import Warmbly, WarmblyError, verify_webhook_signature
 
 
+def store_secret(endpoint_id: str, secret: str) -> None:
+    """Stand-in for your secret store (Vault, SSM, a sealed env var, ...)."""
+    raise NotImplementedError("wire this up to your own secret storage")
+
+
 def manage_endpoints() -> str:
     """Register an endpoint and return its signing secret."""
     client = Warmbly()
@@ -20,7 +25,10 @@ def manage_endpoints() -> str:
         description="Production webhook receiver",
     )
     print("endpoint:", endpoint.id)
-    print("secret:", endpoint.secret)  # shown only here; store it now
+
+    # The signing secret is returned here and never again. Put it straight into
+    # your secret store — don't log it, and don't let it reach a crash report.
+    store_secret(endpoint.id, endpoint.secret or "")
 
     # See what event types are available. `firehose` marks the high-volume ones.
     for event_type in client.webhooks.event_types():
@@ -35,8 +43,9 @@ def manage_endpoints() -> str:
         print("  failed:", delivery.event_type, delivery.error_reason)
         client.webhooks.redeliver(delivery.id)
 
-    # Rotate the signing secret when needed.
+    # Rotate the signing secret when needed. Same rule: store, never log.
     rotated = client.webhooks.rotate_secret(endpoint.id)
+    store_secret(endpoint.id, rotated.secret or "")
     client.close()
     return rotated.secret or ""
 

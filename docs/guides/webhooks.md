@@ -265,7 +265,8 @@ async def main() -> None:
         url="https://app.example.com/warmbly/webhook",
         event_types=["campaign.completed"],
     )
-    print(endpoint.id, endpoint.secret)
+    print(endpoint.id)
+    await store_secret(endpoint.secret)  # shown once; store it, never log it
 
     async for delivery in client.webhooks.endpoint_deliveries(endpoint.id):
         print(delivery.status)
