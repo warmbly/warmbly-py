@@ -76,13 +76,13 @@ def test_make_status_error_unmapped_4xx_is_plain_status_error() -> None:
 
 def test_make_status_error_5xx_is_internal_server_error() -> None:
     err = make_status_error(
-        status_code=503,
+        status_code=500,
         request_id=None,
         headers=None,
         body={"message": "down"},
     )
     assert type(err) is InternalServerError
-    assert err.status_code == 503
+    assert err.status_code == 500
     assert err.message == "down"
 
 

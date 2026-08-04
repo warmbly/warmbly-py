@@ -36,23 +36,23 @@ def _page(data: list[dict]) -> dict:
 def test_emails_send(client: Warmbly) -> None:
     route = respx.post(f"{BASE_URL}/emails/em_1/send").mock(
         return_value=httpx.Response(
-            200, json={"id": "msg_1", "status": "sent", "email_account_id": "em_1"}
+            200, json={"task_id": "task_1", "send_mode": "instant"}
         )
     )
 
     result = client.emails.send(
-        "em_1", to="dest@example.com", subject="Hi", text="Hello"
+        "em_1", to=["dest@example.com"], subject="Hi", body_plain="Hello"
     )
 
     request = route.calls.last.request
     assert request.method == "POST"
     assert request.url.path == "/v1/emails/em_1/send"
     assert json.loads(request.content) == {
-        "to": "dest@example.com",
+        "to": ["dest@example.com"],
         "subject": "Hi",
-        "text": "Hello",
+        "body_plain": "Hello",
     }
-    assert result.id == "msg_1"
+    assert result.task_id == "task_1"
 
 
 # -- contacts ---------------------------------------------------------------
@@ -65,8 +65,7 @@ def test_contacts_search(client: Warmbly) -> None:
             200,
             json={
                 "data": [{"id": "ct_1", "email": "lead@example.com"}],
-                "total": 1,
-                "has_more": False,
+                "pagination": {"total": 1, "has_more": False, "next_cursor": None},
             },
         )
     )
@@ -76,8 +75,10 @@ def test_contacts_search(client: Warmbly) -> None:
     request = route.calls.last.request
     assert request.method == "POST"
     assert request.url.path == "/v1/contacts/search"
-    assert json.loads(request.content) == {"query": "lead", "limit": 10}
-    assert result.total == 1
+    # The filter travels in the body; paging rides the query string.
+    assert json.loads(request.content) == {"query": "lead"}
+    assert request.url.params.get("limit") == "10"
+    assert result.pagination["total"] == 1
     assert result.data[0].id == "ct_1"
 
 
@@ -87,7 +88,7 @@ def test_contacts_search(client: Warmbly) -> None:
 @respx.mock
 def test_webhooks_list(client: Warmbly) -> None:
     route = respx.get(f"{BASE_URL}/webhooks").mock(
-        return_value=httpx.Response(200, json=_page([{"id": "wh_1"}]))
+        return_value=httpx.Response(200, json={"endpoints": [{"id": "wh_1"}]})
     )
 
     hooks = list(client.webhooks.list())
@@ -123,7 +124,7 @@ def test_analytics_dashboard(client: Warmbly) -> None:
 @respx.mock
 def test_integrations_catalog(client: Warmbly) -> None:
     route = respx.get(f"{BASE_URL}/integrations/catalog").mock(
-        return_value=httpx.Response(200, json=_page([{"id": "salesforce"}]))
+        return_value=httpx.Response(200, json={"catalog": [{"provider": "salesforce"}]})
     )
 
     entries = list(client.integrations.catalog())
@@ -131,7 +132,7 @@ def test_integrations_catalog(client: Warmbly) -> None:
     request = route.calls.last.request
     assert request.method == "GET"
     assert request.url.path == "/v1/integrations/catalog"
-    assert [e.id for e in entries] == ["salesforce"]
+    assert [e.provider for e in entries] == ["salesforce"]
 
 
 # -- templates --------------------------------------------------------------
@@ -146,7 +147,7 @@ def test_templates_create(client: Warmbly) -> None:
     )
 
     template = client.templates.create(
-        name="Welcome", subject="Hi", body="<p>Hello</p>"
+        name="Welcome", subject="Hi", body_html="<p>Hello</p>"
     )
 
     request = route.calls.last.request
@@ -155,7 +156,7 @@ def test_templates_create(client: Warmbly) -> None:
     assert json.loads(request.content) == {
         "name": "Welcome",
         "subject": "Hi",
-        "body": "<p>Hello</p>",
+        "body_html": "<p>Hello</p>",
     }
     assert template.id == "tpl_1"
 
@@ -181,17 +182,17 @@ def test_crm_list_deals(client: Warmbly) -> None:
 
 
 @respx.mock
-def test_teams_list_members(client: Warmbly) -> None:
-    route = respx.get(f"{BASE_URL}/teams/members").mock(
-        return_value=httpx.Response(200, json=_page([{"id": "tm_1"}]))
+def test_teams_list(client: Warmbly) -> None:
+    route = respx.get(f"{BASE_URL}/teams").mock(
+        return_value=httpx.Response(200, json={"data": [{"id": "tm_1"}]})
     )
 
-    members = list(client.teams.list_members())
+    teams = list(client.teams.list())
 
     request = route.calls.last.request
     assert request.method == "GET"
-    assert request.url.path == "/v1/teams/members"
-    assert [m.id for m in members] == ["tm_1"]
+    assert request.url.path == "/v1/teams"
+    assert [t.id for t in teams] == ["tm_1"]
 
 
 # -- plans ------------------------------------------------------------------
@@ -200,7 +201,7 @@ def test_teams_list_members(client: Warmbly) -> None:
 @respx.mock
 def test_plans_list(client: Warmbly) -> None:
     route = respx.get(f"{BASE_URL}/plans").mock(
-        return_value=httpx.Response(200, json=_page([{"id": "pro"}]))
+        return_value=httpx.Response(200, json={"plans": [{"id": "pro"}]})
     )
 
     plans = list(client.plans.list())
@@ -238,17 +239,18 @@ def test_timezones_list(client: Warmbly) -> None:
 
 
 @respx.mock
-def test_unibox_list_threads(client: Warmbly) -> None:
-    route = respx.get(f"{BASE_URL}/unibox/threads").mock(
-        return_value=httpx.Response(200, json=_page([{"id": "th_1"}]))
+def test_unibox_list(client: Warmbly) -> None:
+    route = respx.get(f"{BASE_URL}/unibox").mock(
+        return_value=httpx.Response(200, json=_page([{"id": "msg_1"}]))
     )
 
-    threads = list(client.unibox.list_threads())
+    messages = list(client.unibox.list(unseen=True))
 
     request = route.calls.last.request
     assert request.method == "GET"
-    assert request.url.path == "/v1/unibox/threads"
-    assert [t.id for t in threads] == ["th_1"]
+    assert request.url.path == "/v1/unibox"
+    assert request.url.params.get("unseen") == "true"
+    assert [m.id for m in messages] == ["msg_1"]
 
 
 # -- async examples ---------------------------------------------------------
@@ -258,7 +260,7 @@ def test_unibox_list_threads(client: Warmbly) -> None:
 @respx.mock
 async def test_async_plans_list() -> None:
     route = respx.get(f"{BASE_URL}/plans").mock(
-        return_value=httpx.Response(200, json=_page([{"id": "pro"}]))
+        return_value=httpx.Response(200, json={"plans": [{"id": "pro"}]})
     )
 
     async with AsyncWarmbly(
@@ -276,17 +278,17 @@ async def test_async_plans_list() -> None:
 @respx.mock
 async def test_async_emails_send() -> None:
     route = respx.post(f"{BASE_URL}/emails/em_1/send").mock(
-        return_value=httpx.Response(200, json={"id": "msg_1", "status": "sent"})
+        return_value=httpx.Response(200, json={"task_id": "task_1"})
     )
 
     async with AsyncWarmbly(
         api_key="wmbly_test", base_url=BASE_URL, max_retries=0
     ) as client:
         result = await client.emails.send(
-            "em_1", to="dest@example.com", subject="Hi", text="Hello"
+            "em_1", to=["dest@example.com"], subject="Hi", body_plain="Hello"
         )
 
     request = route.calls.last.request
     assert request.method == "POST"
     assert request.url.path == "/v1/emails/em_1/send"
-    assert result.id == "msg_1"
+    assert result.task_id == "task_1"

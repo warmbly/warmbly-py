@@ -354,11 +354,13 @@ def test_oauth_applications_sync_create_and_list(client: Warmbly) -> None:
     assert create.calls.last.request.method == "POST"
 
     list_route = respx.get(f"{BASE_URL}/oauth/applications").mock(
-        return_value=httpx.Response(200, json=_page([{"id": "app_1", "name": "App"}]))
+        return_value=httpx.Response(
+            200, json={"applications": [{"id": "app_1", "name": "App"}]}
+        )
     )
-    ids = [a.id for a in client.oauth_applications.list(limit=10)]
+    ids = [a.id for a in client.oauth_applications.list()]
     assert ids == ["app_1"]
-    assert list_route.calls.last.request.url.params.get("limit") == "10"
+    assert list_route.calls.last.request.url.path == "/v1/oauth/applications"
 
 
 @respx.mock
@@ -419,9 +421,9 @@ def test_oauth_applications_sync_delete_and_secrets(client: Warmbly) -> None:
     assert rotate_wh.calls.last.request.method == "POST"
 
     delete = respx.delete(f"{BASE_URL}/oauth/applications/app_1").mock(
-        return_value=httpx.Response(204)
+        return_value=httpx.Response(200, json={"deleted": True})
     )
-    assert client.oauth_applications.delete("app_1") is None
+    assert client.oauth_applications.delete("app_1").deleted is True
     assert delete.calls.last.request.method == "DELETE"
 
 
@@ -447,7 +449,9 @@ async def test_oauth_applications_async_full(aclient: AsyncWarmbly) -> None:
     }
 
     list_route = respx.get(f"{BASE_URL}/oauth/applications").mock(
-        return_value=httpx.Response(200, json=_page([{"id": "app_1", "name": "App"}]))
+        return_value=httpx.Response(
+            200, json={"applications": [{"id": "app_1", "name": "App"}]}
+        )
     )
     assert [a.id async for a in aclient.oauth_applications.list()] == ["app_1"]
     assert list_route.called
@@ -483,7 +487,7 @@ async def test_oauth_applications_async_full(aclient: AsyncWarmbly) -> None:
     ).webhook_secret == "w2"
 
     delete = respx.delete(f"{BASE_URL}/oauth/applications/app_1").mock(
-        return_value=httpx.Response(204)
+        return_value=httpx.Response(200, json={"deleted": True})
     )
-    assert await aclient.oauth_applications.delete("app_1") is None
+    assert (await aclient.oauth_applications.delete("app_1")).deleted is True
     assert delete.calls.last.request.method == "DELETE"

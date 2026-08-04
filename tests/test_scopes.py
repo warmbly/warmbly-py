@@ -84,9 +84,9 @@ def test_all_scopes_grants_everything() -> None:
     assert set(mask_to_scopes(ALL_SCOPES)) == set(SCOPES.keys())
 
 
-def test_all_scopes_is_22_bits() -> None:
-    assert len(SCOPES) == 22
-    assert bin(ALL_SCOPES).count("1") == 22
+def test_all_scopes_is_24_bits() -> None:
+    assert len(SCOPES) == 24
+    assert bin(ALL_SCOPES).count("1") == 24
 
 
 # ---------------------------------------------------------------------------

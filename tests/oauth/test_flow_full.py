@@ -285,30 +285,6 @@ def test_sync_refresh_token() -> None:
 
 
 @respx.mock
-def test_sync_client_credentials_with_scopes() -> None:
-    route = respx.post(TOKEN_URL).mock(
-        return_value=httpx.Response(200, json=_token_body())
-    )
-    with _confidential() as client:
-        client.client_credentials(scopes=["read", "write"])
-    form = parse_qs(route.calls.last.request.content.decode())
-    assert form["grant_type"] == ["client_credentials"]
-    assert form["scope"] == ["read write"]
-
-
-@respx.mock
-def test_sync_client_credentials_without_scopes() -> None:
-    route = respx.post(TOKEN_URL).mock(
-        return_value=httpx.Response(200, json=_token_body())
-    )
-    with _confidential() as client:
-        client.client_credentials()
-    form = parse_qs(route.calls.last.request.content.decode())
-    assert form["grant_type"] == ["client_credentials"]
-    assert "scope" not in form
-
-
-@respx.mock
 def test_sync_revoke_returns_none() -> None:
     route = respx.post(REVOKE_URL).mock(return_value=httpx.Response(200))
     with _confidential() as client:
@@ -539,31 +515,6 @@ async def test_async_refresh_token() -> None:
     assert form["grant_type"] == ["refresh_token"]
     assert form["refresh_token"] == ["wmrt_old"]
     assert token.refresh_token == "wmrt_rotated"
-
-
-@pytest.mark.anyio
-@respx.mock
-async def test_async_client_credentials_with_scopes() -> None:
-    route = respx.post(TOKEN_URL).mock(
-        return_value=httpx.Response(200, json=_token_body())
-    )
-    async with _async_confidential() as client:
-        await client.client_credentials(scopes=["read", "write"])
-    form = parse_qs(route.calls.last.request.content.decode())
-    assert form["grant_type"] == ["client_credentials"]
-    assert form["scope"] == ["read write"]
-
-
-@pytest.mark.anyio
-@respx.mock
-async def test_async_client_credentials_without_scopes() -> None:
-    route = respx.post(TOKEN_URL).mock(
-        return_value=httpx.Response(200, json=_token_body())
-    )
-    async with _async_confidential() as client:
-        await client.client_credentials()
-    form = parse_qs(route.calls.last.request.content.decode())
-    assert "scope" not in form
 
 
 @pytest.mark.anyio

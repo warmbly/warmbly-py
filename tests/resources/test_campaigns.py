@@ -126,19 +126,13 @@ def test_create_step(client: Warmbly) -> None:
         )
     )
 
-    step = client.campaigns.create_step(
-        "camp_1", type="email", order=1, subject="Hello", body="Hi there"
-    )
+    # The endpoint takes no body: a step is created blank, then filled in.
+    step = client.campaigns.create_step("camp_1")
 
     request = route.calls.last.request
     assert request.method == "POST"
     assert request.url.path == "/v1/campaigns/camp_1/steps"
-    assert json.loads(request.content) == {
-        "type": "email",
-        "order": 1,
-        "subject": "Hello",
-        "body": "Hi there",
-    }
+    assert request.content == b""
     assert step.id == "step_1"
 
 
