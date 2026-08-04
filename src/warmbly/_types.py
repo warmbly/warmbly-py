@@ -14,6 +14,7 @@ from typing import (
     Literal,
     TypeAlias,
     TypedDict,
+    TypeGuard,
     TypeVar,
     Union,
 )
@@ -78,8 +79,12 @@ class Omit:
         return "Omit"
 
 
-def is_given(value: NotGivenOr[_T]) -> bool:
-    """Return ``True`` unless *value* is the :data:`NOT_GIVEN` sentinel."""
+def is_given(value: NotGivenOr[_T]) -> TypeGuard[_T]:
+    """Return ``True`` unless *value* is the :data:`NOT_GIVEN` sentinel.
+
+    Typed as a :class:`~typing.TypeGuard` so a truthy check narrows the value
+    to ``T``, letting callers use it without a cast.
+    """
     return not isinstance(value, NotGiven)
 
 

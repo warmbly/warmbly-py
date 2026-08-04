@@ -22,15 +22,25 @@ from ._exceptions import (
     GatewayError,
     InternalServerError,
     NotFoundError,
+    NotImplementedAPIError,
     OAuthError,
+    PaymentRequiredError,
     PermissionDeniedError,
     RateLimitError,
+    ServiceUnavailableError,
     UnprocessableEntityError,
     WarmblyError,
 )
 from ._models import BaseModel
 from ._types import NOT_GIVEN, NotGiven, Omit, RequestOptions, Timeout
-from ._utils import mask_to_scopes, scopes_to_mask
+from ._utils import (
+    ALL_SCOPES,
+    FULL_ACCESS_SCOPES,
+    READ_ONLY_SCOPES,
+    SCOPES,
+    mask_to_scopes,
+    scopes_to_mask,
+)
 from .gateway import AsyncGatewayClient, GatewayClient, GatewayEvent
 from .resources import verify_signature, verify_webhook_signature
 
@@ -66,6 +76,10 @@ __all__ = [  # noqa: RUF022 - grouped by category for readability
     # Scope helpers
     "scopes_to_mask",
     "mask_to_scopes",
+    "SCOPES",
+    "ALL_SCOPES",
+    "READ_ONLY_SCOPES",
+    "FULL_ACCESS_SCOPES",
     # Exceptions
     "WarmblyError",
     "APIError",
@@ -75,12 +89,15 @@ __all__ = [  # noqa: RUF022 - grouped by category for readability
     "APIStatusError",
     "BadRequestError",
     "AuthenticationError",
+    "PaymentRequiredError",
     "PermissionDeniedError",
     "NotFoundError",
     "ConflictError",
     "UnprocessableEntityError",
     "RateLimitError",
     "InternalServerError",
+    "NotImplementedAPIError",
+    "ServiceUnavailableError",
     "OAuthError",
     "GatewayError",
 ]

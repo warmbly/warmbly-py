@@ -1,8 +1,11 @@
 """Cursor-based pagination.
 
-The Warmbly list endpoints return ``{"data": [...], "pagination": {"total",
-"next_cursor", "has_more"}}``. These page objects expose the current ``data``
-and transparently fetch subsequent pages, so callers can simply iterate::
+Most Warmbly list endpoints return ``{"data": [...], "pagination": {"total",
+"next_cursor", "has_more"}}``. A few name the collection differently
+(``{"endpoints": [...]}``, ``{"rules": [...]}``, ...) or return a bare JSON
+array; the transport normalizes all three onto these page objects. They expose
+the current ``data`` and transparently fetch subsequent pages, so callers can
+simply iterate::
 
     for key in client.api_keys.list():
         ...
