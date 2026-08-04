@@ -57,6 +57,10 @@ except warmbly.WarmblyError as exc:
 
 ::: warmbly.AuthenticationError
 
+### PaymentRequiredError
+
+::: warmbly.PaymentRequiredError
+
 ### PermissionDeniedError
 
 ::: warmbly.PermissionDeniedError
@@ -80,6 +84,14 @@ except warmbly.WarmblyError as exc:
 ### InternalServerError
 
 ::: warmbly.InternalServerError
+
+### NotImplementedAPIError
+
+::: warmbly.NotImplementedAPIError
+
+### ServiceUnavailableError
+
+::: warmbly.ServiceUnavailableError
 
 ## OAuth and gateway errors
 

@@ -20,6 +20,16 @@ for campaign in client.campaigns.list():
     method surface returning awaitables; list operations on the async clients
     return an `AsyncCursorPage` you iterate with `async for`.
 
+!!! info "What is not here"
+    The clients cover what an API key or OAuth token can reach. Routes that
+    require a browser session — organization governance, billing and
+    subscriptions, mailbox onboarding, and the OAuth consent flow — are
+    deliberately absent, because a long-lived credential cannot call them.
+
+## Identity
+
+::: warmbly.resources.identity.Me
+
 ## API keys
 
 ::: warmbly.resources.api_keys.ApiKeys
@@ -40,6 +50,10 @@ for campaign in client.campaigns.list():
 
 ::: warmbly.resources.contacts.Contacts
 
+## Unibox
+
+::: warmbly.resources.unibox.Unibox
+
 ## Webhooks
 
 ::: warmbly.resources.webhooks.Webhooks
@@ -48,9 +62,21 @@ for campaign in client.campaigns.list():
 
 ::: warmbly.resources.analytics.Analytics
 
+## Advisor
+
+::: warmbly.resources.advisor.Advisor
+
 ## Integrations
 
 ::: warmbly.resources.integrations.Integrations
+
+## Automations
+
+::: warmbly.resources.automations.Automations
+
+## Lead sync
+
+::: warmbly.resources.lead_sync.LeadSync
 
 ## Templates
 
@@ -60,9 +86,48 @@ for campaign in client.campaigns.list():
 
 ::: warmbly.resources.crm.Crm
 
+## Meetings
+
+::: warmbly.resources.meetings.Meetings
+
 ## Teams
 
 ::: warmbly.resources.teams.Teams
+
+## Folders, tags, and categories
+
+`client.folders`, `client.tags`, and `client.categories` are the same resource
+bound to three route prefixes.
+
+::: warmbly.resources.groups.Groups
+
+## AI generation
+
+::: warmbly.resources.generation.Generation
+
+## AI skills
+
+::: warmbly.resources.ai_skills.AISkills
+
+## Outreach settings
+
+::: warmbly.resources.outreach.Outreach
+
+## Deliverability
+
+::: warmbly.resources.deliverability.Deliverability
+
+## Warmup routing
+
+::: warmbly.resources.warmup_routing.WarmupRouting
+
+## Task dead-letter queue
+
+::: warmbly.resources.tasks.Tasks
+
+## Audit logs
+
+::: warmbly.resources.audit_logs.AuditLogs
 
 ## Plans
 
@@ -71,7 +136,3 @@ for campaign in client.campaigns.list():
 ## Timezones
 
 ::: warmbly.resources.timezones.Timezones
-
-## Unibox
-
-::: warmbly.resources.unibox.Unibox

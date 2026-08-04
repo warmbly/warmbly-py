@@ -37,9 +37,9 @@ See the [Authentication guide](guides/auth.md) for the full picture and the
 
 - **Sync and async, same API.** Every method on `Warmbly` has an `await`-able
   twin on [`AsyncWarmbly`](reference/client.md). No second mental model.
-- **OAuth2 done right.** [`warmbly.oauth`](reference/oauth.md) ships PKCE,
-  authorization-code and client-credentials grants, token refresh, revocation,
-  and pluggable storage (memory, encrypted file, OS keyring).
+- **OAuth2 done right.** [`warmbly.oauth`](reference/oauth.md) ships the
+  authorization-code grant with PKCE, token refresh, revocation, and pluggable
+  storage (memory, encrypted file, OS keyring).
 - **Realtime gateway.** [`AsyncGatewayClient`](reference/gateway.md) subscribes
   to live events over a single resilient WebSocket, with heartbeats, automatic
   reconnect, and session resume handled for you (a blocking `GatewayClient`

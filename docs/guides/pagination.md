@@ -35,9 +35,17 @@ for key in client.api_keys.list():
 `cursor` yourself when auto-iterating. The SDK threads it through for you:
 
 ```python
-for contact in client.contacts.list(limit=100):
+for campaign in client.campaigns.list(status="active", limit=100):
     ...
 ```
+
+!!! note "Contacts are the exception"
+    There is no `client.contacts.list()`. The contact collection is queried
+    through `client.contacts.search()`, whose faceted filter travels in the
+    request body, so it returns one explicit page rather than an auto-iterating
+    one. Carry `page.pagination["next_cursor"]` into the next call yourself.
+    `client.crm.search_deals()` and `client.crm.search_tasks()` work the same
+    way.
 
 !!! tip "Stop early whenever you like"
     Because pages are fetched lazily, you can `break` out of the loop at any
@@ -96,11 +104,11 @@ while page.has_next_page():
 resume later by passing it back as `cursor=`:
 
 ```python
-page = client.contacts.list(limit=100)
+page = client.campaigns.list(limit=100)
 save_cursor(page.next_cursor)  # your storage
 
 # ... later, in another process ...
-page = client.contacts.list(limit=100, cursor=load_cursor())
+page = client.campaigns.list(limit=100, cursor=load_cursor())
 ```
 
 ## Async pagination
@@ -125,14 +133,14 @@ so you can also fetch and inspect a single page with `await`:
 
 ```python
 async with AsyncWarmbly(api_key="wmbly_...") as client:
-    page = await client.contacts.list(limit=100)
+    page = await client.campaigns.list(limit=100)
 
-    for contact in page.data:
-        print(contact.id)
+    for campaign in page.data:
+        print(campaign.id)
 
     while page.has_next_page():
         page = await page.get_next_page()
-        for contact in page.data:
+        for campaign in page.data:
             print(contact.id)
 ```
 

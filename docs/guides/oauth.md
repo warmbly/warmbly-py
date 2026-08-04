@@ -2,15 +2,19 @@
 
 Use OAuth2 when your application needs to act **on behalf of another Warmbly
 user or organization** rather than as itself. The
-`warmbly.oauth` subsystem implements the RFC 9700-sanctioned
-grants against Warmbly's authorization server:
+`warmbly.oauth` subsystem implements the two grants Warmbly's authorization
+server accepts:
 
 - **authorization_code + PKCE (S256)**: the interactive browser flow.
 - **refresh_token**: exchange a (rotating) refresh token for a fresh token set.
-- **client_credentials**: machine-to-machine, with no user present.
 
 It also provides token revocation, pluggable token storage, and an
 auto-refreshing token manager.
+
+!!! note "No client-credentials grant"
+    Every Warmbly token is bound to a user who consented, so there is no
+    machine-to-machine grant. For a backend acting as itself, use an
+    [API key](auth.md) instead: `Warmbly(api_key="wmbly_...")`.
 
 ```python
 from warmbly.oauth import OAuth2Client
@@ -150,19 +154,6 @@ new_token = oauth.refresh_token(token.refresh_token)
     `OAuthError` (for example `invalid_grant`), which means the user must
     re-authenticate. The [TokenManager](#automatic-refresh-with-tokenmanager)
     handles all of this for you.
-
-## Client-credentials grant
-
-For machine-to-machine access with no user, use
-[`client_credentials`][warmbly.oauth.OAuth2Client.client_credentials]:
-
-```python
-token = oauth.client_credentials(scopes=["read_analytics"])
-api = Warmbly(api_key=token.access_token)
-```
-
-This grant typically does not return a refresh token; obtain a new token when
-the current one expires.
 
 ## Revoking a token
 

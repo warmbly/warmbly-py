@@ -159,7 +159,7 @@ Override it per request through `options`:
 
 ```python
 # Give this slow report query more time.
-client.analytics.list(options={"timeout": 120.0})
+client.analytics.deliverability(options={"timeout": 120.0})
 ```
 
 ## Putting it together
