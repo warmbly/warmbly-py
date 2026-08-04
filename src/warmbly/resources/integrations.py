@@ -1,14 +1,17 @@
-"""The ``integrations`` resource: third-party connections and lead sync.
+"""The ``integrations`` resource: third-party connections.
 
 Maps to the ``/v1/integrations`` route group. Covers the catalog of available
 providers, the connections an organization has configured, their event
 subscriptions, field mappings, sync runs, webhook signing secrets, connection
-testing, ad-hoc pushes, and booked meetings.
+testing, contact pushes, and recently booked meetings.
 
-A connection's ``webhook_secret`` is returned only by
-:meth:`Integrations.connection_webhook_secret`; store it to verify inbound
-provider webhooks. Sub-objects (``config``, mapping entries, run records) are
-modeled permissively because provider shapes vary and the catalog grows.
+Connecting an OAuth provider is a session-only browser flow
+(``/v1/integrations/oauth/*``), so it is not reachable with an API key or OAuth
+token; :meth:`Integrations.create_connection` covers the API-key- and
+webhook-style providers.
+
+Sub-objects (``config``, ``display_fields``, mapping entries) are modeled
+permissively because provider shapes vary and the catalog grows.
 """
 
 from __future__ import annotations
@@ -28,31 +31,42 @@ __all__ = [
     "IntegrationCatalogEntry",
     "IntegrationConnection",
     "IntegrationConnectionDeleted",
+    "IntegrationConnectionDetail",
     "IntegrationEvent",
     "IntegrationEventDeleted",
+    "IntegrationFieldMapping",
     "IntegrationFieldMappings",
     "IntegrationRun",
-    "IntegrationRunResult",
     "IntegrationTestResult",
     "IntegrationWebhookSecret",
     "Integrations",
+    "PushResult",
 ]
 
 
 class IntegrationCatalogEntry(BaseModel):
-    """A provider available to connect from the integrations catalog."""
+    """A provider available to connect from the integrations catalog.
+
+    ``configured`` reports whether this deployment has the credentials needed
+    to offer the provider at all.
+    """
 
     provider: str
     name: str | None = None
-    description: str | None = None
+    tagline: str | None = None
     category: str | None = None
-    logo_url: str | None = None
-    auth_type: str | None = None
-    scopes: Sequence[str] = []
-    capabilities: Sequence[str] = []
-    config_schema: dict[str, Any] = {}
     docs_url: str | None = None
-    status: str | None = None
+    auth_method: str | None = None
+    badge_color: str | None = None
+    beta: bool | None = None
+    webhook_hint: str | None = None
+    highlights: Sequence[str] = []
+    scopes: Sequence[str] = []
+    events: Sequence[str] = []
+    action_types: Sequence[str] = []
+    supports_push: bool | None = None
+    capability: dict[str, Any] | None = None
+    configured: bool | None = None
 
 
 class IntegrationConnection(BaseModel):
@@ -61,20 +75,26 @@ class IntegrationConnection(BaseModel):
     id: str
     organization_id: str | None = None
     provider: str | None = None
+    label: str | None = None
     status: str | None = None
-    config: dict[str, Any] = {}
-    name: str | None = None
-    events: Sequence[str] = []
-    webhook_url: str | None = None
+    auth_method: str | None = None
+    display_fields: dict[str, Any] | None = None
+    config_capabilities: dict[str, Any] | None = None
+    sync_direction: str | None = None
+    connected_by_user_id: str | None = None
+    external_account_id: str | None = None
+    external_account_name: str | None = None
+    granted_scopes: Sequence[str] = []
+    token_expires_at: str | None = None
+    health: str | None = None
+    health_detail: str | None = None
+    health_checked_at: str | None = None
+    inbound_webhook_url: str | None = None
     last_synced_at: str | None = None
+    last_error: str | None = None
+    last_error_at: str | None = None
     created_at: str | None = None
     updated_at: str | None = None
-
-
-class IntegrationConnectionDeleted(BaseModel):
-    """The result of removing a connection."""
-
-    status: str | None = None
 
 
 class IntegrationEvent(BaseModel):
@@ -82,24 +102,14 @@ class IntegrationEvent(BaseModel):
 
     id: str
     connection_id: str | None = None
+    organization_id: str | None = None
     event_type: str | None = None
+    action: str | None = None
+    config: dict[str, Any] | None = None
     enabled: bool | None = None
-    config: dict[str, Any] = {}
+    use_case: str | None = None
+    automation_id: str | None = None
     created_at: str | None = None
-    updated_at: str | None = None
-
-
-class IntegrationEventDeleted(BaseModel):
-    """The result of removing an event subscription."""
-
-    status: str | None = None
-
-
-class IntegrationFieldMappings(BaseModel):
-    """The field mappings between Warmbly and a provider for a connection."""
-
-    connection_id: str | None = None
-    mappings: Sequence[dict[str, Any]] = []
     updated_at: str | None = None
 
 
@@ -108,53 +118,122 @@ class IntegrationRun(BaseModel):
 
     id: str
     connection_id: str | None = None
+    organization_id: str | None = None
+    kind: str | None = None
     status: str | None = None
-    direction: str | None = None
+    detail: str | None = None
     records_processed: int | None = None
-    records_failed: int | None = None
-    error: str | None = None
     started_at: str | None = None
     finished_at: str | None = None
+
+
+class IntegrationConnectionDetail(BaseModel):
+    """A connection together with its subscriptions and recent runs.
+
+    This is the shape both :meth:`Integrations.get_connection` and
+    :meth:`Integrations.update_connection_config` return; the latter populates
+    only ``connection``.
+    """
+
+    connection: IntegrationConnection | None = None
+    events: Sequence[IntegrationEvent] = []
+    runs: Sequence[IntegrationRun] = []
+
+
+class IntegrationConnectionDeleted(BaseModel):
+    """The result of removing a connection (``204 No Content``)."""
+
+    id: str | None = None
+    deleted: bool | None = None
+
+
+class IntegrationEventDeleted(BaseModel):
+    """The result of removing an event subscription (``204 No Content``)."""
+
+    id: str | None = None
+    deleted: bool | None = None
+
+
+class IntegrationFieldMapping(BaseModel):
+    """One field map between a Warmbly field and a provider field."""
+
+    id: str | None = None
+    connection_id: str | None = None
+    organization_id: str | None = None
+    subscription_id: str | None = None
+    direction: str | None = None
+    object_name: str | None = None
+    warmbly_field: str | None = None
+    external_field: str | None = None
+    transform: str | None = None
+    static_value: str | None = None
+    is_default: bool | None = None
     created_at: str | None = None
 
 
-class IntegrationRunResult(BaseModel):
-    """The result of triggering a push to a connection."""
+class IntegrationFieldMappings(BaseModel):
+    """The full set of field mappings configured for a connection."""
 
-    run_id: str | None = None
-    status: str | None = None
-    accepted: int | None = None
+    mappings: Sequence[IntegrationFieldMapping] = []
 
 
 class IntegrationWebhookSecret(BaseModel):
-    """A connection's inbound webhook signing secret."""
+    """A connection's inbound webhook signing secret and its scheme.
 
-    webhook_secret: str | None = None
+    ``scheme`` documents exactly what is signed so you can verify the
+    ``signature_header`` on inbound provider webhooks.
+    """
+
+    signing_secret: str | None = None
+    signature_header: str | None = None
+    scheme: str | None = None
 
 
 class IntegrationTestResult(BaseModel):
-    """The result of testing a connection's credentials/connectivity."""
+    """The result of firing a synthetic event through a connection.
 
-    ok: bool | None = None
-    status: str | None = None
-    message: str | None = None
-    details: dict[str, Any] = {}
+    ``sent`` counts the automations the test event actually reached, so ``0``
+    means the connection is live but nothing is wired to it.
+    """
+
+    sent: int | None = None
+
+
+class PushResult(BaseModel):
+    """The result of pushing contacts into a connected CRM.
+
+    ``results`` carries one entry per contact, so a partial failure is legible
+    rather than an opaque count.
+    """
+
+    provider: str | None = None
+    pushed: int | None = None
+    failed: int | None = None
+    results: Sequence[dict[str, Any]] = []
 
 
 class IntegrationBooking(BaseModel):
-    """A booked meeting surfaced through a calendar/scheduling integration."""
+    """A booked meeting ingested from a scheduling provider."""
 
     id: str
-    connection_id: str | None = None
-    provider: str | None = None
-    contact_id: str | None = None
-    campaign_id: str | None = None
+    organization_id: str | None = None
+    source: str | None = None
+    external_event_id: str | None = None
     status: str | None = None
-    title: str | None = None
-    attendee_email: str | None = None
-    start_at: str | None = None
-    end_at: str | None = None
+    invitee_email: str | None = None
+    invitee_name: str | None = None
+    event_name: str | None = None
+    event_type: str | None = None
+    scheduled_for: str | None = None
+    end_time: str | None = None
+    join_url: str | None = None
     location: str | None = None
+    cancel_url: str | None = None
+    reschedule_url: str | None = None
+    canceled_reason: str | None = None
+    contact_id: str | None = None
+    contact_name: str | None = None
+    campaign_id: str | None = None
     created_at: str | None = None
     updated_at: str | None = None
 
@@ -165,32 +244,22 @@ class Integrations(SyncAPIResource):
     def catalog(
         self, *, options: RequestOptions | None = None
     ) -> SyncCursorPage[IntegrationCatalogEntry]:
-        """List providers available to connect (auto-paginating)."""
+        """List every provider in the catalog. Returned in full, unpaginated."""
         return self._get_api_list(
             "/integrations/catalog",
             model=IntegrationCatalogEntry,
+            data_key="catalog",
             options=options,
         )
 
     def list_connections(
-        self,
-        *,
-        limit: NotGivenOr[int] = NOT_GIVEN,
-        cursor: NotGivenOr[str] = NOT_GIVEN,
-        provider: NotGivenOr[str] = NOT_GIVEN,
-        status: NotGivenOr[str] = NOT_GIVEN,
-        options: RequestOptions | None = None,
+        self, *, options: RequestOptions | None = None
     ) -> SyncCursorPage[IntegrationConnection]:
-        """List configured connections (auto-paginating)."""
+        """List the organization's connections. Returned in full, unpaginated."""
         return self._get_api_list(
             "/integrations/connections",
             model=IntegrationConnection,
-            query={
-                "limit": limit,
-                "cursor": cursor,
-                "provider": provider,
-                "status": status,
-            },
+            data_key="connections",
             options=options,
         )
 
@@ -198,27 +267,20 @@ class Integrations(SyncAPIResource):
         self,
         *,
         provider: str,
+        label: NotGivenOr[str] = NOT_GIVEN,
         config: NotGivenOr[dict[str, Any]] = NOT_GIVEN,
-        name: NotGivenOr[str] = NOT_GIVEN,
-        events: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> IntegrationConnection:
-        """Create a connection to a provider.
+        """Connect an API-key or webhook provider.
+
+        OAuth providers go through the browser flow instead.
 
         Args:
             provider: The catalog provider key to connect.
+            label: A human-readable name for the connection.
             config: Provider-specific configuration (credentials, options).
-            name: An optional human-readable label for the connection.
-            events: Optional list of provider event types to subscribe to.
         """
-        body = drop_not_given(
-            {
-                "provider": provider,
-                "config": config,
-                "name": name,
-                "events": events,
-            }
-        )
+        body = drop_not_given({"provider": provider, "label": label, "config": config})
         return self._post(
             "/integrations/connections",
             cast_to=IntegrationConnection,
@@ -228,11 +290,11 @@ class Integrations(SyncAPIResource):
 
     def get_connection(
         self, connection_id: str, *, options: RequestOptions | None = None
-    ) -> IntegrationConnection:
-        """Retrieve a single connection by id."""
+    ) -> IntegrationConnectionDetail:
+        """Retrieve a connection with its subscriptions and recent runs."""
         return self._get(
             f"/integrations/connections/{connection_id}",
-            cast_to=IntegrationConnection,
+            cast_to=IntegrationConnectionDetail,
             options=options,
         )
 
@@ -240,19 +302,26 @@ class Integrations(SyncAPIResource):
         self,
         connection_id: str,
         *,
-        config: dict[str, Any],
+        config_capabilities: NotGivenOr[dict[str, Any]] = NOT_GIVEN,
+        sync_direction: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
-    ) -> IntegrationConnection:
-        """Update a connection's provider-specific configuration.
+    ) -> IntegrationConnectionDetail:
+        """Update a connection's capability snapshot and sync direction.
 
         Args:
             connection_id: The connection to update.
-            config: The new provider configuration to merge/apply.
+            config_capabilities: What the integration is configured to do.
+            sync_direction: The direction records flow in.
         """
-        body = drop_not_given({"config": config})
+        body = drop_not_given(
+            {
+                "config_capabilities": config_capabilities,
+                "sync_direction": sync_direction,
+            }
+        )
         return self._patch(
             f"/integrations/connections/{connection_id}/config",
-            cast_to=IntegrationConnection,
+            cast_to=IntegrationConnectionDetail,
             body=body,
             options=options,
         )
@@ -260,7 +329,7 @@ class Integrations(SyncAPIResource):
     def delete_connection(
         self, connection_id: str, *, options: RequestOptions | None = None
     ) -> IntegrationConnectionDeleted:
-        """Remove a connection."""
+        """Disconnect a provider."""
         return self._delete(
             f"/integrations/connections/{connection_id}",
             cast_to=IntegrationConnectionDeleted,
@@ -268,18 +337,13 @@ class Integrations(SyncAPIResource):
         )
 
     def list_events(
-        self,
-        connection_id: str,
-        *,
-        limit: NotGivenOr[int] = NOT_GIVEN,
-        cursor: NotGivenOr[str] = NOT_GIVEN,
-        options: RequestOptions | None = None,
+        self, connection_id: str, *, options: RequestOptions | None = None
     ) -> SyncCursorPage[IntegrationEvent]:
-        """List a connection's event subscriptions (auto-paginating)."""
+        """List a connection's event subscriptions. Returned in full."""
         return self._get_api_list(
             f"/integrations/connections/{connection_id}/events",
             model=IntegrationEvent,
-            query={"limit": limit, "cursor": cursor},
+            data_key="events",
             options=options,
         )
 
@@ -288,23 +352,26 @@ class Integrations(SyncAPIResource):
         connection_id: str,
         *,
         event_type: str,
-        enabled: NotGivenOr[bool] = NOT_GIVEN,
+        action: NotGivenOr[str] = NOT_GIVEN,
         config: NotGivenOr[dict[str, Any]] = NOT_GIVEN,
+        enabled: NotGivenOr[bool] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> IntegrationEvent:
-        """Subscribe a connection to a provider event type.
+        """Subscribe a connection to a Warmbly event.
 
         Args:
-            connection_id: The connection to attach the event to.
-            event_type: The provider event type to subscribe to.
+            connection_id: The connection to attach the subscription to.
+            event_type: The Warmbly event to react to.
+            action: What the provider should do when it fires.
+            config: Action-specific configuration (channel, board, ...).
             enabled: Whether the subscription is active.
-            config: Optional event-specific configuration.
         """
         body = drop_not_given(
             {
                 "event_type": event_type,
-                "enabled": enabled,
+                "action": action,
                 "config": config,
+                "enabled": enabled,
             }
         )
         return self._post(
@@ -342,16 +409,20 @@ class Integrations(SyncAPIResource):
         self,
         connection_id: str,
         *,
+        object: str,
         mappings: Sequence[dict[str, Any]],
         options: RequestOptions | None = None,
     ) -> IntegrationFieldMappings:
-        """Replace a connection's field mappings.
+        """Replace the field mappings for one object on a connection.
 
         Args:
             connection_id: The connection whose mappings to replace.
-            mappings: The full set of field mappings to store.
+            object: The object the mappings apply to (e.g. ``"contact"``).
+            mappings: The full set of maps, each
+                ``{"warmbly_field", "external_field", "transform",
+                "static_value"}``.
         """
-        body = drop_not_given({"mappings": mappings})
+        body = {"object": object, "mappings": [dict(m) for m in mappings]}
         return self._put(
             f"/integrations/connections/{connection_id}/field-mappings",
             cast_to=IntegrationFieldMappings,
@@ -360,26 +431,20 @@ class Integrations(SyncAPIResource):
         )
 
     def runs(
-        self,
-        connection_id: str,
-        *,
-        limit: NotGivenOr[int] = NOT_GIVEN,
-        cursor: NotGivenOr[str] = NOT_GIVEN,
-        status: NotGivenOr[str] = NOT_GIVEN,
-        options: RequestOptions | None = None,
+        self, connection_id: str, *, options: RequestOptions | None = None
     ) -> SyncCursorPage[IntegrationRun]:
-        """List a connection's sync runs (auto-paginating)."""
+        """List a connection's recent sync runs."""
         return self._get_api_list(
             f"/integrations/connections/{connection_id}/runs",
             model=IntegrationRun,
-            query={"limit": limit, "cursor": cursor, "status": status},
+            data_key="runs",
             options=options,
         )
 
     def connection_webhook_secret(
         self, connection_id: str, *, options: RequestOptions | None = None
     ) -> IntegrationWebhookSecret:
-        """Retrieve a connection's inbound webhook signing secret."""
+        """Retrieve (generating on first call) a connection's signing secret."""
         return self._get(
             f"/integrations/connections/{connection_id}/webhook-secret",
             cast_to=IntegrationWebhookSecret,
@@ -389,7 +454,7 @@ class Integrations(SyncAPIResource):
     def test_connection(
         self, connection_id: str, *, options: RequestOptions | None = None
     ) -> IntegrationTestResult:
-        """Test a connection's credentials and connectivity."""
+        """Fire a synthetic event through the connection's automations."""
         return self._post(
             f"/integrations/connections/{connection_id}/test",
             cast_to=IntegrationTestResult,
@@ -400,71 +465,37 @@ class Integrations(SyncAPIResource):
         self,
         connection_id: str,
         *,
-        records: NotGivenOr[Sequence[dict[str, Any]]] = NOT_GIVEN,
-        event_type: NotGivenOr[str] = NOT_GIVEN,
-        payload: NotGivenOr[dict[str, Any]] = NOT_GIVEN,
+        contact_ids: Sequence[str],
         options: RequestOptions | None = None,
-    ) -> IntegrationRunResult:
-        """Push records or an event to a connection's provider.
+    ) -> PushResult:
+        """Upsert contacts into a connected CRM, synchronously.
+
+        Every upsert is keyed by email, so repeating a push converges rather
+        than duplicating records.
 
         Args:
             connection_id: The connection to push to.
-            records: Optional records to send to the provider.
-            event_type: Optional event type describing the push.
-            payload: Optional free-form payload for the push.
+            contact_ids: The contacts to upsert.
         """
-        body = drop_not_given(
-            {
-                "records": records,
-                "event_type": event_type,
-                "payload": payload,
-            }
-        )
         return self._post(
             f"/integrations/connections/{connection_id}/push",
-            cast_to=IntegrationRunResult,
-            body=body,
+            cast_to=PushResult,
+            body={"contact_ids": list(contact_ids)},
             options=options,
         )
 
     def bookings(
-        self,
-        *,
-        limit: NotGivenOr[int] = NOT_GIVEN,
-        cursor: NotGivenOr[str] = NOT_GIVEN,
-        connection_id: NotGivenOr[str] = NOT_GIVEN,
-        contact_id: NotGivenOr[str] = NOT_GIVEN,
-        campaign_id: NotGivenOr[str] = NOT_GIVEN,
-        status: NotGivenOr[str] = NOT_GIVEN,
-        from_: NotGivenOr[str] = NOT_GIVEN,
-        to: NotGivenOr[str] = NOT_GIVEN,
-        options: RequestOptions | None = None,
+        self, *, options: RequestOptions | None = None
     ) -> SyncCursorPage[IntegrationBooking]:
-        """List booked meetings from calendar/scheduling integrations.
+        """List recently booked meetings from scheduling integrations.
 
-        Args:
-            limit: Maximum number of bookings per page.
-            cursor: Pagination cursor.
-            connection_id: Filter by source connection.
-            contact_id: Filter by contact.
-            campaign_id: Filter by campaign.
-            status: Filter by booking status.
-            from_: Lower bound (RFC3339) on the booking start time.
-            to: Upper bound (RFC3339) on the booking start time.
+        Capped at the 50 most recent. Use ``client.meetings.list()`` for the
+        full, filterable meetings list.
         """
         return self._get_api_list(
             "/integrations/bookings",
             model=IntegrationBooking,
-            query={
-                "limit": limit,
-                "cursor": cursor,
-                "connection_id": connection_id,
-                "contact_id": contact_id,
-                "campaign_id": campaign_id,
-                "status": status,
-                "from": from_,
-                "to": to,
-            },
+            data_key="bookings",
             options=options,
         )
 
@@ -475,32 +506,22 @@ class AsyncIntegrations(AsyncAPIResource):
     def catalog(
         self, *, options: RequestOptions | None = None
     ) -> AsyncPaginator[IntegrationCatalogEntry]:
-        """List providers available to connect (auto-paginating)."""
+        """List every provider in the catalog. Returned in full, unpaginated."""
         return self._get_api_list(
             "/integrations/catalog",
             model=IntegrationCatalogEntry,
+            data_key="catalog",
             options=options,
         )
 
     def list_connections(
-        self,
-        *,
-        limit: NotGivenOr[int] = NOT_GIVEN,
-        cursor: NotGivenOr[str] = NOT_GIVEN,
-        provider: NotGivenOr[str] = NOT_GIVEN,
-        status: NotGivenOr[str] = NOT_GIVEN,
-        options: RequestOptions | None = None,
+        self, *, options: RequestOptions | None = None
     ) -> AsyncPaginator[IntegrationConnection]:
-        """List configured connections (auto-paginating)."""
+        """List the organization's connections. Returned in full, unpaginated."""
         return self._get_api_list(
             "/integrations/connections",
             model=IntegrationConnection,
-            query={
-                "limit": limit,
-                "cursor": cursor,
-                "provider": provider,
-                "status": status,
-            },
+            data_key="connections",
             options=options,
         )
 
@@ -508,27 +529,20 @@ class AsyncIntegrations(AsyncAPIResource):
         self,
         *,
         provider: str,
+        label: NotGivenOr[str] = NOT_GIVEN,
         config: NotGivenOr[dict[str, Any]] = NOT_GIVEN,
-        name: NotGivenOr[str] = NOT_GIVEN,
-        events: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> IntegrationConnection:
-        """Create a connection to a provider.
+        """Connect an API-key or webhook provider.
+
+        OAuth providers go through the browser flow instead.
 
         Args:
             provider: The catalog provider key to connect.
+            label: A human-readable name for the connection.
             config: Provider-specific configuration (credentials, options).
-            name: An optional human-readable label for the connection.
-            events: Optional list of provider event types to subscribe to.
         """
-        body = drop_not_given(
-            {
-                "provider": provider,
-                "config": config,
-                "name": name,
-                "events": events,
-            }
-        )
+        body = drop_not_given({"provider": provider, "label": label, "config": config})
         return await self._post(
             "/integrations/connections",
             cast_to=IntegrationConnection,
@@ -538,11 +552,11 @@ class AsyncIntegrations(AsyncAPIResource):
 
     async def get_connection(
         self, connection_id: str, *, options: RequestOptions | None = None
-    ) -> IntegrationConnection:
-        """Retrieve a single connection by id."""
+    ) -> IntegrationConnectionDetail:
+        """Retrieve a connection with its subscriptions and recent runs."""
         return await self._get(
             f"/integrations/connections/{connection_id}",
-            cast_to=IntegrationConnection,
+            cast_to=IntegrationConnectionDetail,
             options=options,
         )
 
@@ -550,19 +564,26 @@ class AsyncIntegrations(AsyncAPIResource):
         self,
         connection_id: str,
         *,
-        config: dict[str, Any],
+        config_capabilities: NotGivenOr[dict[str, Any]] = NOT_GIVEN,
+        sync_direction: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
-    ) -> IntegrationConnection:
-        """Update a connection's provider-specific configuration.
+    ) -> IntegrationConnectionDetail:
+        """Update a connection's capability snapshot and sync direction.
 
         Args:
             connection_id: The connection to update.
-            config: The new provider configuration to merge/apply.
+            config_capabilities: What the integration is configured to do.
+            sync_direction: The direction records flow in.
         """
-        body = drop_not_given({"config": config})
+        body = drop_not_given(
+            {
+                "config_capabilities": config_capabilities,
+                "sync_direction": sync_direction,
+            }
+        )
         return await self._patch(
             f"/integrations/connections/{connection_id}/config",
-            cast_to=IntegrationConnection,
+            cast_to=IntegrationConnectionDetail,
             body=body,
             options=options,
         )
@@ -570,7 +591,7 @@ class AsyncIntegrations(AsyncAPIResource):
     async def delete_connection(
         self, connection_id: str, *, options: RequestOptions | None = None
     ) -> IntegrationConnectionDeleted:
-        """Remove a connection."""
+        """Disconnect a provider."""
         return await self._delete(
             f"/integrations/connections/{connection_id}",
             cast_to=IntegrationConnectionDeleted,
@@ -578,18 +599,13 @@ class AsyncIntegrations(AsyncAPIResource):
         )
 
     def list_events(
-        self,
-        connection_id: str,
-        *,
-        limit: NotGivenOr[int] = NOT_GIVEN,
-        cursor: NotGivenOr[str] = NOT_GIVEN,
-        options: RequestOptions | None = None,
+        self, connection_id: str, *, options: RequestOptions | None = None
     ) -> AsyncPaginator[IntegrationEvent]:
-        """List a connection's event subscriptions (auto-paginating)."""
+        """List a connection's event subscriptions. Returned in full."""
         return self._get_api_list(
             f"/integrations/connections/{connection_id}/events",
             model=IntegrationEvent,
-            query={"limit": limit, "cursor": cursor},
+            data_key="events",
             options=options,
         )
 
@@ -598,23 +614,26 @@ class AsyncIntegrations(AsyncAPIResource):
         connection_id: str,
         *,
         event_type: str,
-        enabled: NotGivenOr[bool] = NOT_GIVEN,
+        action: NotGivenOr[str] = NOT_GIVEN,
         config: NotGivenOr[dict[str, Any]] = NOT_GIVEN,
+        enabled: NotGivenOr[bool] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> IntegrationEvent:
-        """Subscribe a connection to a provider event type.
+        """Subscribe a connection to a Warmbly event.
 
         Args:
-            connection_id: The connection to attach the event to.
-            event_type: The provider event type to subscribe to.
+            connection_id: The connection to attach the subscription to.
+            event_type: The Warmbly event to react to.
+            action: What the provider should do when it fires.
+            config: Action-specific configuration (channel, board, ...).
             enabled: Whether the subscription is active.
-            config: Optional event-specific configuration.
         """
         body = drop_not_given(
             {
                 "event_type": event_type,
-                "enabled": enabled,
+                "action": action,
                 "config": config,
+                "enabled": enabled,
             }
         )
         return await self._post(
@@ -652,16 +671,20 @@ class AsyncIntegrations(AsyncAPIResource):
         self,
         connection_id: str,
         *,
+        object: str,
         mappings: Sequence[dict[str, Any]],
         options: RequestOptions | None = None,
     ) -> IntegrationFieldMappings:
-        """Replace a connection's field mappings.
+        """Replace the field mappings for one object on a connection.
 
         Args:
             connection_id: The connection whose mappings to replace.
-            mappings: The full set of field mappings to store.
+            object: The object the mappings apply to (e.g. ``"contact"``).
+            mappings: The full set of maps, each
+                ``{"warmbly_field", "external_field", "transform",
+                "static_value"}``.
         """
-        body = drop_not_given({"mappings": mappings})
+        body = {"object": object, "mappings": [dict(m) for m in mappings]}
         return await self._put(
             f"/integrations/connections/{connection_id}/field-mappings",
             cast_to=IntegrationFieldMappings,
@@ -670,26 +693,20 @@ class AsyncIntegrations(AsyncAPIResource):
         )
 
     def runs(
-        self,
-        connection_id: str,
-        *,
-        limit: NotGivenOr[int] = NOT_GIVEN,
-        cursor: NotGivenOr[str] = NOT_GIVEN,
-        status: NotGivenOr[str] = NOT_GIVEN,
-        options: RequestOptions | None = None,
+        self, connection_id: str, *, options: RequestOptions | None = None
     ) -> AsyncPaginator[IntegrationRun]:
-        """List a connection's sync runs (auto-paginating)."""
+        """List a connection's recent sync runs."""
         return self._get_api_list(
             f"/integrations/connections/{connection_id}/runs",
             model=IntegrationRun,
-            query={"limit": limit, "cursor": cursor, "status": status},
+            data_key="runs",
             options=options,
         )
 
     async def connection_webhook_secret(
         self, connection_id: str, *, options: RequestOptions | None = None
     ) -> IntegrationWebhookSecret:
-        """Retrieve a connection's inbound webhook signing secret."""
+        """Retrieve (generating on first call) a connection's signing secret."""
         return await self._get(
             f"/integrations/connections/{connection_id}/webhook-secret",
             cast_to=IntegrationWebhookSecret,
@@ -699,7 +716,7 @@ class AsyncIntegrations(AsyncAPIResource):
     async def test_connection(
         self, connection_id: str, *, options: RequestOptions | None = None
     ) -> IntegrationTestResult:
-        """Test a connection's credentials and connectivity."""
+        """Fire a synthetic event through the connection's automations."""
         return await self._post(
             f"/integrations/connections/{connection_id}/test",
             cast_to=IntegrationTestResult,
@@ -710,70 +727,36 @@ class AsyncIntegrations(AsyncAPIResource):
         self,
         connection_id: str,
         *,
-        records: NotGivenOr[Sequence[dict[str, Any]]] = NOT_GIVEN,
-        event_type: NotGivenOr[str] = NOT_GIVEN,
-        payload: NotGivenOr[dict[str, Any]] = NOT_GIVEN,
+        contact_ids: Sequence[str],
         options: RequestOptions | None = None,
-    ) -> IntegrationRunResult:
-        """Push records or an event to a connection's provider.
+    ) -> PushResult:
+        """Upsert contacts into a connected CRM, synchronously.
+
+        Every upsert is keyed by email, so repeating a push converges rather
+        than duplicating records.
 
         Args:
             connection_id: The connection to push to.
-            records: Optional records to send to the provider.
-            event_type: Optional event type describing the push.
-            payload: Optional free-form payload for the push.
+            contact_ids: The contacts to upsert.
         """
-        body = drop_not_given(
-            {
-                "records": records,
-                "event_type": event_type,
-                "payload": payload,
-            }
-        )
         return await self._post(
             f"/integrations/connections/{connection_id}/push",
-            cast_to=IntegrationRunResult,
-            body=body,
+            cast_to=PushResult,
+            body={"contact_ids": list(contact_ids)},
             options=options,
         )
 
     def bookings(
-        self,
-        *,
-        limit: NotGivenOr[int] = NOT_GIVEN,
-        cursor: NotGivenOr[str] = NOT_GIVEN,
-        connection_id: NotGivenOr[str] = NOT_GIVEN,
-        contact_id: NotGivenOr[str] = NOT_GIVEN,
-        campaign_id: NotGivenOr[str] = NOT_GIVEN,
-        status: NotGivenOr[str] = NOT_GIVEN,
-        from_: NotGivenOr[str] = NOT_GIVEN,
-        to: NotGivenOr[str] = NOT_GIVEN,
-        options: RequestOptions | None = None,
+        self, *, options: RequestOptions | None = None
     ) -> AsyncPaginator[IntegrationBooking]:
-        """List booked meetings from calendar/scheduling integrations.
+        """List recently booked meetings from scheduling integrations.
 
-        Args:
-            limit: Maximum number of bookings per page.
-            cursor: Pagination cursor.
-            connection_id: Filter by source connection.
-            contact_id: Filter by contact.
-            campaign_id: Filter by campaign.
-            status: Filter by booking status.
-            from_: Lower bound (RFC3339) on the booking start time.
-            to: Upper bound (RFC3339) on the booking start time.
+        Capped at the 50 most recent. Use ``client.meetings.list()`` for the
+        full, filterable meetings list.
         """
         return self._get_api_list(
             "/integrations/bookings",
             model=IntegrationBooking,
-            query={
-                "limit": limit,
-                "cursor": cursor,
-                "connection_id": connection_id,
-                "contact_id": contact_id,
-                "campaign_id": campaign_id,
-                "status": status,
-                "from": from_,
-                "to": to,
-            },
+            data_key="bookings",
             options=options,
         )
