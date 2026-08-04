@@ -30,62 +30,94 @@ EventKey = tuple[str, str] | str
 class GatewayEvent:
     """Realtime event-name constants from the gateway event catalog.
 
-    These mirror the server's event names verbatim. The set is intentionally
-    not exhaustive of every possible event (unknown events are still
-    delivered to ``on_event`` handlers and ``wait_for``) but it covers the
-    common campaign, email, contact, account/warmup, bulk, presence, and
-    membership events.
+    These mirror the server's event names verbatim. Unknown events are still
+    delivered to ``on_event`` handlers and ``wait_for``, so a server that adds
+    an event never needs an SDK upgrade to be observable.
+
+    An ``org:*`` subscription can narrow delivery with ``intents``: the server
+    upper-cases the event name, replaces separators with ``_``, and keeps the
+    event if any intent token is a substring. ``intents=["CAMPAIGN"]`` therefore
+    matches every ``CAMPAIGN_*`` event.
     """
 
     # Campaign lifecycle.
+    CAMPAIGN_CREATED = "CAMPAIGN_CREATED"
+    CAMPAIGN_UPDATED = "CAMPAIGN_UPDATED"
+    CAMPAIGN_DELETED = "CAMPAIGN_DELETED"
     CAMPAIGN_STARTED = "CAMPAIGN_STARTED"
     CAMPAIGN_PAUSED = "CAMPAIGN_PAUSED"
     CAMPAIGN_COMPLETED = "CAMPAIGN_COMPLETED"
-    CAMPAIGN_PROGRESS = "CAMPAIGN_PROGRESS"
-    CAMPAIGN_STATUS_CHANGED = "CAMPAIGN_STATUS_CHANGED"
+
+    # Task lifecycle.
+    TASK_CREATED = "TASK_CREATED"
+    TASK_STARTED = "TASK_STARTED"
     TASK_PROGRESS = "TASK_PROGRESS"
+    TASK_COMPLETED = "TASK_COMPLETED"
+    TASK_FAILED = "TASK_FAILED"
 
     # Email / sending events.
     EMAIL_SENT = "EMAIL_SENT"
+    EMAIL_FAILED = "EMAIL_FAILED"
     EMAIL_OPENED = "EMAIL_OPENED"
     EMAIL_CLICKED = "EMAIL_CLICKED"
     EMAIL_REPLIED = "EMAIL_REPLIED"
-    EMAIL_BOUNCED = "EMAIL_BOUNCED"
     EMAIL_RECEIVED = "EMAIL_RECEIVED"
     EMAIL_UPDATED = "EMAIL_UPDATED"
     EMAIL_DELETED = "EMAIL_DELETED"
-    INBOX = "INBOX"
 
     # Contact events.
     CONTACT_CREATED = "CONTACT_CREATED"
     CONTACT_UPDATED = "CONTACT_UPDATED"
     CONTACT_DELETED = "CONTACT_DELETED"
+    CONTACTS_RELOAD = "CONTACTS_RELOAD"
 
-    # Account / warmup events.
+    # Mailbox events.
     ACCOUNT_CONNECTED = "ACCOUNT_CONNECTED"
     ACCOUNT_DISCONNECTED = "ACCOUNT_DISCONNECTED"
     ACCOUNT_ERROR = "ACCOUNT_ERROR"
-    WARMUP_PROGRESS = "WARMUP_PROGRESS"
+    ACCOUNT_SYNCED = "ACCOUNT_SYNCED"
+    ACCOUNT_HEALTH_CHANGED = "ACCOUNT_HEALTH_CHANGED"
 
     # Bulk-operation events.
     BULK_STARTED = "BULK_STARTED"
     BULK_PROGRESS = "BULK_PROGRESS"
     BULK_COMPLETED = "BULK_COMPLETED"
+    BULK_FAILED = "BULK_FAILED"
 
-    # Membership / billing / settings.
-    MEMBER_ADDED = "MEMBER_ADDED"
-    MEMBER_REMOVED = "MEMBER_REMOVED"
-    INVITATION_SENT = "INVITATION_SENT"
-    SUBSCRIPTION_UPDATED = "SUBSCRIPTION_UPDATED"
-    BILLING_UPDATED = "BILLING_UPDATED"
-    SETTINGS_UPDATED = "SETTINGS_UPDATED"
+    # Automation events.
+    AUTOMATION_CREATED = "AUTOMATION_CREATED"
+    AUTOMATION_UPDATED = "AUTOMATION_UPDATED"
+    AUTOMATION_DELETED = "AUTOMATION_DELETED"
+    AUTOMATION_RUN = "AUTOMATION_RUN"
+
+    # Meetings.
+    MEETING_BOOKED = "MEETING_BOOKED"
+    MEETING_RESCHEDULED = "MEETING_RESCHEDULED"
+    MEETING_CANCELED = "MEETING_CANCELED"
+
+    # AI.
+    AI_RESEARCH_PROGRESS = "AI_RESEARCH_PROGRESS"
+    AI_DRAFT_READY = "AI_DRAFT_READY"
+
+    # Billing / audit / notifications.
+    BILLING_CREDITS_LOW = "BILLING_CREDITS_LOW"
+    BILLING_CREDITS_CHANGED = "BILLING_CREDITS_CHANGED"
+    AUDIT_CREATED = "AUDIT_CREATED"
+    NOTIFICATION_CREATED = "NOTIFICATION_CREATED"
+
+    # Developer-fired custom events, plus generic severity signals.
     CUSTOM_EVENT = "CUSTOM_EVENT"
+    ERROR = "ERROR"
+    WARNING = "WARNING"
+
     PRESENCE_POLICY_UPDATED = "PRESENCE_POLICY_UPDATED"
 
     # Presence / lifecycle / control frames surfaced to handlers.
     PRESENCE_STATE = "presence_state"
     PRESENCE_DIFF = "presence_diff"
     RATE_LIMITED = "rate_limited"
+    RESUMED = "resumed"
+    RESUME_FAILED = "resume_failed"
 
 
 class _Waiter:
