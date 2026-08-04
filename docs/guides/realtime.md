@@ -98,13 +98,17 @@ for example because you are not a member of the organization.
 
 ### Filtering org events with `intents`
 
-For `org:*` topics you can narrow the firehose with `intents`: a list of
-substring filters applied to event types server-side. This reduces the events
-delivered to your client:
+For `org:*` topics you can narrow the firehose with `intents`: substring filters
+applied to event types server-side, so the events you do not want never cross
+the wire. The server upper-cases the event name and replaces separators with
+`_` before matching, which is why a family prefix is enough:
 
 ```python
-# Only receive campaign-related events on this org topic.
+# Only campaign events on this org topic.
 await gateway.subscribe("org:org_123", intents=["CAMPAIGN"])
+
+# Two families at once.
+await gateway.subscribe("org:org_123", intents=["AUTOMATION", "MEETING"])
 ```
 
 ### Leaving a topic
@@ -135,7 +139,7 @@ When you only care about one event on one specific topic, register against the
 exact tuple:
 
 ```python
-@gateway.on(("campaign:cmp_123", GatewayEvent.CAMPAIGN_PROGRESS))
+@gateway.on(("campaign:cmp_123", GatewayEvent.TASK_PROGRESS))
 async def on_progress(topic: str, payload: dict) -> None:
     print("progress:", payload)
 ```
@@ -147,12 +151,13 @@ Exceptions raised inside a handler are logged, not propagated.
 
 ### Event-name constants
 
-[`GatewayEvent`][warmbly.gateway.GatewayEvent] collects the common event names as
-constants so you avoid stringly-typed keys: `GatewayEvent.CAMPAIGN_STARTED`,
-`GatewayEvent.EMAIL_OPENED`, `GatewayEvent.CONTACT_CREATED`,
-`GatewayEvent.BULK_PROGRESS`, and so on. The set is not exhaustive; unknown event
-names still reach `on_event` handlers and `wait_for`, so you can pass any string
-the server emits.
+[`GatewayEvent`][warmbly.gateway.GatewayEvent] mirrors the server's event
+vocabulary as constants so you avoid stringly-typed keys:
+`GatewayEvent.CAMPAIGN_STARTED`, `GatewayEvent.EMAIL_OPENED`,
+`GatewayEvent.CONTACT_CREATED`, `GatewayEvent.AUTOMATION_RUN`,
+`GatewayEvent.MEETING_BOOKED`, `GatewayEvent.AI_DRAFT_READY`, and so on. Unknown
+event names still reach `on_event` handlers and `wait_for`, so a server that
+adds an event needs no SDK upgrade.
 
 ### `wait_for`: await a single event
 

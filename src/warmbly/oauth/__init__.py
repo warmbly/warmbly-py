@@ -1,9 +1,11 @@
 """The Warmbly OAuth2 client subsystem.
 
-This package implements the RFC 9700-sanctioned OAuth2 grants against Warmbly's
-authorization server: **authorization_code + PKCE (S256)**, **refresh_token**,
-and **client_credentials**, plus token revocation, secure token storage, and
-auto-refreshing token management.
+This package implements the two OAuth2 grants Warmbly's authorization server
+accepts — **authorization_code + PKCE (S256)** and **refresh_token** — plus
+token revocation, secure token storage, and auto-refreshing token management.
+
+There is no client-credentials grant: every token is bound to a user who
+consented, so machine-to-machine access uses an API key instead.
 
 Typical authorization-code flow::
 

@@ -1,15 +1,19 @@
-"""The ``contacts`` resource: search, manage, import/export, and enrich contacts.
+"""The ``contacts`` resource: leads, their notes, activity, and research.
 
-Maps to the ``/v1/contacts`` route group. The collection is queried via
-``POST /contacts/search`` (not a plain ``GET``), so the listing entrypoint is
-:meth:`Contacts.search`. Bulk create/update/delete operate on the collection
-endpoint itself, while per-contact reads and the CRM sub-resources (emails,
-timeline, notes, activities, deals) hang off ``/contacts/{id}/...``.
+Maps to the ``/v1/contacts`` route group. Contacts are org-scoped and keyed by
+email, which is what makes imports and CRM pushes converge rather than
+duplicate.
+
+There is no plain ``GET /contacts``: listing goes through
+:meth:`Contacts.search`, whose faceted filter body travels in the request
+because it is far richer than a query string. Bulk create, update, and delete
+all take arrays, and the AI research endpoints charge credits.
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+import json as _json
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from .._models import BaseModel
@@ -22,95 +26,205 @@ __all__ = [
     "AsyncContacts",
     "Contact",
     "ContactActivity",
-    "ContactDeal",
     "ContactDeleted",
-    "ContactEmail",
-    "ContactExport",
+    "ContactDetail",
     "ContactImportPreview",
     "ContactImportResult",
+    "ContactLookup",
     "ContactNote",
     "ContactNoteDeleted",
-    "ContactSearchResult",
+    "ContactResearchRun",
+    "ContactSearchPage",
+    "ContactSentEmail",
     "ContactTimelineEntry",
     "Contacts",
-    "ContactsBulkResult",
+    "ContactsAdded",
+    "CustomFieldKeys",
+    "ResearchBatchQueued",
 ]
 
 
 class Contact(BaseModel):
-    """A contact (lead) belonging to an organization."""
+    """A contact (lead).
+
+    ``verification_status`` reflects the last address verification;
+    ``esp_provider`` the mailbox provider the address resolves to.
+    """
 
     id: str
-    campaign_id: str | None = None
-    organization_id: str | None = None
-    email: str | None = None
     first_name: str | None = None
     last_name: str | None = None
+    email: str | None = None
     company: str | None = None
-    status: str | None = None
+    phone: str | None = None
+    custom_fields: dict[str, str] = {}
+    subscribed: bool | None = None
+    campaigns: Sequence[dict[str, Any]] = []
+    categories: Sequence[dict[str, Any]] = []
+    verification_status: str | None = None
+    verification_reason: str | None = None
+    verification_checked_at: str | None = None
+    is_catch_all: bool | None = None
+    esp_provider: str | None = None
+    esp_resolved_at: str | None = None
+    campaign_lead: dict[str, Any] | None = None
     created_at: str | None = None
     updated_at: str | None = None
 
 
-class ContactSearchResult(BaseModel):
-    """A page of contacts returned by ``POST /contacts/search``."""
+class ContactDetail(Contact):
+    """A contact plus its engagement roll-up and suppression state.
 
-    data: Sequence[Contact] = []
-    total: int | None = None
-    next_cursor: str | None = None
-    has_more: bool | None = None
+    ``suppression`` is non-``None`` when the address is suppressed, in which
+    case campaigns skip it.
+    """
 
-
-class ContactsBulkResult(BaseModel):
-    """The outcome of a bulk create, update, or delete operation."""
-
-    created: int | None = None
-    updated: int | None = None
-    deleted: int | None = None
-    skipped: int | None = None
-    failed: int | None = None
-    data: Sequence[Contact] = []
-    errors: Sequence[dict[str, Any]] = []
+    engagement: dict[str, Any] | None = None
+    suppression: dict[str, Any] | None = None
 
 
 class ContactDeleted(BaseModel):
-    """The result of deleting a single contact."""
+    """The result of deleting a contact (``204 No Content``)."""
 
     id: str | None = None
-    status: str | None = None
     deleted: bool | None = None
 
 
-class ContactExport(BaseModel):
-    """A handle to an export job or its inlined payload."""
+class ContactsAdded(BaseModel):
+    """The result of a bulk contact create or edit (permissive).
+
+    An address that already exists is updated rather than duplicated.
+    """
+
+    created: int | None = None
+    updated: int | None = None
+    skipped: int | None = None
+    failed: int | None = None
+    contacts: Sequence[Contact] = []
+
+
+class ContactSearchPage(BaseModel):
+    """One page of contact-search results, plus org-wide counts.
+
+    ``counts`` and ``lead_counts`` are computed over the whole matching set,
+    not the page.
+    """
+
+    data: Sequence[Contact] = []
+    pagination: dict[str, Any] = {}
+    counts: dict[str, Any] | None = None
+    lead_counts: dict[str, Any] | None = None
+
+
+class ContactLookup(BaseModel):
+    """The result of looking a contact up by email address."""
+
+    contact: Contact | None = None
+
+
+class CustomFieldKeys(BaseModel):
+    """Every custom-field key in use across the organization's contacts."""
+
+    data: Sequence[str] = []
+
+
+class ContactNote(BaseModel):
+    """A note attached to a contact."""
+
+    id: str
+    contact_id: str | None = None
+    organization_id: str | None = None
+    user_id: str | None = None
+    content: str | None = None
+    user: dict[str, Any] | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+class ContactNoteDeleted(BaseModel):
+    """The result of deleting a note (``204 No Content``)."""
 
     id: str | None = None
-    status: str | None = None
-    format: str | None = None
-    url: str | None = None
-    download_url: str | None = None
-    total: int | None = None
+    deleted: bool | None = None
+
+
+class ContactActivity(BaseModel):
+    """A recorded activity on a contact."""
+
+    id: str
+    contact_id: str | None = None
+    organization_id: str | None = None
+    user_id: str | None = None
+    activity_type: str | None = None
+    metadata: dict[str, Any] = {}
+    user: dict[str, Any] | None = None
     created_at: str | None = None
 
 
-class ContactImportPreview(BaseModel):
-    """A dry-run summary of an import before committing it."""
+class ContactSentEmail(BaseModel):
+    """An email sent to a contact, with its engagement timestamps."""
 
-    token: str | None = None
-    total: int | None = None
-    valid: int | None = None
-    invalid: int | None = None
-    duplicates: int | None = None
-    columns: Sequence[str] = []
-    sample: Sequence[dict[str, Any]] = []
-    errors: Sequence[dict[str, Any]] = []
+    task_id: str | None = None
+    status: str | None = None
+    message_id: str | None = None
+    subject: str | None = None
+    sent_at: str | None = None
+    email_account_id: str | None = None
+    email_account_email: str | None = None
+    email_account_name: str | None = None
+    campaign_id: str | None = None
+    campaign_name: str | None = None
+    step_id: str | None = None
+    step_name: str | None = None
+    opened_at: str | None = None
+    clicked_at: str | None = None
+    replied_at: str | None = None
+
+
+class ContactTimelineEntry(BaseModel):
+    """One entry in a contact's merged timeline (permissive)."""
+
+    id: str | None = None
+    type: str | None = None
+    occurred_at: str | None = None
+    data: dict[str, Any] | None = None
+
+
+class ContactResearchRun(BaseModel):
+    """One AI research run against a contact."""
+
+    id: str | None = None
+    contact_id: str | None = None
+    organization_id: str | None = None
+    objective: str | None = None
+    status: str | None = None
+    result: dict[str, Any] | None = None
+    credits_charged: int | None = None
+    model: str | None = None
+    created_at: str | None = None
+    completed_at: str | None = None
+
+
+class ResearchBatchQueued(BaseModel):
+    """The number of research runs a batch request actually queued."""
+
+    queued: int | None = None
+
+
+class ContactImportPreview(BaseModel):
+    """A parsed preview of an upload, before any rows are written."""
+
+    filename: str | None = None
+    headers: Sequence[str] = []
+    rows: Sequence[dict[str, Any]] = []
+    total_rows: int | None = None
+    suggested_mapping: Sequence[dict[str, Any]] = []
 
 
 class ContactImportResult(BaseModel):
-    """The outcome of committing an import."""
+    """Per-row results from a committed import."""
 
-    id: str | None = None
-    status: str | None = None
+    total: int | None = None
     imported: int | None = None
     updated: int | None = None
     skipped: int | None = None
@@ -118,394 +232,299 @@ class ContactImportResult(BaseModel):
     errors: Sequence[dict[str, Any]] = []
 
 
-class ContactEmail(BaseModel):
-    """An email exchanged with a contact."""
-
-    id: str
-    contact_id: str | None = None
-    campaign_id: str | None = None
-    email_account_id: str | None = None
-    direction: str | None = None
-    subject: str | None = None
-    status: str | None = None
-    sent_at: str | None = None
-    created_at: str | None = None
-
-
-class ContactTimelineEntry(BaseModel):
-    """A single event on a contact's activity timeline."""
-
-    id: str
-    contact_id: str | None = None
-    type: str | None = None
-    title: str | None = None
-    description: str | None = None
-    metadata: dict[str, Any] = {}
-    occurred_at: str | None = None
-    created_at: str | None = None
-
-
-class ContactNote(BaseModel):
-    """A free-form note attached to a contact."""
-
-    id: str
-    contact_id: str | None = None
-    organization_id: str | None = None
-    author_id: str | None = None
-    body: str | None = None
-    created_at: str | None = None
-    updated_at: str | None = None
-
-
-class ContactNoteDeleted(BaseModel):
-    """The result of deleting a contact note."""
-
-    id: str | None = None
-    status: str | None = None
-    deleted: bool | None = None
+def _search_body(
+    *,
+    query: NotGivenOr[str],
+    custom_field_filters: NotGivenOr[Sequence[Mapping[str, Any]]],
+    campaign_ids: NotGivenOr[Sequence[str]],
+    lead_status: NotGivenOr[str],
+    category_ids: NotGivenOr[Sequence[str]],
+    min_campaigns: NotGivenOr[int],
+    max_campaigns: NotGivenOr[int],
+    subscribed: NotGivenOr[bool],
+    created_after: NotGivenOr[str],
+    created_before: NotGivenOr[str],
+    updated_after: NotGivenOr[str],
+    updated_before: NotGivenOr[str],
+    sort_by: NotGivenOr[str],
+    reverse: NotGivenOr[bool],
+) -> dict[str, Any]:
+    """Build the faceted contact filter body (shared by search and export)."""
+    return drop_not_given(
+        {
+            "query": query,
+            "custom_field_filters": custom_field_filters,
+            "campaign_ids": campaign_ids,
+            "lead_status": lead_status,
+            "category_ids": category_ids,
+            "min_campaigns": min_campaigns,
+            "max_campaigns": max_campaigns,
+            "subscribed": subscribed,
+            "created_after": created_after,
+            "created_before": created_before,
+            "updated_after": updated_after,
+            "updated_before": updated_before,
+            "sort_by": sort_by,
+            "reverse": reverse,
+        }
+    )
 
 
-class ContactActivity(BaseModel):
-    """An activity record associated with a contact."""
-
-    id: str
-    contact_id: str | None = None
-    type: str | None = None
-    description: str | None = None
-    metadata: dict[str, Any] = {}
-    created_at: str | None = None
-
-
-class ContactDeal(BaseModel):
-    """A CRM deal linked to a contact."""
-
-    id: str
-    contact_id: str | None = None
-    organization_id: str | None = None
-    pipeline_id: str | None = None
-    stage: str | None = None
-    name: str | None = None
-    value: float | None = None
-    currency: str | None = None
-    status: str | None = None
-    created_at: str | None = None
-    updated_at: str | None = None
+def _update_body(
+    *,
+    first_name: NotGivenOr[str],
+    last_name: NotGivenOr[str],
+    company: NotGivenOr[str],
+    phone: NotGivenOr[str],
+    custom_fields: NotGivenOr[Mapping[str, str]],
+    subscribed: NotGivenOr[bool],
+    campaigns: NotGivenOr[Sequence[str]],
+    categories: NotGivenOr[Sequence[str]],
+    add_categories: NotGivenOr[Sequence[str]],
+    remove_categories: NotGivenOr[Sequence[str]],
+) -> dict[str, Any]:
+    return drop_not_given(
+        {
+            "first_name": first_name,
+            "last_name": last_name,
+            "company": company,
+            "phone": phone,
+            "custom_fields": custom_fields,
+            "subscribed": subscribed,
+            "campaigns": campaigns,
+            "categories": categories,
+            "add_categories": add_categories,
+            "remove_categories": remove_categories,
+        }
+    )
 
 
 class Contacts(SyncAPIResource):
     """Synchronous ``contacts`` resource."""
 
+    # -- create / read / update / delete -------------------------------------
+    def create(
+        self,
+        contacts: Sequence[Mapping[str, Any]],
+        *,
+        options: RequestOptions | None = None,
+    ) -> ContactsAdded:
+        """Create contacts in bulk.
+
+        The endpoint takes an array, so a single contact is a one-element
+        list. An address that already exists is updated rather than
+        duplicated.
+
+        Args:
+            contacts: One mapping per contact (``first_name``, ``last_name``,
+                ``email``, ``company``, ``phone``, ``campaigns``,
+                ``categories``, ``custom_fields``).
+        """
+        return self._post(
+            "/contacts",
+            cast_to=ContactsAdded,
+            body=[dict(c) for c in contacts],
+            options=options,
+        )
+
     def search(
         self,
         *,
         query: NotGivenOr[str] = NOT_GIVEN,
-        campaign_id: NotGivenOr[str] = NOT_GIVEN,
-        status: NotGivenOr[str] = NOT_GIVEN,
-        filters: NotGivenOr[dict[str, Any]] = NOT_GIVEN,
-        sort: NotGivenOr[str] = NOT_GIVEN,
+        custom_field_filters: NotGivenOr[Sequence[Mapping[str, Any]]] = NOT_GIVEN,
+        campaign_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        lead_status: NotGivenOr[str] = NOT_GIVEN,
+        category_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        min_campaigns: NotGivenOr[int] = NOT_GIVEN,
+        max_campaigns: NotGivenOr[int] = NOT_GIVEN,
+        subscribed: NotGivenOr[bool] = NOT_GIVEN,
+        created_after: NotGivenOr[str] = NOT_GIVEN,
+        created_before: NotGivenOr[str] = NOT_GIVEN,
+        updated_after: NotGivenOr[str] = NOT_GIVEN,
+        updated_before: NotGivenOr[str] = NOT_GIVEN,
+        sort_by: NotGivenOr[str] = NOT_GIVEN,
+        reverse: NotGivenOr[bool] = NOT_GIVEN,
+        category: NotGivenOr[str] = NOT_GIVEN,
         limit: NotGivenOr[int] = NOT_GIVEN,
         cursor: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
-    ) -> ContactSearchResult:
-        """Search contacts (the collection listing entrypoint).
+    ) -> ContactSearchPage:
+        """Search contacts. This is the list endpoint.
+
+        Every facet is optional; an empty filter matches every contact. Paging
+        is explicit (pass ``cursor`` from ``pagination.next_cursor``) because
+        the filter travels in the request body.
 
         Args:
-            query: A free-text search string.
-            campaign_id: Restrict results to a single campaign.
-            status: Restrict results to contacts in this status.
-            filters: Additional structured filter criteria.
-            sort: A sort expression (e.g. ``"created_at:desc"``).
-            limit: The maximum number of contacts to return.
-            cursor: The pagination cursor from a previous response.
-            options: Per-request overrides.
-
-        Returns:
-            A :class:`ContactSearchResult` carrying the matched contacts and
-            pagination metadata.
+            query: Text search across the core fields.
+            custom_field_filters: One ``{"type", "key", "value"}`` entry per
+                custom-field predicate.
+            campaign_ids: Contacts must be in *all* these campaigns.
+            lead_status: Derived lead status; requires exactly one campaign id.
+            category_ids: Contacts must carry *all* these categories.
+            subscribed: Filter by subscription state.
+            sort_by: e.g. ``"first_name ASC"`` or ``"campaign_count DESC"``.
+            reverse: Invert the sort direction.
+            category: A single category id, as a query filter.
+            limit: Page size.
+            cursor: An opaque cursor from a previous page.
         """
-        body = drop_not_given(
-            {
-                "query": query,
-                "campaign_id": campaign_id,
-                "status": status,
-                "filters": filters,
-                "sort": sort,
-                "limit": limit,
-                "cursor": cursor,
-            }
-        )
         return self._post(
-            "/contacts/search", cast_to=ContactSearchResult, body=body, options=options
-        )
-
-    def create(
-        self,
-        *,
-        contacts: Sequence[dict[str, Any]],
-        campaign_id: NotGivenOr[str] = NOT_GIVEN,
-        options: RequestOptions | None = None,
-    ) -> ContactsBulkResult:
-        """Add one or more contacts.
-
-        Args:
-            contacts: The list of contact objects to add. Each entry typically
-                carries ``email`` plus optional ``first_name``, ``last_name``,
-                ``company``, and custom fields.
-            campaign_id: Optionally associate the new contacts with a campaign.
-            options: Per-request overrides.
-
-        Returns:
-            A :class:`ContactsBulkResult` summarizing the operation.
-        """
-        body = drop_not_given({"contacts": contacts, "campaign_id": campaign_id})
-        return self._post(
-            "/contacts", cast_to=ContactsBulkResult, body=body, options=options
-        )
-
-    def bulk_delete(
-        self,
-        *,
-        ids: Sequence[str],
-        options: RequestOptions | None = None,
-    ) -> ContactsBulkResult:
-        """Delete multiple contacts by id.
-
-        Args:
-            ids: The ids of the contacts to delete.
-            options: Per-request overrides.
-        """
-        return self._delete(
-            "/contacts",
-            cast_to=ContactsBulkResult,
-            body={"ids": ids},
+            "/contacts/search",
+            cast_to=ContactSearchPage,
+            body=_search_body(
+                query=query,
+                custom_field_filters=custom_field_filters,
+                campaign_ids=campaign_ids,
+                lead_status=lead_status,
+                category_ids=category_ids,
+                min_campaigns=min_campaigns,
+                max_campaigns=max_campaigns,
+                subscribed=subscribed,
+                created_after=created_after,
+                created_before=created_before,
+                updated_after=updated_after,
+                updated_before=updated_before,
+                sort_by=sort_by,
+                reverse=reverse,
+            ),
+            query={"category": category, "limit": limit, "cursor": cursor},
             options=options,
         )
 
-    def bulk_update(
-        self,
-        *,
-        ids: Sequence[str],
-        update: dict[str, Any],
-        options: RequestOptions | None = None,
-    ) -> ContactsBulkResult:
-        """Apply the same field updates to multiple contacts.
-
-        Args:
-            ids: The ids of the contacts to update.
-            update: The field changes to apply to every targeted contact.
-            options: Per-request overrides.
-        """
-        return self._patch(
-            "/contacts",
-            cast_to=ContactsBulkResult,
-            body={"ids": ids, "update": update},
-            options=options,
-        )
-
-    def export(
-        self,
-        *,
-        format: NotGivenOr[str] = NOT_GIVEN,
-        campaign_id: NotGivenOr[str] = NOT_GIVEN,
-        status: NotGivenOr[str] = NOT_GIVEN,
-        ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
-        filters: NotGivenOr[dict[str, Any]] = NOT_GIVEN,
-        options: RequestOptions | None = None,
-    ) -> ContactExport:
-        """Start an export of contacts matching the given criteria.
-
-        Args:
-            format: The export format (e.g. ``"csv"``).
-            campaign_id: Restrict the export to a single campaign.
-            status: Restrict the export to contacts in this status.
-            ids: Export only this explicit set of contact ids.
-            filters: Additional structured filter criteria.
-            options: Per-request overrides.
-        """
-        body = drop_not_given(
-            {
-                "format": format,
-                "campaign_id": campaign_id,
-                "status": status,
-                "ids": ids,
-                "filters": filters,
-            }
-        )
-        return self._post(
-            "/contacts/export", cast_to=ContactExport, body=body, options=options
-        )
-
-    def import_preview(
-        self,
-        *,
-        contacts: NotGivenOr[Sequence[dict[str, Any]]] = NOT_GIVEN,
-        file_url: NotGivenOr[str] = NOT_GIVEN,
-        mapping: NotGivenOr[dict[str, str]] = NOT_GIVEN,
-        campaign_id: NotGivenOr[str] = NOT_GIVEN,
-        options: RequestOptions | None = None,
-    ) -> ContactImportPreview:
-        """Dry-run an import to validate rows before committing.
-
-        Args:
-            contacts: Inline contact rows to preview.
-            file_url: A reference to a previously uploaded file to preview.
-            mapping: A column-to-field mapping applied to the source rows.
-            campaign_id: The campaign the contacts would be imported into.
-            options: Per-request overrides.
-
-        Returns:
-            A :class:`ContactImportPreview` with validation counts and a sample.
-            Carry its ``token`` into :meth:`import_commit`.
-        """
-        body = drop_not_given(
-            {
-                "contacts": contacts,
-                "file_url": file_url,
-                "mapping": mapping,
-                "campaign_id": campaign_id,
-            }
-        )
-        return self._post(
-            "/contacts/import/preview",
-            cast_to=ContactImportPreview,
-            body=body,
-            options=options,
-        )
-
-    def import_commit(
-        self,
-        *,
-        token: NotGivenOr[str] = NOT_GIVEN,
-        contacts: NotGivenOr[Sequence[dict[str, Any]]] = NOT_GIVEN,
-        file_url: NotGivenOr[str] = NOT_GIVEN,
-        mapping: NotGivenOr[dict[str, str]] = NOT_GIVEN,
-        campaign_id: NotGivenOr[str] = NOT_GIVEN,
-        options: RequestOptions | None = None,
-    ) -> ContactImportResult:
-        """Commit a previewed import.
-
-        Args:
-            token: The ``token`` returned by :meth:`import_preview`.
-            contacts: Inline contact rows to import (when not using a token).
-            file_url: A reference to a previously uploaded file to import.
-            mapping: A column-to-field mapping applied to the source rows.
-            campaign_id: The campaign to import the contacts into.
-            options: Per-request overrides.
-        """
-        body = drop_not_given(
-            {
-                "token": token,
-                "contacts": contacts,
-                "file_url": file_url,
-                "mapping": mapping,
-                "campaign_id": campaign_id,
-            }
-        )
-        return self._post(
-            "/contacts/import/commit",
-            cast_to=ContactImportResult,
-            body=body,
-            options=options,
-        )
-
-    def lookup(self, *, email: str, options: RequestOptions | None = None) -> Contact:
-        """Look up a single contact by email address.
-
-        Args:
-            email: The email address to look up.
-            options: Per-request overrides.
-        """
+    def lookup(
+        self, *, email: str, options: RequestOptions | None = None
+    ) -> ContactLookup:
+        """Look a contact up by email address."""
         return self._get(
             "/contacts/lookup",
-            cast_to=Contact,
+            cast_to=ContactLookup,
             query={"email": email},
             options=options,
         )
 
+    def custom_fields(
+        self, *, options: RequestOptions | None = None
+    ) -> CustomFieldKeys:
+        """List every custom-field key in use across the organization."""
+        return self._get(
+            "/contacts/custom-fields", cast_to=CustomFieldKeys, options=options
+        )
+
     def retrieve(
         self, contact_id: str, *, options: RequestOptions | None = None
-    ) -> Contact:
-        """Retrieve a single contact by id."""
-        return self._get(f"/contacts/{contact_id}", cast_to=Contact, options=options)
+    ) -> ContactDetail:
+        """Retrieve a contact with its engagement and suppression state."""
+        return self._get(
+            f"/contacts/{contact_id}", cast_to=ContactDetail, options=options
+        )
 
     def update(
         self,
         contact_id: str,
         *,
-        email: NotGivenOr[str] = NOT_GIVEN,
         first_name: NotGivenOr[str] = NOT_GIVEN,
         last_name: NotGivenOr[str] = NOT_GIVEN,
         company: NotGivenOr[str] = NOT_GIVEN,
-        status: NotGivenOr[str] = NOT_GIVEN,
-        campaign_id: NotGivenOr[str] = NOT_GIVEN,
+        phone: NotGivenOr[str] = NOT_GIVEN,
+        custom_fields: NotGivenOr[Mapping[str, str]] = NOT_GIVEN,
+        subscribed: NotGivenOr[bool] = NOT_GIVEN,
+        campaigns: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        categories: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        add_categories: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        remove_categories: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> Contact:
-        """Update a single contact's fields.
+        """Update a contact.
 
         Args:
-            contact_id: The id of the contact to update.
-            email: A new email address.
-            first_name: A new first name.
-            last_name: A new last name.
-            company: A new company.
-            status: A new status.
-            campaign_id: Reassign the contact to a campaign.
-            options: Per-request overrides.
+            campaigns: Replacement campaign membership. Omit to leave as-is.
+            categories: Replacement category set. Omit to leave as-is.
+            add_categories: Diff-style add; ignored when *categories* is set.
+            remove_categories: Diff-style remove; ignored when *categories* is
+                set.
         """
-        body = drop_not_given(
-            {
-                "email": email,
-                "first_name": first_name,
-                "last_name": last_name,
-                "company": company,
-                "status": status,
-                "campaign_id": campaign_id,
-            }
-        )
         return self._patch(
-            f"/contacts/{contact_id}", cast_to=Contact, body=body, options=options
+            f"/contacts/{contact_id}",
+            cast_to=Contact,
+            body=_update_body(
+                first_name=first_name,
+                last_name=last_name,
+                company=company,
+                phone=phone,
+                custom_fields=custom_fields,
+                subscribed=subscribed,
+                campaigns=campaigns,
+                categories=categories,
+                add_categories=add_categories,
+                remove_categories=remove_categories,
+            ),
+            options=options,
         )
 
     def delete(
         self, contact_id: str, *, options: RequestOptions | None = None
     ) -> ContactDeleted:
-        """Delete a single contact by id."""
+        """Delete a contact."""
         return self._delete(
             f"/contacts/{contact_id}", cast_to=ContactDeleted, options=options
         )
 
-    def emails(
+    def bulk_update(
         self,
-        contact_id: str,
         *,
-        limit: NotGivenOr[int] = NOT_GIVEN,
-        cursor: NotGivenOr[str] = NOT_GIVEN,
+        contacts: Sequence[str],
+        add_campaigns: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        remove_campaigns: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        add_categories: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        remove_categories: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        fields: NotGivenOr[Sequence[Mapping[str, Any]]] = NOT_GIVEN,
+        subscribe: NotGivenOr[bool] = NOT_GIVEN,
         options: RequestOptions | None = None,
-    ) -> SyncCursorPage[ContactEmail]:
-        """List emails exchanged with a contact (auto-paginating)."""
-        return self._get_api_list(
-            f"/contacts/{contact_id}/emails",
-            model=ContactEmail,
-            query={"limit": limit, "cursor": cursor},
+    ) -> ContactsAdded:
+        """Apply the same edit to many contacts at once.
+
+        Args:
+            contacts: The contact ids to edit.
+            fields: One ``{"type", "key", "value"}`` entry per field edit.
+            subscribe: Set the subscription state on every listed contact.
+        """
+        return self._patch(
+            "/contacts",
+            cast_to=ContactsAdded,
+            body=drop_not_given(
+                {
+                    "contacts": list(contacts),
+                    "add_campaigns": add_campaigns,
+                    "remove_campaigns": remove_campaigns,
+                    "add_categories": add_categories,
+                    "remove_categories": remove_categories,
+                    "fields": fields,
+                    "subscribe": subscribe,
+                }
+            ),
             options=options,
         )
 
-    def timeline(
+    def bulk_delete(
         self,
-        contact_id: str,
+        contact_ids: Sequence[str],
         *,
-        limit: NotGivenOr[int] = NOT_GIVEN,
-        cursor: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
-    ) -> SyncCursorPage[ContactTimelineEntry]:
-        """List a contact's timeline entries (auto-paginating)."""
-        return self._get_api_list(
-            f"/contacts/{contact_id}/timeline",
-            model=ContactTimelineEntry,
-            query={"limit": limit, "cursor": cursor},
+    ) -> ContactDeleted:
+        """Delete many contacts at once.
+
+        Args:
+            contact_ids: The contact ids to delete, sent as a plain array.
+        """
+        return self._delete(
+            "/contacts",
+            cast_to=ContactDeleted,
+            body=list(contact_ids),
             options=options,
         )
 
+    # -- notes ---------------------------------------------------------------
     def list_notes(
         self,
         contact_id: str,
@@ -514,7 +533,7 @@ class Contacts(SyncAPIResource):
         cursor: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> SyncCursorPage[ContactNote]:
-        """List a contact's notes (auto-paginating)."""
+        """List a contact's notes (auto-paginating). ``limit`` caps at 100."""
         return self._get_api_list(
             f"/contacts/{contact_id}/notes",
             model=ContactNote,
@@ -523,23 +542,13 @@ class Contacts(SyncAPIResource):
         )
 
     def create_note(
-        self,
-        contact_id: str,
-        *,
-        body: str,
-        options: RequestOptions | None = None,
+        self, contact_id: str, *, content: str, options: RequestOptions | None = None
     ) -> ContactNote:
-        """Add a note to a contact.
-
-        Args:
-            contact_id: The id of the contact to annotate.
-            body: The note text.
-            options: Per-request overrides.
-        """
+        """Add a note to a contact. ``content`` caps at 10,000 characters."""
         return self._post(
             f"/contacts/{contact_id}/notes",
             cast_to=ContactNote,
-            body={"body": body},
+            body={"content": content},
             options=options,
         )
 
@@ -548,21 +557,14 @@ class Contacts(SyncAPIResource):
         contact_id: str,
         note_id: str,
         *,
-        body: str,
+        content: str,
         options: RequestOptions | None = None,
     ) -> ContactNote:
-        """Edit an existing note on a contact.
-
-        Args:
-            contact_id: The id of the contact that owns the note.
-            note_id: The id of the note to edit.
-            body: The replacement note text.
-            options: Per-request overrides.
-        """
+        """Edit a note's content."""
         return self._patch(
             f"/contacts/{contact_id}/notes/{note_id}",
             cast_to=ContactNote,
-            body={"body": body},
+            body={"content": content},
             options=options,
         )
 
@@ -573,14 +575,15 @@ class Contacts(SyncAPIResource):
         *,
         options: RequestOptions | None = None,
     ) -> ContactNoteDeleted:
-        """Delete a note from a contact."""
+        """Delete a note."""
         return self._delete(
             f"/contacts/{contact_id}/notes/{note_id}",
             cast_to=ContactNoteDeleted,
             options=options,
         )
 
-    def activities(
+    # -- activity, emails, deals, timeline -----------------------------------
+    def list_activities(
         self,
         contact_id: str,
         *,
@@ -588,7 +591,7 @@ class Contacts(SyncAPIResource):
         cursor: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> SyncCursorPage[ContactActivity]:
-        """List a contact's activity records (auto-paginating)."""
+        """List a contact's activity feed (auto-paginating). ``limit`` caps at 100."""
         return self._get_api_list(
             f"/contacts/{contact_id}/activities",
             model=ContactActivity,
@@ -596,323 +599,33 @@ class Contacts(SyncAPIResource):
             options=options,
         )
 
-    def deals(
+    def list_emails(
         self,
         contact_id: str,
         *,
         limit: NotGivenOr[int] = NOT_GIVEN,
-        cursor: NotGivenOr[str] = NOT_GIVEN,
+        before_at: NotGivenOr[str] = NOT_GIVEN,
+        before_id: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
-    ) -> SyncCursorPage[ContactDeal]:
-        """List the CRM deals linked to a contact (auto-paginating)."""
-        return self._get_api_list(
-            f"/contacts/{contact_id}/deals",
-            model=ContactDeal,
-            query={"limit": limit, "cursor": cursor},
-            options=options,
-        )
+    ) -> SyncCursorPage[ContactSentEmail]:
+        """List emails sent to a contact, newest first.
 
-
-class AsyncContacts(AsyncAPIResource):
-    """Asynchronous ``contacts`` resource."""
-
-    async def search(
-        self,
-        *,
-        query: NotGivenOr[str] = NOT_GIVEN,
-        campaign_id: NotGivenOr[str] = NOT_GIVEN,
-        status: NotGivenOr[str] = NOT_GIVEN,
-        filters: NotGivenOr[dict[str, Any]] = NOT_GIVEN,
-        sort: NotGivenOr[str] = NOT_GIVEN,
-        limit: NotGivenOr[int] = NOT_GIVEN,
-        cursor: NotGivenOr[str] = NOT_GIVEN,
-        options: RequestOptions | None = None,
-    ) -> ContactSearchResult:
-        """Search contacts (the collection listing entrypoint).
-
-        Args:
-            query: A free-text search string.
-            campaign_id: Restrict results to a single campaign.
-            status: Restrict results to contacts in this status.
-            filters: Additional structured filter criteria.
-            sort: A sort expression (e.g. ``"created_at:desc"``).
-            limit: The maximum number of contacts to return.
-            cursor: The pagination cursor from a previous response.
-            options: Per-request overrides.
-
-        Returns:
-            A :class:`ContactSearchResult` carrying the matched contacts and
-            pagination metadata.
+        Paged with a ``(before_at, before_id)`` keyset rather than an opaque
+        cursor; ``limit`` caps at 200.
         """
-        body = drop_not_given(
-            {
-                "query": query,
-                "campaign_id": campaign_id,
-                "status": status,
-                "filters": filters,
-                "sort": sort,
-                "limit": limit,
-                "cursor": cursor,
-            }
-        )
-        return await self._post(
-            "/contacts/search", cast_to=ContactSearchResult, body=body, options=options
-        )
-
-    async def create(
-        self,
-        *,
-        contacts: Sequence[dict[str, Any]],
-        campaign_id: NotGivenOr[str] = NOT_GIVEN,
-        options: RequestOptions | None = None,
-    ) -> ContactsBulkResult:
-        """Add one or more contacts.
-
-        Args:
-            contacts: The list of contact objects to add. Each entry typically
-                carries ``email`` plus optional ``first_name``, ``last_name``,
-                ``company``, and custom fields.
-            campaign_id: Optionally associate the new contacts with a campaign.
-            options: Per-request overrides.
-
-        Returns:
-            A :class:`ContactsBulkResult` summarizing the operation.
-        """
-        body = drop_not_given({"contacts": contacts, "campaign_id": campaign_id})
-        return await self._post(
-            "/contacts", cast_to=ContactsBulkResult, body=body, options=options
-        )
-
-    async def bulk_delete(
-        self,
-        *,
-        ids: Sequence[str],
-        options: RequestOptions | None = None,
-    ) -> ContactsBulkResult:
-        """Delete multiple contacts by id.
-
-        Args:
-            ids: The ids of the contacts to delete.
-            options: Per-request overrides.
-        """
-        return await self._delete(
-            "/contacts",
-            cast_to=ContactsBulkResult,
-            body={"ids": ids},
-            options=options,
-        )
-
-    async def bulk_update(
-        self,
-        *,
-        ids: Sequence[str],
-        update: dict[str, Any],
-        options: RequestOptions | None = None,
-    ) -> ContactsBulkResult:
-        """Apply the same field updates to multiple contacts.
-
-        Args:
-            ids: The ids of the contacts to update.
-            update: The field changes to apply to every targeted contact.
-            options: Per-request overrides.
-        """
-        return await self._patch(
-            "/contacts",
-            cast_to=ContactsBulkResult,
-            body={"ids": ids, "update": update},
-            options=options,
-        )
-
-    async def export(
-        self,
-        *,
-        format: NotGivenOr[str] = NOT_GIVEN,
-        campaign_id: NotGivenOr[str] = NOT_GIVEN,
-        status: NotGivenOr[str] = NOT_GIVEN,
-        ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
-        filters: NotGivenOr[dict[str, Any]] = NOT_GIVEN,
-        options: RequestOptions | None = None,
-    ) -> ContactExport:
-        """Start an export of contacts matching the given criteria.
-
-        Args:
-            format: The export format (e.g. ``"csv"``).
-            campaign_id: Restrict the export to a single campaign.
-            status: Restrict the export to contacts in this status.
-            ids: Export only this explicit set of contact ids.
-            filters: Additional structured filter criteria.
-            options: Per-request overrides.
-        """
-        body = drop_not_given(
-            {
-                "format": format,
-                "campaign_id": campaign_id,
-                "status": status,
-                "ids": ids,
-                "filters": filters,
-            }
-        )
-        return await self._post(
-            "/contacts/export", cast_to=ContactExport, body=body, options=options
-        )
-
-    async def import_preview(
-        self,
-        *,
-        contacts: NotGivenOr[Sequence[dict[str, Any]]] = NOT_GIVEN,
-        file_url: NotGivenOr[str] = NOT_GIVEN,
-        mapping: NotGivenOr[dict[str, str]] = NOT_GIVEN,
-        campaign_id: NotGivenOr[str] = NOT_GIVEN,
-        options: RequestOptions | None = None,
-    ) -> ContactImportPreview:
-        """Dry-run an import to validate rows before committing.
-
-        Args:
-            contacts: Inline contact rows to preview.
-            file_url: A reference to a previously uploaded file to preview.
-            mapping: A column-to-field mapping applied to the source rows.
-            campaign_id: The campaign the contacts would be imported into.
-            options: Per-request overrides.
-
-        Returns:
-            A :class:`ContactImportPreview` with validation counts and a sample.
-            Carry its ``token`` into :meth:`import_commit`.
-        """
-        body = drop_not_given(
-            {
-                "contacts": contacts,
-                "file_url": file_url,
-                "mapping": mapping,
-                "campaign_id": campaign_id,
-            }
-        )
-        return await self._post(
-            "/contacts/import/preview",
-            cast_to=ContactImportPreview,
-            body=body,
-            options=options,
-        )
-
-    async def import_commit(
-        self,
-        *,
-        token: NotGivenOr[str] = NOT_GIVEN,
-        contacts: NotGivenOr[Sequence[dict[str, Any]]] = NOT_GIVEN,
-        file_url: NotGivenOr[str] = NOT_GIVEN,
-        mapping: NotGivenOr[dict[str, str]] = NOT_GIVEN,
-        campaign_id: NotGivenOr[str] = NOT_GIVEN,
-        options: RequestOptions | None = None,
-    ) -> ContactImportResult:
-        """Commit a previewed import.
-
-        Args:
-            token: The ``token`` returned by :meth:`import_preview`.
-            contacts: Inline contact rows to import (when not using a token).
-            file_url: A reference to a previously uploaded file to import.
-            mapping: A column-to-field mapping applied to the source rows.
-            campaign_id: The campaign to import the contacts into.
-            options: Per-request overrides.
-        """
-        body = drop_not_given(
-            {
-                "token": token,
-                "contacts": contacts,
-                "file_url": file_url,
-                "mapping": mapping,
-                "campaign_id": campaign_id,
-            }
-        )
-        return await self._post(
-            "/contacts/import/commit",
-            cast_to=ContactImportResult,
-            body=body,
-            options=options,
-        )
-
-    async def lookup(
-        self, *, email: str, options: RequestOptions | None = None
-    ) -> Contact:
-        """Look up a single contact by email address.
-
-        Args:
-            email: The email address to look up.
-            options: Per-request overrides.
-        """
-        return await self._get(
-            "/contacts/lookup",
-            cast_to=Contact,
-            query={"email": email},
-            options=options,
-        )
-
-    async def retrieve(
-        self, contact_id: str, *, options: RequestOptions | None = None
-    ) -> Contact:
-        """Retrieve a single contact by id."""
-        return await self._get(
-            f"/contacts/{contact_id}", cast_to=Contact, options=options
-        )
-
-    async def update(
-        self,
-        contact_id: str,
-        *,
-        email: NotGivenOr[str] = NOT_GIVEN,
-        first_name: NotGivenOr[str] = NOT_GIVEN,
-        last_name: NotGivenOr[str] = NOT_GIVEN,
-        company: NotGivenOr[str] = NOT_GIVEN,
-        status: NotGivenOr[str] = NOT_GIVEN,
-        campaign_id: NotGivenOr[str] = NOT_GIVEN,
-        options: RequestOptions | None = None,
-    ) -> Contact:
-        """Update a single contact's fields.
-
-        Args:
-            contact_id: The id of the contact to update.
-            email: A new email address.
-            first_name: A new first name.
-            last_name: A new last name.
-            company: A new company.
-            status: A new status.
-            campaign_id: Reassign the contact to a campaign.
-            options: Per-request overrides.
-        """
-        body = drop_not_given(
-            {
-                "email": email,
-                "first_name": first_name,
-                "last_name": last_name,
-                "company": company,
-                "status": status,
-                "campaign_id": campaign_id,
-            }
-        )
-        return await self._patch(
-            f"/contacts/{contact_id}", cast_to=Contact, body=body, options=options
-        )
-
-    async def delete(
-        self, contact_id: str, *, options: RequestOptions | None = None
-    ) -> ContactDeleted:
-        """Delete a single contact by id."""
-        return await self._delete(
-            f"/contacts/{contact_id}", cast_to=ContactDeleted, options=options
-        )
-
-    def emails(
-        self,
-        contact_id: str,
-        *,
-        limit: NotGivenOr[int] = NOT_GIVEN,
-        cursor: NotGivenOr[str] = NOT_GIVEN,
-        options: RequestOptions | None = None,
-    ) -> AsyncPaginator[ContactEmail]:
-        """List emails exchanged with a contact (auto-paginating)."""
         return self._get_api_list(
             f"/contacts/{contact_id}/emails",
-            model=ContactEmail,
-            query={"limit": limit, "cursor": cursor},
+            model=ContactSentEmail,
+            query={"limit": limit, "before_at": before_at, "before_id": before_id},
             options=options,
+        )
+
+    def list_deals(
+        self, contact_id: str, *, options: RequestOptions | None = None
+    ) -> SyncCursorPage[dict[str, Any]]:
+        """List the CRM deals attached to a contact. Returned in full."""
+        return self._get_api_list(
+            f"/contacts/{contact_id}/deals", model=dict, options=options
         )
 
     def timeline(
@@ -920,17 +633,397 @@ class AsyncContacts(AsyncAPIResource):
         contact_id: str,
         *,
         limit: NotGivenOr[int] = NOT_GIVEN,
-        cursor: NotGivenOr[str] = NOT_GIVEN,
+        before: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
-    ) -> AsyncPaginator[ContactTimelineEntry]:
-        """List a contact's timeline entries (auto-paginating)."""
+    ) -> SyncCursorPage[ContactTimelineEntry]:
+        """List a contact's merged timeline, newest first.
+
+        Paged with a ``before`` timestamp; ``limit`` caps at 200.
+        """
         return self._get_api_list(
             f"/contacts/{contact_id}/timeline",
             model=ContactTimelineEntry,
-            query={"limit": limit, "cursor": cursor},
+            query={"limit": limit, "before": before},
             options=options,
         )
 
+    # -- AI research ---------------------------------------------------------
+    def list_research(
+        self,
+        contact_id: str,
+        *,
+        limit: NotGivenOr[int] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> SyncCursorPage[ContactResearchRun]:
+        """List past research runs for a contact. ``limit`` caps at 100."""
+        return self._get_api_list(
+            f"/contacts/{contact_id}/research",
+            model=ContactResearchRun,
+            query={"limit": limit},
+            options=options,
+        )
+
+    def research(
+        self,
+        contact_id: str,
+        *,
+        objective: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> ContactResearchRun:
+        """Run AI research against a contact. Charges AI credits.
+
+        Args:
+            objective: What to research. Defaults to a general profile.
+        """
+        return self._post(
+            f"/contacts/{contact_id}/research",
+            cast_to=ContactResearchRun,
+            body=drop_not_given({"objective": objective}),
+            options=options,
+        )
+
+    def research_batch(
+        self,
+        *,
+        contact_ids: Sequence[str],
+        objective: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> ResearchBatchQueued:
+        """Queue AI research for many contacts. Charges credits per run.
+
+        Runs asynchronously: watch the ``AI_RESEARCH_PROGRESS`` gateway event,
+        or poll :meth:`list_research`.
+        """
+        return self._post(
+            "/contacts/research/batch",
+            cast_to=ResearchBatchQueued,
+            body=drop_not_given(
+                {"contact_ids": list(contact_ids), "objective": objective}
+            ),
+            options=options,
+        )
+
+    # -- import / export -----------------------------------------------------
+    def import_preview(
+        self,
+        *,
+        file: bytes,
+        filename: str,
+        content_type: str = "text/csv",
+        options: RequestOptions | None = None,
+    ) -> ContactImportPreview:
+        """Parse an upload and return its headers, sample rows, and a mapping.
+
+        Writes nothing. Uploads are capped at 50 MB.
+
+        Args:
+            file: The raw CSV/XLSX bytes.
+            filename: The filename (its extension selects the parser).
+            content_type: The file's MIME type.
+        """
+        return self._client.request(
+            cast_to=ContactImportPreview,
+            method="POST",
+            path="/contacts/import/preview",
+            files={"file": (filename, file, content_type)},
+            options=options,
+        )
+
+    def import_commit(
+        self,
+        *,
+        file: bytes,
+        filename: str,
+        import_options: Mapping[str, Any],
+        content_type: str = "text/csv",
+        options: RequestOptions | None = None,
+    ) -> ContactImportResult:
+        """Apply a column mapping to an upload and write the rows.
+
+        Args:
+            file: The raw CSV/XLSX bytes (the same file you previewed).
+            filename: The filename.
+            import_options: Column mapping, dedup strategy, target campaign,
+                and categories. Serialized into the ``options`` form field.
+            content_type: The file's MIME type.
+            options: Per-request transport overrides.
+        """
+        return self._client.request(
+            cast_to=ContactImportResult,
+            method="POST",
+            path="/contacts/import/commit",
+            form={"options": _json.dumps(dict(import_options))},
+            files={"file": (filename, file, content_type)},
+            options=options,
+        )
+
+    def export(
+        self,
+        *,
+        format: str = "csv",
+        scope: NotGivenOr[str] = NOT_GIVEN,
+        contact_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        filters: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        fields: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        filename: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> bytes:
+        """Export contacts and return the encoded file bytes.
+
+        Args:
+            format: ``"csv"``, ``"xlsx"``, or ``"json"``.
+            scope: Which contacts to export (all, selected, or filtered).
+            contact_ids: Explicit ids, for a selection export.
+            filters: A search filter body, for a filtered export.
+            fields: The columns to include; defaults to every core field.
+            filename: A suggested download filename.
+
+        Returns:
+            The raw encoded file. Write it to disk as-is; ``xlsx`` is binary.
+        """
+        return self._post(
+            "/contacts/export",
+            cast_to=bytes,
+            body=drop_not_given(
+                {
+                    "format": format,
+                    "scope": scope,
+                    "contact_ids": contact_ids,
+                    "filters": filters,
+                    "fields": fields,
+                    "filename": filename,
+                }
+            ),
+            options=options,
+        )
+
+
+class AsyncContacts(AsyncAPIResource):
+    """Asynchronous ``contacts`` resource."""
+
+    # -- create / read / update / delete -------------------------------------
+    async def create(
+        self,
+        contacts: Sequence[Mapping[str, Any]],
+        *,
+        options: RequestOptions | None = None,
+    ) -> ContactsAdded:
+        """Create contacts in bulk.
+
+        The endpoint takes an array, so a single contact is a one-element
+        list. An address that already exists is updated rather than
+        duplicated.
+
+        Args:
+            contacts: One mapping per contact (``first_name``, ``last_name``,
+                ``email``, ``company``, ``phone``, ``campaigns``,
+                ``categories``, ``custom_fields``).
+        """
+        return await self._post(
+            "/contacts",
+            cast_to=ContactsAdded,
+            body=[dict(c) for c in contacts],
+            options=options,
+        )
+
+    async def search(
+        self,
+        *,
+        query: NotGivenOr[str] = NOT_GIVEN,
+        custom_field_filters: NotGivenOr[Sequence[Mapping[str, Any]]] = NOT_GIVEN,
+        campaign_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        lead_status: NotGivenOr[str] = NOT_GIVEN,
+        category_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        min_campaigns: NotGivenOr[int] = NOT_GIVEN,
+        max_campaigns: NotGivenOr[int] = NOT_GIVEN,
+        subscribed: NotGivenOr[bool] = NOT_GIVEN,
+        created_after: NotGivenOr[str] = NOT_GIVEN,
+        created_before: NotGivenOr[str] = NOT_GIVEN,
+        updated_after: NotGivenOr[str] = NOT_GIVEN,
+        updated_before: NotGivenOr[str] = NOT_GIVEN,
+        sort_by: NotGivenOr[str] = NOT_GIVEN,
+        reverse: NotGivenOr[bool] = NOT_GIVEN,
+        category: NotGivenOr[str] = NOT_GIVEN,
+        limit: NotGivenOr[int] = NOT_GIVEN,
+        cursor: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> ContactSearchPage:
+        """Search contacts. This is the list endpoint.
+
+        Every facet is optional; an empty filter matches every contact. Paging
+        is explicit (pass ``cursor`` from ``pagination.next_cursor``) because
+        the filter travels in the request body.
+
+        Args:
+            query: Text search across the core fields.
+            custom_field_filters: One ``{"type", "key", "value"}`` entry per
+                custom-field predicate.
+            campaign_ids: Contacts must be in *all* these campaigns.
+            lead_status: Derived lead status; requires exactly one campaign id.
+            category_ids: Contacts must carry *all* these categories.
+            subscribed: Filter by subscription state.
+            sort_by: e.g. ``"first_name ASC"`` or ``"campaign_count DESC"``.
+            reverse: Invert the sort direction.
+            category: A single category id, as a query filter.
+            limit: Page size.
+            cursor: An opaque cursor from a previous page.
+        """
+        return await self._post(
+            "/contacts/search",
+            cast_to=ContactSearchPage,
+            body=_search_body(
+                query=query,
+                custom_field_filters=custom_field_filters,
+                campaign_ids=campaign_ids,
+                lead_status=lead_status,
+                category_ids=category_ids,
+                min_campaigns=min_campaigns,
+                max_campaigns=max_campaigns,
+                subscribed=subscribed,
+                created_after=created_after,
+                created_before=created_before,
+                updated_after=updated_after,
+                updated_before=updated_before,
+                sort_by=sort_by,
+                reverse=reverse,
+            ),
+            query={"category": category, "limit": limit, "cursor": cursor},
+            options=options,
+        )
+
+    async def lookup(
+        self, *, email: str, options: RequestOptions | None = None
+    ) -> ContactLookup:
+        """Look a contact up by email address."""
+        return await self._get(
+            "/contacts/lookup",
+            cast_to=ContactLookup,
+            query={"email": email},
+            options=options,
+        )
+
+    async def custom_fields(
+        self, *, options: RequestOptions | None = None
+    ) -> CustomFieldKeys:
+        """List every custom-field key in use across the organization."""
+        return await self._get(
+            "/contacts/custom-fields", cast_to=CustomFieldKeys, options=options
+        )
+
+    async def retrieve(
+        self, contact_id: str, *, options: RequestOptions | None = None
+    ) -> ContactDetail:
+        """Retrieve a contact with its engagement and suppression state."""
+        return await self._get(
+            f"/contacts/{contact_id}", cast_to=ContactDetail, options=options
+        )
+
+    async def update(
+        self,
+        contact_id: str,
+        *,
+        first_name: NotGivenOr[str] = NOT_GIVEN,
+        last_name: NotGivenOr[str] = NOT_GIVEN,
+        company: NotGivenOr[str] = NOT_GIVEN,
+        phone: NotGivenOr[str] = NOT_GIVEN,
+        custom_fields: NotGivenOr[Mapping[str, str]] = NOT_GIVEN,
+        subscribed: NotGivenOr[bool] = NOT_GIVEN,
+        campaigns: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        categories: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        add_categories: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        remove_categories: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> Contact:
+        """Update a contact.
+
+        Args:
+            campaigns: Replacement campaign membership. Omit to leave as-is.
+            categories: Replacement category set. Omit to leave as-is.
+            add_categories: Diff-style add; ignored when *categories* is set.
+            remove_categories: Diff-style remove; ignored when *categories* is
+                set.
+        """
+        return await self._patch(
+            f"/contacts/{contact_id}",
+            cast_to=Contact,
+            body=_update_body(
+                first_name=first_name,
+                last_name=last_name,
+                company=company,
+                phone=phone,
+                custom_fields=custom_fields,
+                subscribed=subscribed,
+                campaigns=campaigns,
+                categories=categories,
+                add_categories=add_categories,
+                remove_categories=remove_categories,
+            ),
+            options=options,
+        )
+
+    async def delete(
+        self, contact_id: str, *, options: RequestOptions | None = None
+    ) -> ContactDeleted:
+        """Delete a contact."""
+        return await self._delete(
+            f"/contacts/{contact_id}", cast_to=ContactDeleted, options=options
+        )
+
+    async def bulk_update(
+        self,
+        *,
+        contacts: Sequence[str],
+        add_campaigns: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        remove_campaigns: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        add_categories: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        remove_categories: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        fields: NotGivenOr[Sequence[Mapping[str, Any]]] = NOT_GIVEN,
+        subscribe: NotGivenOr[bool] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> ContactsAdded:
+        """Apply the same edit to many contacts at once.
+
+        Args:
+            contacts: The contact ids to edit.
+            fields: One ``{"type", "key", "value"}`` entry per field edit.
+            subscribe: Set the subscription state on every listed contact.
+        """
+        return await self._patch(
+            "/contacts",
+            cast_to=ContactsAdded,
+            body=drop_not_given(
+                {
+                    "contacts": list(contacts),
+                    "add_campaigns": add_campaigns,
+                    "remove_campaigns": remove_campaigns,
+                    "add_categories": add_categories,
+                    "remove_categories": remove_categories,
+                    "fields": fields,
+                    "subscribe": subscribe,
+                }
+            ),
+            options=options,
+        )
+
+    async def bulk_delete(
+        self,
+        contact_ids: Sequence[str],
+        *,
+        options: RequestOptions | None = None,
+    ) -> ContactDeleted:
+        """Delete many contacts at once.
+
+        Args:
+            contact_ids: The contact ids to delete, sent as a plain array.
+        """
+        return await self._delete(
+            "/contacts",
+            cast_to=ContactDeleted,
+            body=list(contact_ids),
+            options=options,
+        )
+
+    # -- notes ---------------------------------------------------------------
     def list_notes(
         self,
         contact_id: str,
@@ -939,7 +1032,7 @@ class AsyncContacts(AsyncAPIResource):
         cursor: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> AsyncPaginator[ContactNote]:
-        """List a contact's notes (auto-paginating)."""
+        """List a contact's notes (auto-paginating). ``limit`` caps at 100."""
         return self._get_api_list(
             f"/contacts/{contact_id}/notes",
             model=ContactNote,
@@ -948,23 +1041,13 @@ class AsyncContacts(AsyncAPIResource):
         )
 
     async def create_note(
-        self,
-        contact_id: str,
-        *,
-        body: str,
-        options: RequestOptions | None = None,
+        self, contact_id: str, *, content: str, options: RequestOptions | None = None
     ) -> ContactNote:
-        """Add a note to a contact.
-
-        Args:
-            contact_id: The id of the contact to annotate.
-            body: The note text.
-            options: Per-request overrides.
-        """
+        """Add a note to a contact. ``content`` caps at 10,000 characters."""
         return await self._post(
             f"/contacts/{contact_id}/notes",
             cast_to=ContactNote,
-            body={"body": body},
+            body={"content": content},
             options=options,
         )
 
@@ -973,21 +1056,14 @@ class AsyncContacts(AsyncAPIResource):
         contact_id: str,
         note_id: str,
         *,
-        body: str,
+        content: str,
         options: RequestOptions | None = None,
     ) -> ContactNote:
-        """Edit an existing note on a contact.
-
-        Args:
-            contact_id: The id of the contact that owns the note.
-            note_id: The id of the note to edit.
-            body: The replacement note text.
-            options: Per-request overrides.
-        """
+        """Edit a note's content."""
         return await self._patch(
             f"/contacts/{contact_id}/notes/{note_id}",
             cast_to=ContactNote,
-            body={"body": body},
+            body={"content": content},
             options=options,
         )
 
@@ -998,14 +1074,15 @@ class AsyncContacts(AsyncAPIResource):
         *,
         options: RequestOptions | None = None,
     ) -> ContactNoteDeleted:
-        """Delete a note from a contact."""
+        """Delete a note."""
         return await self._delete(
             f"/contacts/{contact_id}/notes/{note_id}",
             cast_to=ContactNoteDeleted,
             options=options,
         )
 
-    def activities(
+    # -- activity, emails, deals, timeline -----------------------------------
+    def list_activities(
         self,
         contact_id: str,
         *,
@@ -1013,7 +1090,7 @@ class AsyncContacts(AsyncAPIResource):
         cursor: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> AsyncPaginator[ContactActivity]:
-        """List a contact's activity records (auto-paginating)."""
+        """List a contact's activity feed (auto-paginating). ``limit`` caps at 100."""
         return self._get_api_list(
             f"/contacts/{contact_id}/activities",
             model=ContactActivity,
@@ -1021,18 +1098,200 @@ class AsyncContacts(AsyncAPIResource):
             options=options,
         )
 
-    def deals(
+    def list_emails(
         self,
         contact_id: str,
         *,
         limit: NotGivenOr[int] = NOT_GIVEN,
-        cursor: NotGivenOr[str] = NOT_GIVEN,
+        before_at: NotGivenOr[str] = NOT_GIVEN,
+        before_id: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
-    ) -> AsyncPaginator[ContactDeal]:
-        """List the CRM deals linked to a contact (auto-paginating)."""
+    ) -> AsyncPaginator[ContactSentEmail]:
+        """List emails sent to a contact, newest first.
+
+        Paged with a ``(before_at, before_id)`` keyset rather than an opaque
+        cursor; ``limit`` caps at 200.
+        """
         return self._get_api_list(
-            f"/contacts/{contact_id}/deals",
-            model=ContactDeal,
-            query={"limit": limit, "cursor": cursor},
+            f"/contacts/{contact_id}/emails",
+            model=ContactSentEmail,
+            query={"limit": limit, "before_at": before_at, "before_id": before_id},
+            options=options,
+        )
+
+    def list_deals(
+        self, contact_id: str, *, options: RequestOptions | None = None
+    ) -> AsyncPaginator[dict[str, Any]]:
+        """List the CRM deals attached to a contact. Returned in full."""
+        return self._get_api_list(
+            f"/contacts/{contact_id}/deals", model=dict, options=options
+        )
+
+    def timeline(
+        self,
+        contact_id: str,
+        *,
+        limit: NotGivenOr[int] = NOT_GIVEN,
+        before: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> AsyncPaginator[ContactTimelineEntry]:
+        """List a contact's merged timeline, newest first.
+
+        Paged with a ``before`` timestamp; ``limit`` caps at 200.
+        """
+        return self._get_api_list(
+            f"/contacts/{contact_id}/timeline",
+            model=ContactTimelineEntry,
+            query={"limit": limit, "before": before},
+            options=options,
+        )
+
+    # -- AI research ---------------------------------------------------------
+    def list_research(
+        self,
+        contact_id: str,
+        *,
+        limit: NotGivenOr[int] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> AsyncPaginator[ContactResearchRun]:
+        """List past research runs for a contact. ``limit`` caps at 100."""
+        return self._get_api_list(
+            f"/contacts/{contact_id}/research",
+            model=ContactResearchRun,
+            query={"limit": limit},
+            options=options,
+        )
+
+    async def research(
+        self,
+        contact_id: str,
+        *,
+        objective: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> ContactResearchRun:
+        """Run AI research against a contact. Charges AI credits.
+
+        Args:
+            objective: What to research. Defaults to a general profile.
+        """
+        return await self._post(
+            f"/contacts/{contact_id}/research",
+            cast_to=ContactResearchRun,
+            body=drop_not_given({"objective": objective}),
+            options=options,
+        )
+
+    async def research_batch(
+        self,
+        *,
+        contact_ids: Sequence[str],
+        objective: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> ResearchBatchQueued:
+        """Queue AI research for many contacts. Charges credits per run.
+
+        Runs asynchronously: watch the ``AI_RESEARCH_PROGRESS`` gateway event,
+        or poll :meth:`list_research`.
+        """
+        return await self._post(
+            "/contacts/research/batch",
+            cast_to=ResearchBatchQueued,
+            body=drop_not_given(
+                {"contact_ids": list(contact_ids), "objective": objective}
+            ),
+            options=options,
+        )
+
+    # -- import / export -----------------------------------------------------
+    async def import_preview(
+        self,
+        *,
+        file: bytes,
+        filename: str,
+        content_type: str = "text/csv",
+        options: RequestOptions | None = None,
+    ) -> ContactImportPreview:
+        """Parse an upload and return its headers, sample rows, and a mapping.
+
+        Writes nothing. Uploads are capped at 50 MB.
+
+        Args:
+            file: The raw CSV/XLSX bytes.
+            filename: The filename (its extension selects the parser).
+            content_type: The file's MIME type.
+        """
+        return await self._client.request(
+            cast_to=ContactImportPreview,
+            method="POST",
+            path="/contacts/import/preview",
+            files={"file": (filename, file, content_type)},
+            options=options,
+        )
+
+    async def import_commit(
+        self,
+        *,
+        file: bytes,
+        filename: str,
+        import_options: Mapping[str, Any],
+        content_type: str = "text/csv",
+        options: RequestOptions | None = None,
+    ) -> ContactImportResult:
+        """Apply a column mapping to an upload and write the rows.
+
+        Args:
+            file: The raw CSV/XLSX bytes (the same file you previewed).
+            filename: The filename.
+            import_options: Column mapping, dedup strategy, target campaign,
+                and categories. Serialized into the ``options`` form field.
+            content_type: The file's MIME type.
+            options: Per-request transport overrides.
+        """
+        return await self._client.request(
+            cast_to=ContactImportResult,
+            method="POST",
+            path="/contacts/import/commit",
+            form={"options": _json.dumps(dict(import_options))},
+            files={"file": (filename, file, content_type)},
+            options=options,
+        )
+
+    async def export(
+        self,
+        *,
+        format: str = "csv",
+        scope: NotGivenOr[str] = NOT_GIVEN,
+        contact_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        filters: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        fields: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        filename: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> bytes:
+        """Export contacts and return the encoded file bytes.
+
+        Args:
+            format: ``"csv"``, ``"xlsx"``, or ``"json"``.
+            scope: Which contacts to export (all, selected, or filtered).
+            contact_ids: Explicit ids, for a selection export.
+            filters: A search filter body, for a filtered export.
+            fields: The columns to include; defaults to every core field.
+            filename: A suggested download filename.
+
+        Returns:
+            The raw encoded file. Write it to disk as-is; ``xlsx`` is binary.
+        """
+        return await self._post(
+            "/contacts/export",
+            cast_to=bytes,
+            body=drop_not_given(
+                {
+                    "format": format,
+                    "scope": scope,
+                    "contact_ids": contact_ids,
+                    "filters": filters,
+                    "fields": fields,
+                    "filename": filename,
+                }
+            ),
             options=options,
         )

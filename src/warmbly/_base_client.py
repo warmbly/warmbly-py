@@ -92,6 +92,7 @@ class _PreparedRequest:
     params: dict[str, Any] | None
     json: Any | None
     data: Mapping[str, Any] | None
+    files: Mapping[str, Any] | None
     timeout: float | Timeout | None
     max_retries: int
     has_idempotency_key: bool
@@ -185,13 +186,16 @@ class BaseClient:
         *,
         json_body: Any | None = None,
         form_body: Mapping[str, Any] | None = None,
+        files: Mapping[str, Any] | None = None,
         query: Mapping[str, object] | None = None,
         options: RequestOptions | None = None,
     ) -> _PreparedRequest:
         method = method.upper()
         options = options or RequestOptions()
         has_json_body = json_body is not None
-        is_form = form_body is not None
+        # Multipart counts as a form: httpx sets its own Content-Type (with the
+        # boundary), and an Idempotency-Key on a file upload buys nothing.
+        is_form = form_body is not None or files is not None
         headers, has_idempotency = self._build_headers(
             method, options, has_json_body=has_json_body, is_form=is_form
         )
@@ -207,6 +211,7 @@ class BaseClient:
             params=self._clean_query(query, options),
             json=json_payload,
             data=dict(form_body) if form_body is not None else None,
+            files=dict(files) if files is not None else None,
             timeout=resolved_timeout,
             max_retries=options.get("max_retries", self._max_retries),
             has_idempotency_key=has_idempotency,
@@ -242,6 +247,11 @@ class BaseClient:
         request_id = response.headers.get("x-request-id")
         if response.status_code == 204:
             return construct_type(cast_to, None, request_id=request_id)
+        # A few endpoints stream a file rather than JSON (contact export).
+        # Asking for bytes hands back the body verbatim, so binary formats
+        # survive intact.
+        if cast_to is bytes:
+            return response.content  # type: ignore[return-value]
         data = _safe_json(response)
         logger.debug(
             "response %s %s request_id=%s",
@@ -270,13 +280,17 @@ class BaseClient:
         )
 
     def _page_fields(
-        self, response: httpx.Response
+        self, response: httpx.Response, data_key: str = "data"
     ) -> tuple[list[Any], str | None, bool, int | None, str | None]:
         request_id = response.headers.get("x-request-id")
         payload = _safe_json(response)
+        # A handful of endpoints return the collection as a bare JSON array
+        # rather than an envelope; treat that as a single, final page.
+        if isinstance(payload, list):
+            return list(payload), None, False, None, request_id
         if not isinstance(payload, dict):
             return [], None, False, None, request_id
-        data = payload.get("data") or []
+        data = payload.get(data_key) or []
         pagination = payload.get("pagination") or {}
         return (
             list(data),
@@ -362,6 +376,7 @@ class SyncAPIClient(BaseClient):
                     params=prepared.params,
                     json=prepared.json,
                     data=prepared.data,
+                    files=prepared.files,
                     timeout=prepared.timeout,
                 )
             except httpx.TimeoutException as exc:
@@ -398,11 +413,18 @@ class SyncAPIClient(BaseClient):
         path: str,
         body: Any | None = None,
         form: Mapping[str, Any] | None = None,
+        files: Mapping[str, Any] | None = None,
         query: Mapping[str, object] | None = None,
         options: RequestOptions | None = None,
     ) -> _T:
         prepared = self._prepare(
-            method, path, json_body=body, form_body=form, query=query, options=options
+            method,
+            path,
+            json_body=body,
+            form_body=form,
+            files=files,
+            query=query,
+            options=options,
         )
         return self._parse_response(self._send(prepared), cast_to)
 
@@ -428,6 +450,7 @@ class SyncAPIClient(BaseClient):
         model: type[ModelT],
         query: Mapping[str, object] | None = None,
         options: RequestOptions | None = None,
+        data_key: str = "data",
     ) -> SyncCursorPage[ModelT]:
         base_query = dict(query or {})
 
@@ -437,7 +460,9 @@ class SyncAPIClient(BaseClient):
                 merged["cursor"] = cursor
             prepared = self._prepare("GET", path, query=merged, options=options)
             response = self._send(prepared)
-            data, next_cursor, has_more, total, request_id = self._page_fields(response)
+            data, next_cursor, has_more, total, request_id = self._page_fields(
+                response, data_key
+            )
             items = [
                 construct_type(model, item, request_id=request_id) for item in data
             ]
@@ -503,6 +528,7 @@ class AsyncAPIClient(BaseClient):
                     params=prepared.params,
                     json=prepared.json,
                     data=prepared.data,
+                    files=prepared.files,
                     timeout=prepared.timeout,
                 )
             except httpx.TimeoutException as exc:
@@ -539,11 +565,18 @@ class AsyncAPIClient(BaseClient):
         path: str,
         body: Any | None = None,
         form: Mapping[str, Any] | None = None,
+        files: Mapping[str, Any] | None = None,
         query: Mapping[str, object] | None = None,
         options: RequestOptions | None = None,
     ) -> _T:
         prepared = self._prepare(
-            method, path, json_body=body, form_body=form, query=query, options=options
+            method,
+            path,
+            json_body=body,
+            form_body=form,
+            files=files,
+            query=query,
+            options=options,
         )
         return self._parse_response(await self._send(prepared), cast_to)
 
@@ -569,6 +602,7 @@ class AsyncAPIClient(BaseClient):
         model: type[ModelT],
         query: Mapping[str, object] | None = None,
         options: RequestOptions | None = None,
+        data_key: str = "data",
     ) -> AsyncPaginator[ModelT]:
         base_query = dict(query or {})
 
@@ -578,7 +612,9 @@ class AsyncAPIClient(BaseClient):
                 merged["cursor"] = cursor
             prepared = self._prepare("GET", path, query=merged, options=options)
             response = await self._send(prepared)
-            data, next_cursor, has_more, total, request_id = self._page_fields(response)
+            data, next_cursor, has_more, total, request_id = self._page_fields(
+                response, data_key
+            )
             items = [
                 construct_type(model, item, request_id=request_id) for item in data
             ]

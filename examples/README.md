@@ -20,7 +20,10 @@ python examples/quickstart.py
 | [`oauth_token_manager.py`](./oauth_token_manager.py) | Persistent storage + automatic token refresh |
 | [`campaigns.py`](./campaigns.py) | Create a campaign, add steps, start/stop, read logs |
 | [`email_accounts.py`](./email_accounts.py) | Manage mailboxes, warmup controls, send an email |
-| [`contacts.py`](./contacts.py) | Search, bulk add, import, notes |
+| [`contacts.py`](./contacts.py) | Search, bulk add, CSV import/export, notes |
+| [`unibox.py`](./unibox.py) | Read the inbox, label, AI-draft, reply, schedule sends |
+| [`crm.py`](./crm.py) | Pipelines and stages, deals, tasks, faceted search + summaries |
+| [`advisor.py`](./advisor.py) | Read deliverability findings and apply the fixes |
 | [`pagination.py`](./pagination.py) | Auto-iterate every page, or walk pages manually |
 | [`error_handling.py`](./error_handling.py) | The exception hierarchy, rate limits, retries, timeouts |
 | [`async_usage.py`](./async_usage.py) | `AsyncWarmbly`, `async for`, concurrent requests |
@@ -29,4 +32,6 @@ python examples/quickstart.py
 | [`webhooks.py`](./webhooks.py) | Verify inbound webhook signatures and manage endpoints |
 
 > These call the real API. Run them against a test organization, and note that
-> `campaigns.start(...)` and `emails.send(...)` actually send mail.
+> `campaigns.start(...)`, `emails.send(...)`, and `unibox.reply(...)` actually
+> send mail. The AI endpoints (`generation.*`, `contacts.research()`,
+> `unibox.draft_reply()`) spend credits.

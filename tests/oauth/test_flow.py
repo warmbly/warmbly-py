@@ -232,19 +232,6 @@ def test_refresh_token_posts_refresh_grant() -> None:
 
 
 @respx.mock
-def test_client_credentials_posts_grant_with_scopes() -> None:
-    route = respx.post(TOKEN_URL).mock(
-        return_value=httpx.Response(200, json=_token_body())
-    )
-    client = _confidential_client()
-    client.client_credentials(scopes=["read_campaigns", "write_campaigns"])
-
-    form = parse_qs(route.calls.last.request.content.decode())
-    assert form["grant_type"] == ["client_credentials"]
-    assert form["scope"] == ["read_campaigns write_campaigns"]
-
-
-@respx.mock
 def test_revoke_posts_token_and_returns_none() -> None:
     route = respx.post(REVOKE_URL).mock(return_value=httpx.Response(200))
     client = _confidential_client()

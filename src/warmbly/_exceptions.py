@@ -25,9 +25,12 @@ __all__ = [
     "GatewayError",
     "InternalServerError",
     "NotFoundError",
+    "NotImplementedAPIError",
     "OAuthError",
+    "PaymentRequiredError",
     "PermissionDeniedError",
     "RateLimitError",
+    "ServiceUnavailableError",
     "UnprocessableEntityError",
     "WarmblyError",
     "make_status_error",
@@ -135,6 +138,10 @@ class AuthenticationError(APIStatusError):
     """HTTP 401: missing or invalid credentials."""
 
 
+class PaymentRequiredError(APIStatusError):
+    """HTTP 402: the account is out of AI credits or needs a plan upgrade."""
+
+
 class PermissionDeniedError(APIStatusError):
     """HTTP 403: authenticated but not allowed (named to avoid shadowing the builtin)."""
 
@@ -185,6 +192,14 @@ class InternalServerError(APIStatusError):
     """HTTP 5xx: server-side failure."""
 
 
+class NotImplementedAPIError(InternalServerError):
+    """HTTP 501: the endpoint is not enabled on this deployment."""
+
+
+class ServiceUnavailableError(InternalServerError):
+    """HTTP 503: a dependency (AI provider, mail server, ...) is temporarily down."""
+
+
 class OAuthError(WarmblyError):
     """An OAuth2 token-endpoint error (RFC 6749 ``{error, error_description}``).
 
@@ -209,11 +224,14 @@ class GatewayError(WarmblyError):
 _STATUS_MAP: dict[int, type[APIStatusError]] = {
     400: BadRequestError,
     401: AuthenticationError,
+    402: PaymentRequiredError,
     403: PermissionDeniedError,
     404: NotFoundError,
     409: ConflictError,
     422: UnprocessableEntityError,
     429: RateLimitError,
+    501: NotImplementedAPIError,
+    503: ServiceUnavailableError,
 }
 
 

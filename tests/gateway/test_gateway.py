@@ -117,7 +117,7 @@ async def test_wait_for_with_check_predicate(fake_gateway: FakeGateway) -> None:
         await asyncio.wait_for(client.subscribe("org:org_123"), timeout=_TIMEOUT)
         waiter = asyncio.ensure_future(
             client.wait_for(
-                GatewayEvent.CAMPAIGN_PROGRESS,
+                GatewayEvent.TASK_PROGRESS,
                 check=lambda _topic, p: p.get("pct") == 100,
                 timeout=_TIMEOUT,
             )
@@ -125,10 +125,10 @@ async def test_wait_for_with_check_predicate(fake_gateway: FakeGateway) -> None:
         await asyncio.sleep(0)
         # First broadcast fails the check and is ignored.
         await fake_gateway.broadcast(
-            "org:org_123", GatewayEvent.CAMPAIGN_PROGRESS, {"pct": 50}
+            "org:org_123", GatewayEvent.TASK_PROGRESS, {"pct": 50}
         )
         await fake_gateway.broadcast(
-            "org:org_123", GatewayEvent.CAMPAIGN_PROGRESS, {"pct": 100}
+            "org:org_123", GatewayEvent.TASK_PROGRESS, {"pct": 100}
         )
         payload = await asyncio.wait_for(waiter, timeout=_TIMEOUT)
         assert payload == {"pct": 100}

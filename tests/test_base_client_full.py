@@ -596,12 +596,14 @@ def test_sync_get_api_list_paginates(sync_client: Warmbly) -> None:
 
 
 @respx.mock
-def test_sync_get_api_list_non_dict_body_empty(sync_client: Warmbly) -> None:
+def test_sync_get_api_list_bare_array_is_one_page(sync_client: Warmbly) -> None:
+    """A few endpoints answer with a bare array; treat it as a final page."""
     route = respx.get(f"{BASE_URL}/items").mock(
-        return_value=httpx.Response(200, json=["not", "a", "dict"])
+        return_value=httpx.Response(200, json=[{"id": "a"}, {"id": "b"}])
     )
     page = sync_client.get_api_list("/items", model=BaseModel)
-    assert page.data == []
+    assert len(page.data) == 2
+    assert page.has_next_page() is False
     assert page.has_more is False
     assert page.next_cursor is None
     assert page.total is None

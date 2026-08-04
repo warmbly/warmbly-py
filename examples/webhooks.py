@@ -10,43 +10,66 @@ from __future__ import annotations
 from warmbly import Warmbly, WarmblyError, verify_webhook_signature
 
 
+def store_secret(endpoint_id: str, secret: str) -> None:
+    """Stand-in for your secret store (Vault, SSM, a sealed env var, ...)."""
+    raise NotImplementedError("wire this up to your own secret storage")
+
+
 def manage_endpoints() -> str:
     """Register an endpoint and return its signing secret."""
     client = Warmbly()
 
     endpoint = client.webhooks.create(
         url="https://app.example.com/webhooks/warmbly",
-        event_types=["campaign.started", "campaign.completed", "email.replied"],
+        event_types=["campaign.started", "campaign.completed", "inbox.reply_received"],
         description="Production webhook receiver",
     )
     print("endpoint:", endpoint.id)
 
-    # See what event types are available, and inspect recent deliveries.
-    print("event types:", client.webhooks.event_types())
-    for delivery in client.webhooks.deliveries():
-        print("  delivery:", delivery)
+    # The signing secret is returned here and never again. Put it straight into
+    # your secret store — don't log it, and don't let it reach a crash report.
+    store_secret(endpoint.id, endpoint.secret or "")
 
-    # Rotate the signing secret when needed.
+    # See what event types are available. `firehose` marks the high-volume ones.
+    for event_type in client.webhooks.event_types():
+        print("  event type:", event_type.type, event_type.category)
+
+    # Ask Warmbly to challenge the endpoint. It flips to verified once your
+    # handler echoes the `challenge` value from the body.
+    print("verification:", client.webhooks.verify(endpoint.id).status)
+
+    # Inspect what has been delivered, and retry anything that failed.
+    for delivery in client.webhooks.endpoint_deliveries(endpoint.id, status="failed"):
+        print("  failed:", delivery.event_type, delivery.error_reason)
+        client.webhooks.redeliver(delivery.id)
+
+    # Rotate the signing secret when needed. Same rule: store, never log.
     rotated = client.webhooks.rotate_secret(endpoint.id)
+    store_secret(endpoint.id, rotated.secret or "")
     client.close()
-    return getattr(rotated, "secret", "") or ""
+    return rotated.secret or ""
 
 
 # --- Receiving side -------------------------------------------------------
 # Verify the signature before trusting any payload. Pass the RAW request body
 # (never a re-serialized dict) and the `X-Warmbly-Signature` header.
+#
+# The header is `t=<unix>,v1=<hex>`, where the digest covers "{t}.{raw_body}".
+# Folding the timestamp in is what makes a captured request un-replayable, and
+# `verify_webhook_signature` enforces a 5-minute window by default.
 
 
 def handle_delivery(raw_body: bytes, signature_header: str, secret: str) -> None:
     try:
         event = verify_webhook_signature(
             payload=raw_body,
-            signature=signature_header,  # "sha256=<hex>"
+            signature=signature_header,  # "t=<unix>,v1=<hex>"
             secret=secret,
         )
-    except WarmblyError:
-        # Signature mismatch; reject (e.g. return HTTP 400).
-        print("invalid signature; rejecting")
+    except WarmblyError as exc:
+        # Bad signature, malformed header, or a stale timestamp: reject it
+        # (e.g. return HTTP 400).
+        print("rejecting delivery:", exc)
         return
 
     # Trusted: dispatch on the event type.
@@ -68,7 +91,8 @@ def handle_delivery(raw_body: bytes, signature_header: str, secret: str) -> None
 #             )
 #         except WarmblyError:
 #             abort(400)
-#         handle(event)
+#         # X-Warmbly-Event-Id is stable across retries: dedupe on it.
+#         handle(event, request.headers["X-Warmbly-Event-Id"])
 #         return "", 204
 
 
@@ -76,9 +100,13 @@ if __name__ == "__main__":
     import hashlib
     import hmac
     import json
+    import time
 
     # Demonstrate verification locally with a self-signed payload.
     secret = "whsec_demo"
     body = json.dumps({"event_type": "campaign.started", "data": {}}).encode()
-    sig = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
-    handle_delivery(body, sig, secret)
+    timestamp = int(time.time())
+    digest = hmac.new(
+        secret.encode(), f"{timestamp}.".encode() + body, hashlib.sha256
+    ).hexdigest()
+    handle_delivery(body, f"t={timestamp},v1={digest}", secret)

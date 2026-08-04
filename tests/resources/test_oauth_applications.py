@@ -115,7 +115,7 @@ def test_update(client: Warmbly) -> None:
 @respx.mock
 def test_delete(client: Warmbly) -> None:
     route = respx.delete(f"{BASE_URL}/oauth/applications/app_1").mock(
-        return_value=httpx.Response(204)
+        return_value=httpx.Response(200, json={"deleted": True})
     )
 
     result = client.oauth_applications.delete("app_1")
@@ -123,7 +123,7 @@ def test_delete(client: Warmbly) -> None:
     request = route.calls.last.request
     assert request.method == "DELETE"
     assert request.url.path == "/v1/oauth/applications/app_1"
-    assert result is None
+    assert result.deleted is True
 
 
 @respx.mock
@@ -131,10 +131,7 @@ def test_list(client: Warmbly) -> None:
     route = respx.get(f"{BASE_URL}/oauth/applications").mock(
         return_value=httpx.Response(
             200,
-            json={
-                "data": [{"id": "app_1", "name": "One"}],
-                "pagination": {"next_cursor": None, "has_more": False, "total": 1},
-            },
+            json={"applications": [{"id": "app_1", "name": "One"}]},
         )
     )
 

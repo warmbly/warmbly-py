@@ -83,8 +83,8 @@ from warmbly import AsyncWarmbly
 
 async def main():
     async with AsyncWarmbly(api_key="wmbly_...") as client:
-        async for contact in client.contacts.list():
-            print(contact.id)
+        async for campaign in client.campaigns.list():
+            print(campaign.id)
     # the connection pool is closed here
 
 
@@ -164,7 +164,7 @@ request.
 
 The OAuth2 subsystem has async equivalents too:
 [`AsyncOAuth2Client`][warmbly.oauth.AsyncOAuth2Client] (with awaitable
-`exchange_code`, `refresh_token`, `client_credentials`, and `revoke`) and
+`exchange_code`, `refresh_token`, and `revoke`) and
 [`AsyncTokenManager`][warmbly.oauth.AsyncTokenManager]. `authorization_url` stays
 synchronous because it performs no I/O. See the [OAuth2 guide](oauth.md) for the
 full flow.

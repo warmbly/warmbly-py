@@ -12,9 +12,12 @@ from warmbly import (
     ConflictError,
     InternalServerError,
     NotFoundError,
+    NotImplementedAPIError,
     OAuthError,
+    PaymentRequiredError,
     PermissionDeniedError,
     RateLimitError,
+    ServiceUnavailableError,
     UnprocessableEntityError,
     WarmblyError,
 )
@@ -51,7 +54,7 @@ def test_make_status_error_known_codes(
     assert err.message == "boom"
 
 
-@pytest.mark.parametrize("status_code", [500, 502, 503, 504, 599])
+@pytest.mark.parametrize("status_code", [500, 502, 504, 599])
 def test_make_status_error_5xx_is_internal_server_error(status_code: int) -> None:
     err = make_status_error(
         status_code=status_code,
@@ -63,7 +66,7 @@ def test_make_status_error_5xx_is_internal_server_error(status_code: int) -> Non
     assert err.status_code == status_code
 
 
-@pytest.mark.parametrize("status_code", [402, 405, 418, 451, 499])
+@pytest.mark.parametrize("status_code", [405, 418, 451, 499])
 def test_make_status_error_unknown_4xx_is_generic_status_error(
     status_code: int,
 ) -> None:
@@ -76,6 +79,36 @@ def test_make_status_error_unknown_4xx_is_generic_status_error(
     # Unknown non-5xx codes fall back to the base APIStatusError exactly.
     assert type(err) is APIStatusError
     assert err.status_code == status_code
+
+
+def test_make_status_error_402_is_payment_required() -> None:
+    """The API answers 402 when an org runs out of AI credits."""
+    err = make_status_error(
+        status_code=402,
+        request_id=None,
+        headers=None,
+        body={"message": "You're out of AI credits."},
+    )
+    assert type(err) is PaymentRequiredError
+    assert err.status_code == 402
+
+
+@pytest.mark.parametrize(
+    ("status_code", "expected"),
+    [(501, NotImplementedAPIError), (503, ServiceUnavailableError)],
+)
+def test_make_status_error_named_5xx_subclasses(
+    status_code: int, expected: type
+) -> None:
+    err = make_status_error(
+        status_code=status_code,
+        request_id=None,
+        headers=None,
+        body=None,
+    )
+    assert type(err) is expected
+    # Both stay catchable as InternalServerError.
+    assert isinstance(err, InternalServerError)
 
 
 # ---------------------------------------------------------------------------

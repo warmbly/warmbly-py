@@ -1,8 +1,12 @@
-"""The ``plans`` resource: read-only billing plan catalog.
+"""The ``plans`` resource: the read-only billing plan catalog.
 
-Maps to the ``/v1/plans`` route group. Both methods are ``GET``. Plan objects
-are permissive :class:`~warmbly._models.BaseModel` subclasses so additional
-pricing or feature fields are preserved without a client upgrade.
+Maps to ``GET /v1/plans``, which returns the whole catalog in one response
+under a ``plans`` key. Plan objects are permissive
+:class:`~warmbly._models.BaseModel` subclasses so additional pricing or feature
+fields are preserved without a client upgrade.
+
+Subscribing to a plan is a session-only flow (``/v1/subscription/*``) that an
+API key or OAuth token cannot reach, so this resource is read-only by design.
 """
 
 from __future__ import annotations
@@ -12,7 +16,7 @@ from typing import Any
 from .._models import BaseModel
 from .._pagination import AsyncPaginator, SyncCursorPage
 from .._resource import AsyncAPIResource, SyncAPIResource
-from .._types import NOT_GIVEN, NotGivenOr, RequestOptions
+from .._types import RequestOptions
 
 __all__ = [
     "AsyncPlans",
@@ -46,68 +50,30 @@ class Plan(BaseModel):
 class Plans(SyncAPIResource):
     """Synchronous ``plans`` resource (read-only)."""
 
-    def list(
-        self,
-        *,
-        limit: NotGivenOr[int] = NOT_GIVEN,
-        cursor: NotGivenOr[str] = NOT_GIVEN,
-        options: RequestOptions | None = None,
-    ) -> SyncCursorPage[Plan]:
-        """List the available billing plans (auto-paginating).
+    def list(self, *, options: RequestOptions | None = None) -> SyncCursorPage[Plan]:
+        """List the available billing plans.
+
+        The catalog is returned in full, so the page never has a next page.
 
         Args:
-            limit: Optional page size.
-            cursor: Optional pagination cursor.
             options: Optional per-request overrides.
         """
         return self._get_api_list(
-            "/plans",
-            model=Plan,
-            query={"limit": limit, "cursor": cursor},
-            options=options,
+            "/plans", model=Plan, data_key="plans", options=options
         )
-
-    def retrieve(self, plan_id: str, *, options: RequestOptions | None = None) -> Plan:
-        """Retrieve a single billing plan by id.
-
-        Args:
-            plan_id: The plan id.
-            options: Optional per-request overrides.
-        """
-        return self._get(f"/plans/{plan_id}", cast_to=Plan, options=options)
 
 
 class AsyncPlans(AsyncAPIResource):
     """Asynchronous ``plans`` resource (read-only)."""
 
-    def list(
-        self,
-        *,
-        limit: NotGivenOr[int] = NOT_GIVEN,
-        cursor: NotGivenOr[str] = NOT_GIVEN,
-        options: RequestOptions | None = None,
-    ) -> AsyncPaginator[Plan]:
-        """List the available billing plans (auto-paginating).
+    def list(self, *, options: RequestOptions | None = None) -> AsyncPaginator[Plan]:
+        """List the available billing plans.
+
+        The catalog is returned in full, so the page never has a next page.
 
         Args:
-            limit: Optional page size.
-            cursor: Optional pagination cursor.
             options: Optional per-request overrides.
         """
         return self._get_api_list(
-            "/plans",
-            model=Plan,
-            query={"limit": limit, "cursor": cursor},
-            options=options,
+            "/plans", model=Plan, data_key="plans", options=options
         )
-
-    async def retrieve(
-        self, plan_id: str, *, options: RequestOptions | None = None
-    ) -> Plan:
-        """Retrieve a single billing plan by id.
-
-        Args:
-            plan_id: The plan id.
-            options: Optional per-request overrides.
-        """
-        return await self._get(f"/plans/{plan_id}", cast_to=Plan, options=options)

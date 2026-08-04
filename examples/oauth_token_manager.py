@@ -23,10 +23,10 @@ def main() -> None:
     # KeyringTokenStorage to use the OS keychain, or MemoryTokenStorage in tests.
     storage = FileTokenStorage("~/.warmbly/acme-token.json")
 
-    # Seed storage once after the initial authorization-code exchange:
+    # Seed storage once, with the token from the initial authorization-code
+    # exchange (see oauth_flow.py). Every Warmbly token is bound to a user who
+    # consented, so there is no grant that skips that first browser round-trip.
     # storage.save(token_from_exchange_code)
-    # (See oauth_flow.py.) For client-credentials apps you can seed it like so:
-    storage.save(oauth.client_credentials(scopes=["read_campaigns"]))
 
     # The manager refreshes via this callback and persists the rotated token.
     def refresh(refresh_token: str) -> OAuth2Token:

@@ -12,9 +12,17 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Literal
 
-__all__ = ["ALL_SCOPES", "SCOPES", "Scope", "mask_to_scopes", "scopes_to_mask"]
+__all__ = [
+    "ALL_SCOPES",
+    "FULL_ACCESS_SCOPES",
+    "READ_ONLY_SCOPES",
+    "SCOPES",
+    "Scope",
+    "mask_to_scopes",
+    "scopes_to_mask",
+]
 
-# The 22 permission bits, in declaration order (matches the backend bitmask).
+# The 24 permission bits, in declaration order (matches the backend bitmask).
 SCOPES: dict[str, int] = {
     "read_emails": 1 << 0,
     "read_campaigns": 1 << 1,
@@ -38,6 +46,8 @@ SCOPES: dict[str, int] = {
     "read_audit_logs": 1 << 19,
     "integrations": 1 << 20,
     "warmup_routing": 1 << 21,
+    "ai_agent": 1 << 22,
+    "ai_research": 1 << 23,
 }
 
 Scope = Literal[
@@ -63,10 +73,20 @@ Scope = Literal[
     "read_audit_logs",
     "integrations",
     "warmup_routing",
+    "ai_agent",
+    "ai_research",
 ]
 
 ALL_SCOPES: int = sum(SCOPES.values())
 """A bitmask granting every scope."""
+
+READ_ONLY_SCOPES: int = sum(
+    bit for name, bit in SCOPES.items() if name.startswith("read_")
+)
+"""The backend's ``read_only`` preset: every read scope and nothing else."""
+
+FULL_ACCESS_SCOPES: int = ALL_SCOPES
+"""The backend's ``full_access`` preset: every scope."""
 
 
 def scopes_to_mask(names: Iterable[str]) -> int:

@@ -1,10 +1,13 @@
 # OAuth2
 
-The `warmbly.oauth` subsystem implements the OAuth2 grants supported by
-Warmbly's authorization server: **authorization_code + PKCE (S256)**,
-**refresh_token**, and **client_credentials**, plus token revocation, secure
-token storage, and auto-refreshing token management. Token-endpoint and
-transport errors surface as [`OAuthError`][warmbly.OAuthError].
+The `warmbly.oauth` subsystem implements the two OAuth2 grants Warmbly's
+authorization server accepts — **authorization_code + PKCE (S256)** and
+**refresh_token** — plus token revocation, secure token storage, and
+auto-refreshing token management. Token-endpoint and transport errors surface
+as [`OAuthError`][warmbly.OAuthError].
+
+There is no client-credentials grant: every token is bound to a user who
+consented, so machine-to-machine access uses an API key instead.
 
 ```python
 from warmbly.oauth import OAuth2Client

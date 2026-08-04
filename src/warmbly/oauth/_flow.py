@@ -1,11 +1,13 @@
-"""The OAuth2 authorization-code (+PKCE), refresh, and client-credentials flows.
+"""The OAuth2 authorization-code (+PKCE) and refresh flows.
 
 :class:`OAuth2Client` (sync) and :class:`AsyncOAuth2Client` (async) drive the
-RFC 9700-sanctioned grants against Warmbly's authorization server:
+two grants Warmbly's authorization server accepts:
 
 * **authorization_code + PKCE (S256)**: the interactive browser flow.
 * **refresh_token**: exchange a (rotating) refresh token for a fresh token set.
-* **client_credentials**: machine-to-machine, no user.
+
+There is no client-credentials grant: every token is bound to a user who
+consented, so machine-to-machine access uses an API key instead.
 
 This module uses ``httpx`` directly (the OAuth subsystem is permitted to), but
 never lets an ``httpx`` exception escape: transport failures and RFC 6749 error
@@ -201,9 +203,9 @@ class _OAuth2ClientBase:
 class OAuth2Client(_OAuth2ClientBase):
     """Synchronous OAuth2 client for the Warmbly authorization server.
 
-    Supports the authorization-code (+PKCE S256), refresh-token, and
-    client-credentials grants, plus token revocation. Construct it with your
-    application's ``client_id`` (and ``client_secret`` for confidential clients).
+    Supports the authorization-code (+PKCE S256) and refresh-token grants, plus
+    token revocation. Construct it with your application's ``client_id`` (and
+    ``client_secret`` for confidential clients).
     """
 
     def __init__(
@@ -330,23 +332,6 @@ class OAuth2Client(_OAuth2ClientBase):
         form = {"grant_type": "refresh_token", "refresh_token": refresh_token}
         return self._post_token(form)
 
-    def client_credentials(self, *, scopes: list[str] | None = None) -> OAuth2Token:
-        """Obtain a token via the client-credentials grant (machine-to-machine).
-
-        Args:
-            scopes: Optional scopes to request (space-joined).
-
-        Returns:
-            The issued :class:`OAuth2Token`.
-
-        Raises:
-            OAuthError: On an RFC 6749 error response or a transport failure.
-        """
-        form: dict[str, object] = {"grant_type": "client_credentials"}
-        if scopes:
-            form["scope"] = " ".join(scopes)
-        return self._post_token(form)
-
     def revoke(self, token: str) -> None:
         """Revoke an access or refresh token (RFC 7009).
 
@@ -461,18 +446,6 @@ class AsyncOAuth2Client(_OAuth2ClientBase):
         See :meth:`OAuth2Client.refresh_token` for argument and error semantics.
         """
         form = {"grant_type": "refresh_token", "refresh_token": refresh_token}
-        return await self._post_token(form)
-
-    async def client_credentials(
-        self, *, scopes: list[str] | None = None
-    ) -> OAuth2Token:
-        """Obtain a token via the client-credentials grant.
-
-        See :meth:`OAuth2Client.client_credentials` for argument semantics.
-        """
-        form: dict[str, object] = {"grant_type": "client_credentials"}
-        if scopes:
-            form["scope"] = " ".join(scopes)
         return await self._post_token(form)
 
     async def revoke(self, token: str) -> None:

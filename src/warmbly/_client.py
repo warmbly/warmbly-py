@@ -4,6 +4,11 @@ A single client object owns all configuration and a shared connection pool, and
 exposes each API resource group as a lazily-instantiated attribute
 (``client.api_keys``, ``client.campaigns``, ...). Swap ``Warmbly`` for
 ``AsyncWarmbly`` and ``await`` the methods for the async variant.
+
+The clients cover the API-key- and OAuth-reachable surface. Routes that require
+a browser session — organization governance, billing, mailbox onboarding, the
+OAuth consent flow — are deliberately absent, because a long-lived credential
+cannot call them.
 """
 
 from __future__ import annotations
@@ -22,33 +27,63 @@ from ._base_client import (
 from ._exceptions import WarmblyError
 from ._types import Timeout
 from .resources import (
+    Advisor,
+    AISkills,
     Analytics,
     ApiKeys,
+    AsyncAdvisor,
+    AsyncAISkills,
     AsyncAnalytics,
     AsyncApiKeys,
+    AsyncAuditLogs,
+    AsyncAutomations,
     AsyncCampaigns,
+    AsyncCategories,
     AsyncContacts,
     AsyncCrm,
+    AsyncDeliverability,
     AsyncEmails,
+    AsyncFolders,
+    AsyncGeneration,
     AsyncIntegrations,
+    AsyncLeadSync,
+    AsyncMe,
+    AsyncMeetings,
     AsyncOAuthApplications,
+    AsyncOutreach,
     AsyncPlans,
+    AsyncTags,
+    AsyncTasks,
     AsyncTeams,
     AsyncTemplates,
     AsyncTimezones,
     AsyncUnibox,
+    AsyncWarmupRouting,
     AsyncWebhooks,
+    AuditLogs,
+    Automations,
     Campaigns,
+    Categories,
     Contacts,
     Crm,
+    Deliverability,
     Emails,
+    Folders,
+    Generation,
     Integrations,
+    LeadSync,
+    Me,
+    Meetings,
     OAuthApplications,
+    Outreach,
     Plans,
+    Tags,
+    Tasks,
     Teams,
     Templates,
     Timezones,
     Unibox,
+    WarmupRouting,
     Webhooks,
 )
 
@@ -109,6 +144,10 @@ class Warmbly(SyncAPIClient):
         return {"Authorization": f"Bearer {self.api_key}"}
 
     @cached_property
+    def me(self) -> Me:
+        return Me(self)
+
+    @cached_property
     def api_keys(self) -> ApiKeys:
         return ApiKeys(self)
 
@@ -141,6 +180,10 @@ class Warmbly(SyncAPIClient):
         return Integrations(self)
 
     @cached_property
+    def automations(self) -> Automations:
+        return Automations(self)
+
+    @cached_property
     def templates(self) -> Templates:
         return Templates(self)
 
@@ -153,6 +196,10 @@ class Warmbly(SyncAPIClient):
         return Teams(self)
 
     @cached_property
+    def meetings(self) -> Meetings:
+        return Meetings(self)
+
+    @cached_property
     def plans(self) -> Plans:
         return Plans(self)
 
@@ -163,6 +210,54 @@ class Warmbly(SyncAPIClient):
     @cached_property
     def unibox(self) -> Unibox:
         return Unibox(self)
+
+    @cached_property
+    def advisor(self) -> Advisor:
+        return Advisor(self)
+
+    @cached_property
+    def ai_skills(self) -> AISkills:
+        return AISkills(self)
+
+    @cached_property
+    def generation(self) -> Generation:
+        return Generation(self)
+
+    @cached_property
+    def audit_logs(self) -> AuditLogs:
+        return AuditLogs(self)
+
+    @cached_property
+    def outreach(self) -> Outreach:
+        return Outreach(self)
+
+    @cached_property
+    def deliverability(self) -> Deliverability:
+        return Deliverability(self)
+
+    @cached_property
+    def tasks(self) -> Tasks:
+        return Tasks(self)
+
+    @cached_property
+    def lead_sync(self) -> LeadSync:
+        return LeadSync(self)
+
+    @cached_property
+    def warmup_routing(self) -> WarmupRouting:
+        return WarmupRouting(self)
+
+    @cached_property
+    def folders(self) -> Folders:
+        return Folders(self)
+
+    @cached_property
+    def tags(self) -> Tags:
+        return Tags(self)
+
+    @cached_property
+    def categories(self) -> Categories:
+        return Categories(self)
 
 
 class AsyncWarmbly(AsyncAPIClient):
@@ -194,6 +289,10 @@ class AsyncWarmbly(AsyncAPIClient):
     @property
     def auth_headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self.api_key}"}
+
+    @cached_property
+    def me(self) -> AsyncMe:
+        return AsyncMe(self)
 
     @cached_property
     def api_keys(self) -> AsyncApiKeys:
@@ -228,6 +327,10 @@ class AsyncWarmbly(AsyncAPIClient):
         return AsyncIntegrations(self)
 
     @cached_property
+    def automations(self) -> AsyncAutomations:
+        return AsyncAutomations(self)
+
+    @cached_property
     def templates(self) -> AsyncTemplates:
         return AsyncTemplates(self)
 
@@ -240,6 +343,10 @@ class AsyncWarmbly(AsyncAPIClient):
         return AsyncTeams(self)
 
     @cached_property
+    def meetings(self) -> AsyncMeetings:
+        return AsyncMeetings(self)
+
+    @cached_property
     def plans(self) -> AsyncPlans:
         return AsyncPlans(self)
 
@@ -250,3 +357,51 @@ class AsyncWarmbly(AsyncAPIClient):
     @cached_property
     def unibox(self) -> AsyncUnibox:
         return AsyncUnibox(self)
+
+    @cached_property
+    def advisor(self) -> AsyncAdvisor:
+        return AsyncAdvisor(self)
+
+    @cached_property
+    def ai_skills(self) -> AsyncAISkills:
+        return AsyncAISkills(self)
+
+    @cached_property
+    def generation(self) -> AsyncGeneration:
+        return AsyncGeneration(self)
+
+    @cached_property
+    def audit_logs(self) -> AsyncAuditLogs:
+        return AsyncAuditLogs(self)
+
+    @cached_property
+    def outreach(self) -> AsyncOutreach:
+        return AsyncOutreach(self)
+
+    @cached_property
+    def deliverability(self) -> AsyncDeliverability:
+        return AsyncDeliverability(self)
+
+    @cached_property
+    def tasks(self) -> AsyncTasks:
+        return AsyncTasks(self)
+
+    @cached_property
+    def lead_sync(self) -> AsyncLeadSync:
+        return AsyncLeadSync(self)
+
+    @cached_property
+    def warmup_routing(self) -> AsyncWarmupRouting:
+        return AsyncWarmupRouting(self)
+
+    @cached_property
+    def folders(self) -> AsyncFolders:
+        return AsyncFolders(self)
+
+    @cached_property
+    def tags(self) -> AsyncTags:
+        return AsyncTags(self)
+
+    @cached_property
+    def categories(self) -> AsyncCategories:
+        return AsyncCategories(self)

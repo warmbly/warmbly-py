@@ -14,14 +14,23 @@ There are two halves to working with webhooks:
 
 ## Verifying inbound signatures
 
-Every outbound webhook request is signed with HMAC-SHA256 over the **raw request
-body**, using your endpoint's signing secret. The signature travels in the
-`X-Warmbly-Signature` header in the form `sha256=<hexdigest>`.
+Every outbound webhook request carries three headers:
 
-`verify_webhook_signature` recomputes the
-digest, compares it against the header in constant time, and (on success)
-returns the parsed JSON body as a `dict`. On a mismatch it raises
-[`WarmblyError`][warmbly.WarmblyError].
+| Header | What it is |
+| --- | --- |
+| `X-Warmbly-Event` | The event type, so you can route without parsing the body. |
+| `X-Warmbly-Event-Id` | The event id. Stable across retries, so use it to dedupe. |
+| `X-Warmbly-Signature` | `t=<unix>,v1=<hex>` — see below. |
+
+The signature is HMAC-SHA256 over `"{t}.{raw_body}"` using your endpoint's
+signing secret, in the same shape Stripe uses. Folding the timestamp into the
+digest is what makes a captured request un-replayable: it cannot be re-stamped
+without the secret.
+
+`verify_webhook_signature` recomputes the digest, compares it against the
+header's `v1` value in constant time, rejects a timestamp outside the tolerance
+window, and (on success) returns the parsed JSON body as a `dict`. Any failure
+raises [`WarmblyError`][warmbly.WarmblyError].
 
 ```python
 from warmbly import verify_webhook_signature, WarmblyError
@@ -40,8 +49,24 @@ print(event["event_type"], event["id"])
     the signature will not match. Read the raw body first, verify, then use the
     `dict` that `verify_webhook_signature` returns.
 
-The `signature` argument accepts the header value with or without the `sha256=`
-prefix, both work, since the prefix is stripped before comparison.
+Pass the header value verbatim; the helper parses it. During a secret rotation
+the server may send more than one `v1` digest, and any match is accepted.
+
+### Replay tolerance
+
+By default a signature more than 300 seconds old is rejected, which bounds how
+long a captured request stays usable. Widen it if your queue can lag, or pass
+`tolerance=None` to skip the check entirely — for instance when verifying a
+delivery you recorded earlier.
+
+```python
+verify_webhook_signature(
+    payload=body,
+    signature=signature_header,
+    secret=endpoint_secret,
+    tolerance=900,  # accept up to 15 minutes of clock skew / queue lag
+)
+```
 
 It's available as a top-level import (no client instance needed):
 
@@ -126,11 +151,12 @@ print(endpoint.id)
 secret = endpoint.secret  # save this securely; shown only once
 ```
 
-To discover which event types you can subscribe to, list them:
+To discover which event types you can subscribe to, list them. `firehose` marks
+the high-volume ones, which are opt-in for a reason:
 
 ```python
 for et in client.webhooks.event_types():
-    print(et.name, "-", et.description)
+    print(et.type, et.category, "-", et.description, "firehose" if et.firehose else "")
 ```
 
 ### List endpoints
@@ -156,6 +182,12 @@ client.webhooks.update(
 )
 ```
 
+### Update an endpoint's URL
+
+Changing the URL clears verification: Warmbly re-challenges the new address and
+holds deliveries until it echoes the challenge, so a mistyped host cannot
+silently swallow your events.
+
 ### Rotate the signing secret
 
 `rotate_secret()` issues a new secret and returns it on the result (again, only
@@ -166,14 +198,16 @@ rotated = client.webhooks.rotate_secret(endpoint.id)
 new_secret = rotated.secret
 ```
 
-### Send a test ping
+### Verify an endpoint
 
-`verify()` asks Warmbly to deliver a server-side test ping so you can confirm an
-endpoint is reachable and your handler responds:
+`verify()` asks Warmbly to deliver a signed challenge. The call returns as soon
+as the challenge is queued; the endpoint flips to verified once it echoes the
+`challenge` value from the body, either back in its response body or in the
+`X-Warmbly-Webhook-Challenge` header.
 
 ```python
 result = client.webhooks.verify(endpoint.id)
-print(result.status, result.response_status)
+print(result.status)  # "challenge_sent"
 ```
 
 ### Delete an endpoint
@@ -195,9 +229,9 @@ List deliveries across all endpoints, or scope to one endpoint:
 for delivery in client.webhooks.deliveries():
     print(delivery.event_type, delivery.status, delivery.response_status)
 
-# For a single endpoint.
-for delivery in client.webhooks.endpoint_deliveries(endpoint.id):
-    print(delivery.id, delivery.status)
+# For a single endpoint, narrowed to the failures.
+for delivery in client.webhooks.endpoint_deliveries(endpoint.id, status="failed"):
+    print(delivery.id, delivery.error_reason, delivery.response_body_excerpt)
 ```
 
 Re-attempt a delivery that previously failed:
@@ -206,12 +240,12 @@ Re-attempt a delivery that previously failed:
 client.webhooks.redeliver(delivery.id)
 ```
 
-Events that were dropped because an endpoint was being throttled are recorded
-separately:
+Events the dispatch throttle dropped are recorded separately, rolled up by day
+over the last 30 days:
 
 ```python
 for drop in client.webhooks.throttle_drops():
-    print(drop.event_type, drop.reason, drop.dropped_at)
+    print(drop.day, drop.event_type, drop.dropped_windows, drop.last_dropped_at)
 ```
 
 ## Async usage
@@ -231,7 +265,8 @@ async def main() -> None:
         url="https://app.example.com/warmbly/webhook",
         event_types=["campaign.completed"],
     )
-    print(endpoint.id, endpoint.secret)
+    print(endpoint.id)
+    await store_secret(endpoint.secret)  # shown once; store it, never log it
 
     async for delivery in client.webhooks.endpoint_deliveries(endpoint.id):
         print(delivery.status)

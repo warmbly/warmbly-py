@@ -175,7 +175,18 @@ read_analytics     write_emails      write_campaigns   write_contacts
 write_unibox       bulk_contacts     bulk_campaigns    realtime_subscribe
 webhooks           api_keys          send_campaigns    read_templates
 write_templates    read_crm          write_crm         read_audit_logs
-integrations       warmup_routing
+integrations       warmup_routing    ai_agent          ai_research
+```
+
+Three presets are exported for the common cases, matching the ones the
+dashboard offers:
+
+```python
+from warmbly import ALL_SCOPES, READ_ONLY_SCOPES, FULL_ACCESS_SCOPES, SCOPES
+
+READ_ONLY_SCOPES    # every read_* scope and nothing else
+FULL_ACCESS_SCOPES  # every scope (same as ALL_SCOPES)
+SCOPES              # the name -> bit mapping, if you want to build your own
 ```
 
 The same scope strings are used when requesting OAuth2 authorization. See the

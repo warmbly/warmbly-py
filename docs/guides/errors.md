@@ -22,12 +22,15 @@ WarmblyError                     # base: catches everything below
 │   └── APIStatusError           # server returned a non-2xx status
 │       ├── BadRequestError          # 400
 │       ├── AuthenticationError      # 401
+│       ├── PaymentRequiredError     # 402
 │       ├── PermissionDeniedError    # 403
 │       ├── NotFoundError            # 404
 │       ├── ConflictError            # 409
 │       ├── UnprocessableEntityError # 422
 │       ├── RateLimitError           # 429
 │       └── InternalServerError      # 5xx
+│           ├── NotImplementedAPIError   # 501
+│           └── ServiceUnavailableError  # 503
 ├── OAuthError                   # OAuth2 token-endpoint error (RFC 6749)
 └── GatewayError                 # realtime gateway error
 ```
@@ -43,12 +46,15 @@ from warmbly import (
     APIStatusError,
     BadRequestError,
     AuthenticationError,
+    PaymentRequiredError,
     PermissionDeniedError,
     NotFoundError,
     ConflictError,
     UnprocessableEntityError,
     RateLimitError,
     InternalServerError,
+    NotImplementedAPIError,
+    ServiceUnavailableError,
     OAuthError,
     GatewayError,
 )
@@ -64,13 +70,26 @@ no dedicated class become `InternalServerError` (5xx) or the generic
 | ------ | --------- | --------------- |
 | 400 | `BadRequestError` | Malformed request. |
 | 401 | `AuthenticationError` | Missing or invalid API key / token. |
+| 402 | `PaymentRequiredError` | Out of AI credits, or the plan does not cover it. |
 | 403 | `PermissionDeniedError` | Authenticated, but not allowed to do this. |
 | 404 | `NotFoundError` | The resource does not exist. |
 | 409 | `ConflictError` | State conflict (e.g. duplicate / version mismatch). |
 | 422 | `UnprocessableEntityError` | Semantically invalid request. |
 | 429 | `RateLimitError` | Rate limit exceeded; see `.retry_after`. |
-| 5xx | `InternalServerError` | Server-side failure. |
+| 501 | `NotImplementedAPIError` | The endpoint is not enabled on this deployment. |
+| 503 | `ServiceUnavailableError` | A dependency (AI provider, mail server) is down. |
+| other 5xx | `InternalServerError` | Server-side failure. |
 | other non-2xx | `APIStatusError` | Anything without a dedicated subclass. |
+
+`NotImplementedAPIError` and `ServiceUnavailableError` both subclass
+`InternalServerError`, so an existing `except InternalServerError` still catches
+them.
+
+!!! tip "Running out of AI credits"
+    The AI endpoints — `client.generation.*`, `client.contacts.research()`,
+    `client.unibox.draft_reply()` — answer 402 when the organization's credit
+    balance is exhausted, and 429 when it trips the daily usage cap. The first
+    needs a top-up; the second just needs waiting.
 
 ## Catching specific errors
 
@@ -183,7 +202,7 @@ but exceeds the configured timeout, it raises
 from warmbly import APITimeoutError, APIConnectionError
 
 try:
-    client.contacts.list()
+    client.campaigns.list()
 except APITimeoutError:
     print("request timed out")
 except APIConnectionError as exc:

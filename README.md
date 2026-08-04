@@ -130,8 +130,8 @@ asyncio.run(main())
 List endpoints return an iterator that transparently fetches every page:
 
 ```python
-for contact in client.contacts.list():   # walks all pages
-    print(contact.email)
+for campaign in client.campaigns.list():  # walks all pages
+    print(campaign.name)
 
 page = client.api_keys.list()             # or work a page at a time
 print(page.data, page.has_more, page.next_cursor)
@@ -184,13 +184,16 @@ pass `idempotency_key=...` to a method to supply your own.
 
 ## Webhooks
 
-Verify inbound webhook signatures before trusting a payload:
+Verify inbound webhook signatures before trusting a payload. The
+`X-Warmbly-Signature` header is `t=<unix>,v1=<hex>`, where the digest covers
+`"{t}.{raw_body}"`; the helper checks it in constant time and rejects a stale
+timestamp as a replay.
 
 ```python
 from warmbly import verify_webhook_signature
 
 event = verify_webhook_signature(
-    payload=request.body,
+    payload=request.body,  # raw bytes, never re-serialized
     signature=request.headers["X-Warmbly-Signature"],
     secret=endpoint_secret,
 )
