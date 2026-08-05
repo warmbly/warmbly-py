@@ -17,3 +17,11 @@ updates:
       github-actions:
         patterns: ["*"]
     open-pull-requests-limit: 5
+    ignore:
+      # codeql-action is pinned to its floating major tag on purpose, so only
+      # a new major is worth a pull request; anything narrower would rewrite
+      # the tag into an exact version and freeze the bundle between bumps.
+      - dependency-name: github/codeql-action
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-patch
