@@ -47,6 +47,8 @@ class GatewayEvent:
     CAMPAIGN_STARTED = "CAMPAIGN_STARTED"
     CAMPAIGN_PAUSED = "CAMPAIGN_PAUSED"
     CAMPAIGN_COMPLETED = "CAMPAIGN_COMPLETED"
+    #: A continuous campaign ran out of leads and is waiting for more.
+    CAMPAIGN_IDLE = "CAMPAIGN_IDLE"
 
     # Task lifecycle.
     TASK_CREATED = "TASK_CREATED"
@@ -71,12 +73,18 @@ class GatewayEvent:
     CONTACT_DELETED = "CONTACT_DELETED"
     CONTACTS_RELOAD = "CONTACTS_RELOAD"
 
+    # Hosted forms and website tracking.
+    FORM_SUBMISSION_CREATED = "FORM_SUBMISSION_CREATED"
+    PAGE_HIT = "PAGE_HIT"
+
     # Mailbox events.
     ACCOUNT_CONNECTED = "ACCOUNT_CONNECTED"
     ACCOUNT_DISCONNECTED = "ACCOUNT_DISCONNECTED"
     ACCOUNT_ERROR = "ACCOUNT_ERROR"
     ACCOUNT_SYNCED = "ACCOUNT_SYNCED"
     ACCOUNT_HEALTH_CHANGED = "ACCOUNT_HEALTH_CHANGED"
+    #: A mailbox's import progress or fair-use hold changed.
+    ACCOUNT_SYNC_STATE = "ACCOUNT_SYNC_STATE"
 
     # Bulk-operation events.
     BULK_STARTED = "BULK_STARTED"

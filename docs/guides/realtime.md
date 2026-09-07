@@ -159,6 +159,13 @@ vocabulary as constants so you avoid stringly-typed keys:
 event names still reach `on_event` handlers and `wait_for`, so a server that
 adds an event needs no SDK upgrade.
 
+`GatewayEvent.CAMPAIGN_IDLE` is worth knowing about if you run continuous
+campaigns: it fires when one runs out of leads and starts waiting for more,
+rather than finishing. `GatewayEvent.FORM_SUBMISSION_CREATED` and
+`GatewayEvent.PAGE_HIT` cover hosted forms and website tracking, and
+`GatewayEvent.ACCOUNT_SYNC_STATE` reports a mailbox's import progress and any
+fair-use hold on it.
+
 ### `wait_for`: await a single event
 
 Instead of a long-lived handler, you can suspend until the next matching event

@@ -31,9 +31,14 @@ def lint(session: nox.Session) -> None:
 
 @nox.session(python="3.12")
 def typecheck(session: nox.Session) -> None:
-    """Run mypy in strict mode."""
+    """Run mypy in strict mode over the shipped package, as CI does.
+
+    The test suite is kept lint-clean rather than strictly typed, and pointing
+    mypy at it fails outright: `tests/conftest.py` and `tests/gateway/conftest.py`
+    collide as one module name.
+    """
     session.install("-e", ".[oauth,test]", "mypy>=1.11")
-    session.run("mypy", "src", "tests")
+    session.run("mypy", "src")
 
 
 @nox.session(python="3.12")

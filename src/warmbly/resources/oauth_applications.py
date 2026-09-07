@@ -64,6 +64,7 @@ class OAuthApplication(BaseModel):
     is_public: bool | None = None
     dynamically_registered: bool | None = None
     created_at: str | None = None
+    updated_at: str | None = None
 
 
 class OAuthApplicationDeleted(BaseModel):

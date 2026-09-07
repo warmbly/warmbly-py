@@ -12,6 +12,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
+from pydantic import Field
+
 from .._models import BaseModel
 from .._resource import AsyncAPIResource, SyncAPIResource
 from .._types import NOT_GIVEN, NotGivenOr, RequestOptions
@@ -41,7 +43,7 @@ class AnalyticsResult(BaseModel):
         data: A generic data array some endpoints return.
     """
 
-    from_: str | None = None
+    from_: str | None = Field(default=None, alias="from")
     to: str | None = None
     interval: str | None = None
     totals: dict[str, Any] | None = None

@@ -50,6 +50,18 @@ for campaign in client.campaigns.list():
 
 ::: warmbly.resources.contacts.Contacts
 
+## Segments
+
+::: warmbly.resources.segments.Segments
+
+## Forms
+
+::: warmbly.resources.forms.Forms
+
+## Suppressions
+
+::: warmbly.resources.suppressions.Suppressions
+
 ## Unibox
 
 ::: warmbly.resources.unibox.Unibox
@@ -108,6 +120,10 @@ bound to three route prefixes.
 ## AI skills
 
 ::: warmbly.resources.ai_skills.AISkills
+
+## AI tools
+
+::: warmbly.resources.ai_tools.AITools
 
 ## Outreach settings
 

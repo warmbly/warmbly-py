@@ -82,10 +82,13 @@ git commit -s -m "feat: ..."
 
 ## Releasing (maintainers)
 
-1. `towncrier build --version vX.Y.Z` to assemble the changelog.
+1. `towncrier build --version X.Y.Z` to assemble the changelog. Pass the bare
+   version: `title_format` in `pyproject.toml` adds the `v`, so a `vX.Y.Z` here
+   renders the heading as `vvX.Y.Z`.
 2. Commit, then tag: `git tag vX.Y.Z && git push --tags`.
-3. The release workflow builds, publishes to TestPyPI, then to PyPI via Trusted
-   Publishing, and drafts a GitHub release. No API tokens are involved.
+3. The release workflow builds, then publishes to PyPI via Trusted Publishing
+   and drafts a GitHub release. No API tokens are involved; the `pypi`
+   environment requires a reviewer before anything uploads.
 
 Versioning follows [SemVer 2.0.0](https://semver.org/). The public API is the
 `warmbly.__all__` export set plus documented resource methods; underscore-prefixed

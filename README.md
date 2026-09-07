@@ -199,6 +199,33 @@ event = verify_webhook_signature(
 )
 ```
 
+## Resources
+
+Each API group hangs off the client as an attribute:
+
+| | |
+| --- | --- |
+| **Sending** | `campaigns`, `emails`, `templates`, `generation`, `outreach`, `deliverability`, `warmup_routing`, `suppressions` |
+| **Audience** | `contacts`, `segments`, `forms`, `folders`, `tags`, `categories` |
+| **Inbox & CRM** | `unibox`, `crm`, `meetings`, `automations`, `lead_sync` |
+| **Insight** | `analytics`, `advisor`, `audit_logs`, `tasks` |
+| **Platform** | `me`, `api_keys`, `oauth_applications`, `teams`, `webhooks`, `integrations`, `plans`, `timezones` |
+| **AI** | `ai_skills`, `ai_tools` |
+
+`client.ai_tools` is the REST tool surface for agents that do not speak MCP:
+list the tools the credential may use, in OpenAI function-calling shape if you
+want, and call them by name.
+
+```python
+tools = [t.to_dict() for t in client.ai_tools.list(format="openai")]
+result = client.ai_tools.call("list_campaigns", arguments={"status": "active"})
+```
+
+The clients cover what an API key or OAuth token can reach. Routes that need a
+browser session — organization governance, billing, mailbox onboarding, the
+OAuth consent flow — are deliberately absent, because a long-lived credential
+cannot call them.
+
 ## Documentation
 
 Full documentation, guides, and the API reference live at

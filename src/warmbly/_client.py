@@ -29,10 +29,12 @@ from ._types import Timeout
 from .resources import (
     Advisor,
     AISkills,
+    AITools,
     Analytics,
     ApiKeys,
     AsyncAdvisor,
     AsyncAISkills,
+    AsyncAITools,
     AsyncAnalytics,
     AsyncApiKeys,
     AsyncAuditLogs,
@@ -44,6 +46,7 @@ from .resources import (
     AsyncDeliverability,
     AsyncEmails,
     AsyncFolders,
+    AsyncForms,
     AsyncGeneration,
     AsyncIntegrations,
     AsyncLeadSync,
@@ -52,6 +55,8 @@ from .resources import (
     AsyncOAuthApplications,
     AsyncOutreach,
     AsyncPlans,
+    AsyncSegments,
+    AsyncSuppressions,
     AsyncTags,
     AsyncTasks,
     AsyncTeams,
@@ -69,6 +74,7 @@ from .resources import (
     Deliverability,
     Emails,
     Folders,
+    Forms,
     Generation,
     Integrations,
     LeadSync,
@@ -77,6 +83,8 @@ from .resources import (
     OAuthApplications,
     Outreach,
     Plans,
+    Segments,
+    Suppressions,
     Tags,
     Tasks,
     Teams,
@@ -259,6 +267,22 @@ class Warmbly(SyncAPIClient):
     def categories(self) -> Categories:
         return Categories(self)
 
+    @cached_property
+    def segments(self) -> Segments:
+        return Segments(self)
+
+    @cached_property
+    def forms(self) -> Forms:
+        return Forms(self)
+
+    @cached_property
+    def suppressions(self) -> Suppressions:
+        return Suppressions(self)
+
+    @cached_property
+    def ai_tools(self) -> AITools:
+        return AITools(self)
+
 
 class AsyncWarmbly(AsyncAPIClient):
     """Asynchronous Warmbly API client.
@@ -405,3 +429,19 @@ class AsyncWarmbly(AsyncAPIClient):
     @cached_property
     def categories(self) -> AsyncCategories:
         return AsyncCategories(self)
+
+    @cached_property
+    def segments(self) -> AsyncSegments:
+        return AsyncSegments(self)
+
+    @cached_property
+    def forms(self) -> AsyncForms:
+        return AsyncForms(self)
+
+    @cached_property
+    def suppressions(self) -> AsyncSuppressions:
+        return AsyncSuppressions(self)
+
+    @cached_property
+    def ai_tools(self) -> AsyncAITools:
+        return AsyncAITools(self)

@@ -208,6 +208,28 @@ class ApiKeys(SyncAPIResource):
             options=options,
         )
 
+    def revoke_self(
+        self,
+        *,
+        reason: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> ApiKeyDeleted:
+        """Revoke the API key this call is made with.
+
+        Deliberately outside the ``api_keys`` scope: a credential can always
+        end its own access, which is what makes signing a machine out actually
+        take effect. Every later call with this key is a 401.
+
+        Args:
+            reason: Why the key was revoked, for the audit trail.
+        """
+        return self._delete(
+            "/api-keys/self",
+            cast_to=ApiKeyDeleted,
+            query=drop_not_given({"reason": reason}),
+            options=options,
+        )
+
     def permissions(
         self, *, options: RequestOptions | None = None
     ) -> ApiKeyPermissions:
@@ -360,6 +382,28 @@ class AsyncApiKeys(AsyncAPIResource):
             f"/api-keys/{api_key_id}",
             cast_to=ApiKeyDeleted,
             query=query,
+            options=options,
+        )
+
+    async def revoke_self(
+        self,
+        *,
+        reason: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> ApiKeyDeleted:
+        """Revoke the API key this call is made with.
+
+        Deliberately outside the ``api_keys`` scope: a credential can always
+        end its own access, which is what makes signing a machine out actually
+        take effect. Every later call with this key is a 401.
+
+        Args:
+            reason: Why the key was revoked, for the audit trail.
+        """
+        return await self._delete(
+            "/api-keys/self",
+            cast_to=ApiKeyDeleted,
+            query=drop_not_given({"reason": reason}),
             options=options,
         )
 

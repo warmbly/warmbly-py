@@ -87,6 +87,7 @@ class AdvisorSummary(BaseModel):
     medium: int | None = None
     low: int | None = None
     surfaces: Sequence[dict[str, Any]] = []
+    last_run_at: str | None = None
 
 
 class AdvisorSettings(BaseModel):

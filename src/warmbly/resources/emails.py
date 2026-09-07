@@ -32,6 +32,13 @@ __all__ = [
     "EmailSendResult",
     "EmailVerification",
     "Emails",
+    "MailboxAllowance",
+    "MailboxSync",
+    "MailboxSyncPolicy",
+    "MailboxSyncState",
+    "SendLifecycleState",
+    "SendingBehavior",
+    "SendingBehaviorPlan",
     "TrackingDomainStatus",
     "WarmupAppeal",
     "WarmupBanStatus",
@@ -70,6 +77,8 @@ class EmailAccount(BaseModel):
     auth_dmarc_policy: str | None = None
     auth_reason: str | None = None
     auth_checked_at: str | None = None
+    auth_failing_since: str | None = None
+    save_to_sent: bool | None = None
     warmup: str | None = None
     warmup_paused_at: str | None = None
     warmup_base: int | None = None
@@ -96,11 +105,26 @@ class EmailAccountDeleted(BaseModel):
 
 
 class TrackingDomainStatus(BaseModel):
-    """The tracking-domain configuration and verification state."""
+    """The tracking-domain configuration and verification state.
+
+    ``cname_target`` is the host this install expects the CNAME to point at.
+    ``status`` is stable and machine-readable — ``verified``, ``unset``,
+    ``no_target``, ``not_found``, ``wrong_target``, ``lookup_error``, or
+    ``pending`` when the value is stored state rather than a fresh lookup —
+    and ``observed`` is what DNS actually returned, so a customer can spot
+    their own typo. ``tracking_host_unresolvable`` means the record is right
+    but this install's own tracking host does not resolve, which is an
+    operator problem rather than a customer one.
+    """
 
     tracking_domain: str | None = None
     tracking_domain_verified: bool | None = None
     tracking_domain_verified_at: str | None = None
+    cname_target: str | None = None
+    status: str | None = None
+    message: str | None = None
+    observed: str | None = None
+    tracking_host_unresolvable: bool | None = None
 
 
 class EmailAuthCheck(BaseModel):
@@ -127,14 +151,21 @@ class EmailVerification(BaseModel):
 
 
 class WarmupBanStatus(BaseModel):
-    """The warmup ban / blocklist status for an account."""
+    """Whether the warmup pool has blocked an account, and why.
 
-    banned: bool | None = None
+    ``blocked_until`` is when the block lapses on its own, and
+    ``pending_appeal`` is ``True`` while an appeal is awaiting review — in
+    which case a second :meth:`Emails.warmup_appeal` is refused.
+    """
+
+    email_account_id: str | None = None
     blocked: bool | None = None
+    health_state: str | None = None
     reason: str | None = None
-    blocklists: Sequence[str] = []
-    banned_at: str | None = None
+    blocked_at: str | None = None
+    blocked_until: str | None = None
     can_appeal: bool | None = None
+    pending_appeal: bool | None = None
 
 
 class WarmupAppeal(BaseModel):
@@ -161,6 +192,188 @@ class EmailSendResult(BaseModel):
     send_mode: str | None = None
 
 
+class MailboxAllowance(BaseModel):
+    """How many mailboxes the workspace may hold, and why.
+
+    ``allowance`` and ``remaining`` are ``None`` when the workspace is
+    unlimited. ``basis`` explains the number: ``unlimited``, ``free`` (an
+    unsubscribed workspace), ``override`` (an operator-approved increase),
+    ``plan`` (the plan carries an explicit mailbox column), or ``fair_use``
+    (the plan's daily sends divided by ``sends_per_mailbox``).
+    """
+
+    used: int | None = None
+    allowance: int | None = None
+    remaining: int | None = None
+    basis: str | None = None
+    sends_per_mailbox: int | None = None
+    plan_daily_sends: int | None = None
+    plan_name: str | None = None
+    paid: bool | None = None
+    pending_request: dict[str, Any] | None = None
+
+
+class SendLifecycleState(BaseModel):
+    """Whether a mailbox is offered to cold sending.
+
+    ``state`` is ``active`` (in rotation), ``resting`` (pulled out to recover
+    on warmup traffic alone, and returning on its own once it has), or
+    ``reserve`` (held back by its owner, and never entered or left
+    automatically).
+    """
+
+    state: str | None = None
+    since: str | None = None
+    reason: str | None = None
+
+
+class MailboxSyncState(BaseModel):
+    """The worker's most recent report of a mailbox's sync.
+
+    ``throttle_reason`` names which budget is exhausted while
+    ``throttled_until`` is set: ``burst``, ``hourly``, ``daily``,
+    ``org_daily`` or ``priority_daily``.
+    """
+
+    backfill_status: str | None = None
+    backfill_synced: int | None = None
+    backfill_since: str | None = None
+    backfill_started_at: str | None = None
+    backfill_completed_at: str | None = None
+    throttled_until: str | None = None
+    throttle_reason: str | None = None
+    deferred: int | None = None
+    last_synced_at: str | None = None
+
+
+class MailboxSyncPolicy(BaseModel):
+    """The fair-use budget a mailbox syncs under.
+
+    Resolved from the instance settings when the mailbox was loaded onto a
+    worker, so a policy change reaches a mailbox on its next load.
+    """
+
+    backfill_days: int | None = None
+    backfill_messages: int | None = None
+    daily_messages: int | None = None
+    org_daily_messages: int | None = None
+
+
+class MailboxSync(BaseModel):
+    """Where a mailbox's import stands, and the budget it runs under.
+
+    ``state`` is ``None`` until the worker has reported once.
+    """
+
+    state: MailboxSyncState | None = None
+    policy: MailboxSyncPolicy | None = None
+
+
+class SendingBehavior(BaseModel):
+    """A mailbox's human sending-behaviour profile.
+
+    These are the *ranges* a mailbox rolls its workday from, not the rolled
+    values: see :class:`SendingBehaviorPlan` for the day it actually rolled.
+    Every minute-of-day value is minutes since local midnight in the mailbox's
+    own timezone, and ``weekdays`` is a Monday-indexed bitmask (bit 0 is
+    Monday, so ``31`` is Mon-Fri).
+    """
+
+    email_account_id: str | None = None
+    enabled: bool | None = None
+    daily_limit_min: int | None = None
+    daily_limit_max: int | None = None
+    hourly_limit_min: int | None = None
+    hourly_limit_max: int | None = None
+    gap_min_seconds: int | None = None
+    gap_max_seconds: int | None = None
+    work_start_min: int | None = None
+    work_start_max: int | None = None
+    work_end_min: int | None = None
+    work_end_max: int | None = None
+    lunch_enabled: bool | None = None
+    lunch_earliest: int | None = None
+    lunch_latest: int | None = None
+    lunch_min_minutes: int | None = None
+    lunch_max_minutes: int | None = None
+    weekdays: int | None = None
+    timezone: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+class SendingBehaviorPlan(BaseModel):
+    """The workday a mailbox actually rolled for the current local date.
+
+    Rolled once per local day and never updated, so every scheduling pass
+    through the day reads the same numbers. This is the read that answers "why
+    is nothing sending right now": ``remaining_today`` is what the plan still
+    allows, and ``lunch_start_minute`` / ``lunch_end_minute`` are ``None`` on a
+    day with no break.
+    """
+
+    email_account_id: str | None = None
+    plan_date: str | None = None
+    timezone: str | None = None
+    is_working_day: bool | None = None
+    daily_limit: int | None = None
+    hourly_limit: int | None = None
+    work_start_minute: int | None = None
+    work_end_minute: int | None = None
+    lunch_start_minute: int | None = None
+    lunch_end_minute: int | None = None
+    gap_min_seconds: int | None = None
+    gap_max_seconds: int | None = None
+    sent_today: int | None = None
+    remaining_today: int | None = None
+    behavior: SendingBehavior | None = None
+    created_at: str | None = None
+
+
+def _behavior_body(
+    *,
+    enabled: NotGivenOr[bool],
+    daily_limit_min: NotGivenOr[int],
+    daily_limit_max: NotGivenOr[int],
+    hourly_limit_min: NotGivenOr[int],
+    hourly_limit_max: NotGivenOr[int],
+    gap_min_seconds: NotGivenOr[int],
+    gap_max_seconds: NotGivenOr[int],
+    work_start_min: NotGivenOr[int],
+    work_start_max: NotGivenOr[int],
+    work_end_min: NotGivenOr[int],
+    work_end_max: NotGivenOr[int],
+    lunch_enabled: NotGivenOr[bool],
+    lunch_earliest: NotGivenOr[int],
+    lunch_latest: NotGivenOr[int],
+    lunch_min_minutes: NotGivenOr[int],
+    lunch_max_minutes: NotGivenOr[int],
+    weekdays: NotGivenOr[int],
+) -> dict[str, Any]:
+    """Build the behaviour-profile patch; omitted fields keep their value."""
+    return drop_not_given(
+        {
+            "enabled": enabled,
+            "daily_limit_min": daily_limit_min,
+            "daily_limit_max": daily_limit_max,
+            "hourly_limit_min": hourly_limit_min,
+            "hourly_limit_max": hourly_limit_max,
+            "gap_min_seconds": gap_min_seconds,
+            "gap_max_seconds": gap_max_seconds,
+            "work_start_min": work_start_min,
+            "work_start_max": work_start_max,
+            "work_end_min": work_end_min,
+            "work_end_max": work_end_max,
+            "lunch_enabled": lunch_enabled,
+            "lunch_earliest": lunch_earliest,
+            "lunch_latest": lunch_latest,
+            "lunch_min_minutes": lunch_min_minutes,
+            "lunch_max_minutes": lunch_max_minutes,
+            "weekdays": weekdays,
+        }
+    )
+
+
 def _update_body(
     *,
     name: NotGivenOr[str],
@@ -174,6 +387,7 @@ def _update_body(
     signature_html: NotGivenOr[str],
     signature_sync: NotGivenOr[bool],
     signature_code: NotGivenOr[bool],
+    save_to_sent: NotGivenOr[bool],
     warmup: NotGivenOr[bool],
     warmup_base: NotGivenOr[int],
     warmup_max: NotGivenOr[int],
@@ -197,6 +411,7 @@ def _update_body(
             "signature_html": signature_html,
             "signature_sync": signature_sync,
             "signature_code": signature_code,
+            "save_to_sent": save_to_sent,
             "warmup": warmup,
             "warmup_base": warmup_base,
             "warmup_max": warmup_max,
@@ -288,6 +503,7 @@ class Emails(SyncAPIResource):
         signature_html: NotGivenOr[str] = NOT_GIVEN,
         signature_sync: NotGivenOr[bool] = NOT_GIVEN,
         signature_code: NotGivenOr[bool] = NOT_GIVEN,
+        save_to_sent: NotGivenOr[bool] = NOT_GIVEN,
         warmup: NotGivenOr[bool] = NOT_GIVEN,
         warmup_base: NotGivenOr[int] = NOT_GIVEN,
         warmup_max: NotGivenOr[int] = NOT_GIVEN,
@@ -314,6 +530,7 @@ class Emails(SyncAPIResource):
             signature_html: HTML signature.
             signature_sync: Keep the signature in sync with the provider.
             signature_code: Treat the HTML signature as raw code.
+            save_to_sent: Copy sends from this mailbox into its Sent folder.
             warmup: Enable or disable warmup.
             warmup_base: Warmup emails per day at the start of the ramp.
             warmup_max: Warmup emails per day at the top of the ramp.
@@ -340,6 +557,7 @@ class Emails(SyncAPIResource):
                 signature_html=signature_html,
                 signature_sync=signature_sync,
                 signature_code=signature_code,
+                save_to_sent=save_to_sent,
                 warmup=warmup,
                 warmup_base=warmup_base,
                 warmup_max=warmup_max,
@@ -484,6 +702,178 @@ class Emails(SyncAPIResource):
             options=options,
         )
 
+    def refresh_auth_check(
+        self, email_id: str, *, options: RequestOptions | None = None
+    ) -> EmailAuthCheck:
+        """Re-run the authentication check and record the verdict.
+
+        Recording it is what lifts the cold-send and warmup gate, so this needs
+        a write scope where :meth:`auth_check` only needs a read.
+        """
+        return self._post(
+            f"/emails/{email_id}/auth-check",
+            cast_to=EmailAuthCheck,
+            options=options,
+        )
+
+    def tracking_domain(
+        self, email_id: str, *, options: RequestOptions | None = None
+    ) -> TrackingDomainStatus:
+        """Read the mailbox's tracking-domain state and the CNAME target.
+
+        Does no DNS work; :meth:`verify_tracking_domain` is the live check.
+        """
+        return self._get(
+            f"/emails/{email_id}/track",
+            cast_to=TrackingDomainStatus,
+            options=options,
+        )
+
+    def verify_tracking_domain(
+        self, email_id: str, *, options: RequestOptions | None = None
+    ) -> TrackingDomainStatus:
+        """Re-resolve the stored tracking domain and persist the verdict."""
+        return self._post(
+            f"/emails/{email_id}/track/verify",
+            cast_to=TrackingDomainStatus,
+            options=options,
+        )
+
+    def hold(
+        self, email_id: str, *, options: RequestOptions | None = None
+    ) -> SendLifecycleState:
+        """Take the mailbox out of campaign sending until it is released.
+
+        Warmup is untouched, so the mailbox keeps its reputation while it sits
+        out. Bodyless and idempotent.
+        """
+        return self._post(
+            f"/emails/{email_id}/hold", cast_to=SendLifecycleState, options=options
+        )
+
+    def release(
+        self, email_id: str, *, options: RequestOptions | None = None
+    ) -> SendLifecycleState:
+        """Put a held or resting mailbox back into campaign rotation.
+
+        Where it lands is up to its warmup health: an unhealthy mailbox comes
+        back as ``resting`` rather than ``active``.
+        """
+        return self._post(
+            f"/emails/{email_id}/release", cast_to=SendLifecycleState, options=options
+        )
+
+    def sync(
+        self, email_id: str, *, options: RequestOptions | None = None
+    ) -> MailboxSync:
+        """Report where the mailbox's import stands and what is holding it."""
+        return self._get(
+            f"/emails/{email_id}/sync", cast_to=MailboxSync, options=options
+        )
+
+    def allowance(self, *, options: RequestOptions | None = None) -> MailboxAllowance:
+        """Report how many mailboxes the workspace holds and may hold."""
+        return self._get("/emails/allowance", cast_to=MailboxAllowance, options=options)
+
+    def behavior(
+        self, email_id: str, *, options: RequestOptions | None = None
+    ) -> SendingBehavior:
+        """Read a mailbox's sending-behaviour profile.
+
+        A mailbox that has never been configured reads back the defaults, so
+        the object is always complete.
+        """
+        return self._get(
+            f"/emails/{email_id}/behavior", cast_to=SendingBehavior, options=options
+        )
+
+    def update_behavior(
+        self,
+        email_id: str,
+        *,
+        enabled: NotGivenOr[bool] = NOT_GIVEN,
+        daily_limit_min: NotGivenOr[int] = NOT_GIVEN,
+        daily_limit_max: NotGivenOr[int] = NOT_GIVEN,
+        hourly_limit_min: NotGivenOr[int] = NOT_GIVEN,
+        hourly_limit_max: NotGivenOr[int] = NOT_GIVEN,
+        gap_min_seconds: NotGivenOr[int] = NOT_GIVEN,
+        gap_max_seconds: NotGivenOr[int] = NOT_GIVEN,
+        work_start_min: NotGivenOr[int] = NOT_GIVEN,
+        work_start_max: NotGivenOr[int] = NOT_GIVEN,
+        work_end_min: NotGivenOr[int] = NOT_GIVEN,
+        work_end_max: NotGivenOr[int] = NOT_GIVEN,
+        lunch_enabled: NotGivenOr[bool] = NOT_GIVEN,
+        lunch_earliest: NotGivenOr[int] = NOT_GIVEN,
+        lunch_latest: NotGivenOr[int] = NOT_GIVEN,
+        lunch_min_minutes: NotGivenOr[int] = NOT_GIVEN,
+        lunch_max_minutes: NotGivenOr[int] = NOT_GIVEN,
+        weekdays: NotGivenOr[int] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> SendingBehavior:
+        """Update a mailbox's behaviour profile.
+
+        Omitted fields keep their stored value, so switching the profile on
+        does not mean resending every range. A range that cannot produce a
+        sane workday is a 400 naming the field.
+
+        Args:
+            email_id: The mailbox id.
+            enabled: Whether the profile shapes this mailbox's sending.
+            daily_limit_min: Fewest cold sends a rolled day may target (1-500).
+            daily_limit_max: Most cold sends a rolled day may target (1-500).
+            hourly_limit_min: Low end of the hourly ceiling band (1-200).
+            hourly_limit_max: High end of the hourly ceiling band (1-200).
+            gap_min_seconds: Shortest gap between two sends (30-86400).
+            gap_max_seconds: Longest gap between two sends (30-86400).
+            work_start_min: Earliest the workday may start, in minutes since
+                local midnight.
+            work_start_max: Latest the workday may start. Must still precede
+                *work_end_min*.
+            work_end_min: Earliest the workday may end.
+            work_end_max: Latest the workday may end.
+            lunch_enabled: Whether the day carries a break.
+            lunch_earliest: Earliest the break may start.
+            lunch_latest: Latest the break may start.
+            lunch_min_minutes: Shortest break (0-240).
+            lunch_max_minutes: Longest break (0-240). The break must fit inside
+                the shortest possible workday.
+            weekdays: Monday-indexed sending-day bitmask (bit 0 is Monday).
+        """
+        return self._put(
+            f"/emails/{email_id}/behavior",
+            cast_to=SendingBehavior,
+            body=_behavior_body(
+                enabled=enabled,
+                daily_limit_min=daily_limit_min,
+                daily_limit_max=daily_limit_max,
+                hourly_limit_min=hourly_limit_min,
+                hourly_limit_max=hourly_limit_max,
+                gap_min_seconds=gap_min_seconds,
+                gap_max_seconds=gap_max_seconds,
+                work_start_min=work_start_min,
+                work_start_max=work_start_max,
+                work_end_min=work_end_min,
+                work_end_max=work_end_max,
+                lunch_enabled=lunch_enabled,
+                lunch_earliest=lunch_earliest,
+                lunch_latest=lunch_latest,
+                lunch_min_minutes=lunch_min_minutes,
+                lunch_max_minutes=lunch_max_minutes,
+                weekdays=weekdays,
+            ),
+            options=options,
+        )
+
+    def behavior_plan(
+        self, email_id: str, *, options: RequestOptions | None = None
+    ) -> SendingBehaviorPlan:
+        """Read the workday this mailbox rolled for the current local date."""
+        return self._get(
+            f"/emails/{email_id}/behavior/plan",
+            cast_to=SendingBehaviorPlan,
+            options=options,
+        )
+
     def verify(
         self, *, email: str, options: RequestOptions | None = None
     ) -> EmailVerification:
@@ -600,6 +990,7 @@ class AsyncEmails(AsyncAPIResource):
         signature_html: NotGivenOr[str] = NOT_GIVEN,
         signature_sync: NotGivenOr[bool] = NOT_GIVEN,
         signature_code: NotGivenOr[bool] = NOT_GIVEN,
+        save_to_sent: NotGivenOr[bool] = NOT_GIVEN,
         warmup: NotGivenOr[bool] = NOT_GIVEN,
         warmup_base: NotGivenOr[int] = NOT_GIVEN,
         warmup_max: NotGivenOr[int] = NOT_GIVEN,
@@ -626,6 +1017,7 @@ class AsyncEmails(AsyncAPIResource):
             signature_html: HTML signature.
             signature_sync: Keep the signature in sync with the provider.
             signature_code: Treat the HTML signature as raw code.
+            save_to_sent: Copy sends from this mailbox into its Sent folder.
             warmup: Enable or disable warmup.
             warmup_base: Warmup emails per day at the start of the ramp.
             warmup_max: Warmup emails per day at the top of the ramp.
@@ -652,6 +1044,7 @@ class AsyncEmails(AsyncAPIResource):
                 signature_html=signature_html,
                 signature_sync=signature_sync,
                 signature_code=signature_code,
+                save_to_sent=save_to_sent,
                 warmup=warmup,
                 warmup_base=warmup_base,
                 warmup_max=warmup_max,
@@ -793,6 +1186,182 @@ class AsyncEmails(AsyncAPIResource):
         return await self._get(
             f"/emails/{email_id}/auth-check",
             cast_to=EmailAuthCheck,
+            options=options,
+        )
+
+    async def refresh_auth_check(
+        self, email_id: str, *, options: RequestOptions | None = None
+    ) -> EmailAuthCheck:
+        """Re-run the authentication check and record the verdict.
+
+        Recording it is what lifts the cold-send and warmup gate, so this needs
+        a write scope where :meth:`auth_check` only needs a read.
+        """
+        return await self._post(
+            f"/emails/{email_id}/auth-check",
+            cast_to=EmailAuthCheck,
+            options=options,
+        )
+
+    async def tracking_domain(
+        self, email_id: str, *, options: RequestOptions | None = None
+    ) -> TrackingDomainStatus:
+        """Read the mailbox's tracking-domain state and the CNAME target.
+
+        Does no DNS work; :meth:`verify_tracking_domain` is the live check.
+        """
+        return await self._get(
+            f"/emails/{email_id}/track",
+            cast_to=TrackingDomainStatus,
+            options=options,
+        )
+
+    async def verify_tracking_domain(
+        self, email_id: str, *, options: RequestOptions | None = None
+    ) -> TrackingDomainStatus:
+        """Re-resolve the stored tracking domain and persist the verdict."""
+        return await self._post(
+            f"/emails/{email_id}/track/verify",
+            cast_to=TrackingDomainStatus,
+            options=options,
+        )
+
+    async def hold(
+        self, email_id: str, *, options: RequestOptions | None = None
+    ) -> SendLifecycleState:
+        """Take the mailbox out of campaign sending until it is released.
+
+        Warmup is untouched, so the mailbox keeps its reputation while it sits
+        out. Bodyless and idempotent.
+        """
+        return await self._post(
+            f"/emails/{email_id}/hold", cast_to=SendLifecycleState, options=options
+        )
+
+    async def release(
+        self, email_id: str, *, options: RequestOptions | None = None
+    ) -> SendLifecycleState:
+        """Put a held or resting mailbox back into campaign rotation.
+
+        Where it lands is up to its warmup health: an unhealthy mailbox comes
+        back as ``resting`` rather than ``active``.
+        """
+        return await self._post(
+            f"/emails/{email_id}/release", cast_to=SendLifecycleState, options=options
+        )
+
+    async def sync(
+        self, email_id: str, *, options: RequestOptions | None = None
+    ) -> MailboxSync:
+        """Report where the mailbox's import stands and what is holding it."""
+        return await self._get(
+            f"/emails/{email_id}/sync", cast_to=MailboxSync, options=options
+        )
+
+    async def allowance(
+        self, *, options: RequestOptions | None = None
+    ) -> MailboxAllowance:
+        """Report how many mailboxes the workspace holds and may hold."""
+        return await self._get(
+            "/emails/allowance", cast_to=MailboxAllowance, options=options
+        )
+
+    async def behavior(
+        self, email_id: str, *, options: RequestOptions | None = None
+    ) -> SendingBehavior:
+        """Read a mailbox's sending-behaviour profile.
+
+        A mailbox that has never been configured reads back the defaults, so
+        the object is always complete.
+        """
+        return await self._get(
+            f"/emails/{email_id}/behavior", cast_to=SendingBehavior, options=options
+        )
+
+    async def update_behavior(
+        self,
+        email_id: str,
+        *,
+        enabled: NotGivenOr[bool] = NOT_GIVEN,
+        daily_limit_min: NotGivenOr[int] = NOT_GIVEN,
+        daily_limit_max: NotGivenOr[int] = NOT_GIVEN,
+        hourly_limit_min: NotGivenOr[int] = NOT_GIVEN,
+        hourly_limit_max: NotGivenOr[int] = NOT_GIVEN,
+        gap_min_seconds: NotGivenOr[int] = NOT_GIVEN,
+        gap_max_seconds: NotGivenOr[int] = NOT_GIVEN,
+        work_start_min: NotGivenOr[int] = NOT_GIVEN,
+        work_start_max: NotGivenOr[int] = NOT_GIVEN,
+        work_end_min: NotGivenOr[int] = NOT_GIVEN,
+        work_end_max: NotGivenOr[int] = NOT_GIVEN,
+        lunch_enabled: NotGivenOr[bool] = NOT_GIVEN,
+        lunch_earliest: NotGivenOr[int] = NOT_GIVEN,
+        lunch_latest: NotGivenOr[int] = NOT_GIVEN,
+        lunch_min_minutes: NotGivenOr[int] = NOT_GIVEN,
+        lunch_max_minutes: NotGivenOr[int] = NOT_GIVEN,
+        weekdays: NotGivenOr[int] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> SendingBehavior:
+        """Update a mailbox's behaviour profile.
+
+        Omitted fields keep their stored value, so switching the profile on
+        does not mean resending every range. A range that cannot produce a
+        sane workday is a 400 naming the field.
+
+        Args:
+            email_id: The mailbox id.
+            enabled: Whether the profile shapes this mailbox's sending.
+            daily_limit_min: Fewest cold sends a rolled day may target (1-500).
+            daily_limit_max: Most cold sends a rolled day may target (1-500).
+            hourly_limit_min: Low end of the hourly ceiling band (1-200).
+            hourly_limit_max: High end of the hourly ceiling band (1-200).
+            gap_min_seconds: Shortest gap between two sends (30-86400).
+            gap_max_seconds: Longest gap between two sends (30-86400).
+            work_start_min: Earliest the workday may start, in minutes since
+                local midnight.
+            work_start_max: Latest the workday may start. Must still precede
+                *work_end_min*.
+            work_end_min: Earliest the workday may end.
+            work_end_max: Latest the workday may end.
+            lunch_enabled: Whether the day carries a break.
+            lunch_earliest: Earliest the break may start.
+            lunch_latest: Latest the break may start.
+            lunch_min_minutes: Shortest break (0-240).
+            lunch_max_minutes: Longest break (0-240). The break must fit inside
+                the shortest possible workday.
+            weekdays: Monday-indexed sending-day bitmask (bit 0 is Monday).
+        """
+        return await self._put(
+            f"/emails/{email_id}/behavior",
+            cast_to=SendingBehavior,
+            body=_behavior_body(
+                enabled=enabled,
+                daily_limit_min=daily_limit_min,
+                daily_limit_max=daily_limit_max,
+                hourly_limit_min=hourly_limit_min,
+                hourly_limit_max=hourly_limit_max,
+                gap_min_seconds=gap_min_seconds,
+                gap_max_seconds=gap_max_seconds,
+                work_start_min=work_start_min,
+                work_start_max=work_start_max,
+                work_end_min=work_end_min,
+                work_end_max=work_end_max,
+                lunch_enabled=lunch_enabled,
+                lunch_earliest=lunch_earliest,
+                lunch_latest=lunch_latest,
+                lunch_min_minutes=lunch_min_minutes,
+                lunch_max_minutes=lunch_max_minutes,
+                weekdays=weekdays,
+            ),
+            options=options,
+        )
+
+    async def behavior_plan(
+        self, email_id: str, *, options: RequestOptions | None = None
+    ) -> SendingBehaviorPlan:
+        """Read the workday this mailbox rolled for the current local date."""
+        return await self._get(
+            f"/emails/{email_id}/behavior/plan",
+            cast_to=SendingBehaviorPlan,
             options=options,
         )
 
