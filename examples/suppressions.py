@@ -28,7 +28,10 @@ def main() -> None:
 
     # Iterating walks every page.
     for entry in client.suppressions.list(q="example"):
-        print(f"{entry.email:40} {entry.kind:6} {entry.source} {entry.reason or ''}")
+        print(
+            f"{entry.email or '':40} {entry.kind or '':6} "
+            f"{entry.source or ''} {entry.reason or ''}"
+        )
 
     # Lifting a suppression puts the recipient back in scope for campaigns.
     client.suppressions.remove("<suppression-id>")
