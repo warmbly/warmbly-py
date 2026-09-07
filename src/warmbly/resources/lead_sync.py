@@ -73,7 +73,12 @@ class LeadSyncSource(BaseModel):
     dedup: str | None = None
     target_campaign_id: str | None = None
     category_ids: Sequence[str] = []
+    subscribed_default: bool | None = None
     label: str | None = None
+    status: str | None = None
+    last_synced_at: str | None = None
+    last_result: dict[str, Any] | None = None
+    last_error: str | None = None
     created_at: str | None = None
     updated_at: str | None = None
 

@@ -16,11 +16,14 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from pydantic import Field
+
 from .._models import BaseModel
 from .._pagination import AsyncPaginator, SyncCursorPage
 from .._resource import AsyncAPIResource, SyncAPIResource
 from .._types import NOT_GIVEN, NotGivenOr, RequestOptions
 from .._utils import drop_not_given
+from .forms import CampaignFormStats
 
 __all__ = [
     "AsyncCampaigns",
@@ -32,9 +35,13 @@ __all__ = [
     "CampaignAttachment",
     "CampaignAttachmentDeleted",
     "CampaignDeleted",
+    "CampaignEstimate",
+    "CampaignForms",
     "CampaignLog",
     "CampaignPreflight",
     "CampaignRunState",
+    "CampaignSegmentLink",
+    "CampaignSegments",
     "CampaignSender",
     "CampaignSenders",
     "CampaignStep",
@@ -53,6 +60,11 @@ class Campaign(BaseModel):
 
     ``days`` is a weekday bitmask; ``schedule_windows`` supersedes it when
     present. ``senders`` is loaded on demand, not on the list endpoint.
+
+    ``kind`` is fixed at creation: ``"sequence"`` (the multi-step default) or
+    ``"one_time"``, a single message with no follow-ups. A ``continuous``
+    campaign that runs out of leads stays active and waits for more instead of
+    finishing, with ``idle_since`` set while it waits.
     """
 
     id: str
@@ -61,6 +73,7 @@ class Campaign(BaseModel):
     name: str | None = None
     description: str | None = None
     status: str | None = None
+    kind: str | None = None
     stop_on_reply: bool | None = None
     open_tracking: bool | None = None
     link_tracking: bool | None = None
@@ -68,6 +81,7 @@ class Campaign(BaseModel):
     daily_limit: int | None = None
     unsubscribe_header: bool | None = None
     risky_emails: bool | None = None
+    unsubscribe_mode: str | None = None
     cc: Sequence[str] = []
     bcc: Sequence[str] = []
     start_date: str | None = None
@@ -94,9 +108,23 @@ class Campaign(BaseModel):
     esp_match_mode: str | None = None
     max_new_leads_per_day: int | None = None
     prioritize_new_leads: bool | None = None
+    continuous: bool | None = None
+    idle_since: str | None = None
+    guardrail_enabled: bool | None = None
+    guardrail_bounce_rate_max: float | None = None
+    guardrail_complaint_rate_max: float | None = None
+    guardrail_reply_rate_min: float | None = None
+    guardrail_min_sample: int | None = None
+    guardrail_window_days: int | None = None
+    guardrail_tripped_at: str | None = None
+    guardrail_reason: str | None = None
     tracking_domain: str | None = None
     tracking_domain_verified: bool | None = None
     tracking_domain_verified_at: str | None = None
+    utm_tracking: bool | None = None
+    utm_source: str | None = None
+    utm_medium: str | None = None
+    utm_campaign: str | None = None
     last_status_change_at: str | None = None
     created_at: str | None = None
     updated_at: str | None = None
@@ -117,6 +145,7 @@ class CampaignsOverview(BaseModel):
     paused: int | None = None
     draft: int | None = None
     completed: int | None = None
+    one_time: int | None = None
     folders: Sequence[dict[str, Any]] = []
 
 
@@ -255,14 +284,17 @@ class CampaignTestEmail(BaseModel):
 
 
 class CampaignLog(BaseModel):
-    """A single activity-log entry for a campaign (permissive)."""
+    """A single activity-log entry for a campaign.
+
+    ``event_type`` names what happened and ``metadata`` carries the specifics
+    of that kind of entry.
+    """
 
     id: str
     campaign_id: str | None = None
-    level: str | None = None
-    event: str | None = None
+    event_type: str | None = None
     message: str | None = None
-    data: dict[str, Any] | None = None
+    metadata: dict[str, Any] | None = None
     created_at: str | None = None
 
 
@@ -293,21 +325,80 @@ class CampaignTemplatePreview(BaseModel):
     """A template rendered exactly as the send path would render it.
 
     ``errors`` carries template parse failures and ``unresolved`` the merge
-    tokens that had no value, so a composer can flag both inline.
+    tokens that had no value, so a composer can flag both inline. ``from_``
+    is the ``{"name", "email"}`` sender as recipients see it, present when an
+    ``account_id`` was given, and ``attachments`` the files this send would
+    carry, present when a ``campaign_id`` was.
     """
 
     subject: str | None = None
     body_html: str | None = None
     body_plain: str | None = None
+    from_: dict[str, Any] | None = Field(default=None, alias="from")
+    attachments: Sequence[dict[str, Any]] = []
     errors: Sequence[str] = []
     unresolved: Sequence[str] = []
 
 
+class CampaignEstimate(BaseModel):
+    """A projection of an audience against a sender pool. Nothing is written.
+
+    ``daily_capacity`` is the pool's per-day ceiling under the campaign limit
+    and ``remaining_today`` subtracts what those mailboxes already sent today.
+    ``sending_days`` and ``estimated_finish_at`` are ``None`` when the pool has
+    no capacity at all.
+    """
+
+    recipients: int | None = None
+    mailboxes: int | None = None
+    daily_capacity: int | None = None
+    remaining_today: int | None = None
+    sending_days: int | None = None
+    estimated_finish_at: str | None = None
+
+
+class CampaignSegmentLink(BaseModel):
+    """One segment linked to a campaign, with live counts.
+
+    ``contact_count`` is the segment's size now, ``lead_count`` how many of
+    those are already leads of the campaign, and ``held_out_count`` how many
+    are deliberately kept out.
+    """
+
+    segment_id: str | None = None
+    name: str | None = None
+    color: str | None = None
+    description: str | None = None
+    contact_count: int | None = None
+    lead_count: int | None = None
+    held_out_count: int | None = None
+    linked_at: str | None = None
+
+
+class CampaignSegments(BaseModel):
+    """A campaign's linked segments.
+
+    ``added`` is how many new leads the last replace enrolled; it is ``None``
+    when simply reading the set.
+    """
+
+    data: Sequence[CampaignSegmentLink] = []
+    added: int | None = None
+
+
+class CampaignForms(BaseModel):
+    """How the forms linked from a campaign performed for its recipients."""
+
+    data: Sequence[CampaignFormStats] = []
+
+
 def _campaign_body(
     *,
+    for_create: bool = False,
     name: NotGivenOr[str] = NOT_GIVEN,
     description: NotGivenOr[str] = NOT_GIVEN,
     status: NotGivenOr[str] = NOT_GIVEN,
+    kind: NotGivenOr[str] = NOT_GIVEN,
     stop_on_reply: NotGivenOr[bool] = NOT_GIVEN,
     open_tracking: NotGivenOr[bool] = NOT_GIVEN,
     link_tracking: NotGivenOr[bool] = NOT_GIVEN,
@@ -315,6 +406,7 @@ def _campaign_body(
     daily_limit: NotGivenOr[int] = NOT_GIVEN,
     unsubscribe_header: NotGivenOr[bool] = NOT_GIVEN,
     risky_emails: NotGivenOr[bool] = NOT_GIVEN,
+    unsubscribe_mode: NotGivenOr[str] = NOT_GIVEN,
     cc: NotGivenOr[Sequence[str]] = NOT_GIVEN,
     bcc: NotGivenOr[Sequence[str]] = NOT_GIVEN,
     start_date: NotGivenOr[str] = NOT_GIVEN,
@@ -338,14 +430,35 @@ def _campaign_body(
     esp_match_mode: NotGivenOr[str] = NOT_GIVEN,
     max_new_leads_per_day: NotGivenOr[int] = NOT_GIVEN,
     prioritize_new_leads: NotGivenOr[bool] = NOT_GIVEN,
+    continuous: NotGivenOr[bool] = NOT_GIVEN,
     tracking_domain: NotGivenOr[str] = NOT_GIVEN,
+    utm_tracking: NotGivenOr[bool] = NOT_GIVEN,
+    utm_source: NotGivenOr[str] = NOT_GIVEN,
+    utm_medium: NotGivenOr[str] = NOT_GIVEN,
+    utm_campaign: NotGivenOr[str] = NOT_GIVEN,
+    guardrail_enabled: NotGivenOr[bool] = NOT_GIVEN,
+    guardrail_bounce_rate_max: NotGivenOr[float] = NOT_GIVEN,
+    guardrail_complaint_rate_max: NotGivenOr[float] = NOT_GIVEN,
+    guardrail_reply_rate_min: NotGivenOr[float] = NOT_GIVEN,
+    guardrail_min_sample: NotGivenOr[int] = NOT_GIVEN,
+    guardrail_window_days: NotGivenOr[int] = NOT_GIVEN,
+    steps: NotGivenOr[Sequence[Mapping[str, Any]]] = NOT_GIVEN,
+    variants: NotGivenOr[Sequence[Mapping[str, Any]]] = NOT_GIVEN,
+    senders: NotGivenOr[Sequence[Mapping[str, Any]]] = NOT_GIVEN,
+    advanced_overrides: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
 ) -> dict[str, Any]:
-    """Build the create/update campaign body (they share one field set)."""
+    """Build the create/update campaign body.
+
+    The two bodies differ in one place: create names the tag and folder lists
+    ``email_tag_ids`` / ``folder_ids``, update names them ``email_tags`` /
+    ``folders``. *for_create* picks the pair, so a caller never has to.
+    """
     return drop_not_given(
         {
             "name": name,
             "description": description,
             "status": status,
+            "kind": kind,
             "stop_on_reply": stop_on_reply,
             "open_tracking": open_tracking,
             "link_tracking": link_tracking,
@@ -353,6 +466,7 @@ def _campaign_body(
             "daily_limit": daily_limit,
             "unsubscribe_header": unsubscribe_header,
             "risky_emails": risky_emails,
+            "unsubscribe_mode": unsubscribe_mode,
             "cc": cc,
             "bcc": bcc,
             "start_date": start_date,
@@ -362,8 +476,8 @@ def _campaign_body(
             "start_time": start_time,
             "end_time": end_time,
             "schedule_windows": schedule_windows,
-            "email_tags": email_tags,
-            "folders": folders,
+            "email_tag_ids" if for_create else "email_tags": email_tags,
+            "folder_ids" if for_create else "folders": folders,
             "contact_order_by": contact_order_by,
             "contact_order_dir": contact_order_dir,
             "contact_order_field": contact_order_field,
@@ -376,7 +490,22 @@ def _campaign_body(
             "esp_match_mode": esp_match_mode,
             "max_new_leads_per_day": max_new_leads_per_day,
             "prioritize_new_leads": prioritize_new_leads,
+            "continuous": continuous,
             "tracking_domain": tracking_domain,
+            "utm_tracking": utm_tracking,
+            "utm_source": utm_source,
+            "utm_medium": utm_medium,
+            "utm_campaign": utm_campaign,
+            "guardrail_enabled": guardrail_enabled,
+            "guardrail_bounce_rate_max": guardrail_bounce_rate_max,
+            "guardrail_complaint_rate_max": guardrail_complaint_rate_max,
+            "guardrail_reply_rate_min": guardrail_reply_rate_min,
+            "guardrail_min_sample": guardrail_min_sample,
+            "guardrail_window_days": guardrail_window_days,
+            "steps": steps,
+            "variants": variants,
+            "senders": senders,
+            "advanced_overrides": advanced_overrides,
         }
     )
 
@@ -443,6 +572,7 @@ class Campaigns(SyncAPIResource):
         self,
         *,
         name: str,
+        kind: NotGivenOr[str] = NOT_GIVEN,
         description: NotGivenOr[str] = NOT_GIVEN,
         stop_on_reply: NotGivenOr[bool] = NOT_GIVEN,
         open_tracking: NotGivenOr[bool] = NOT_GIVEN,
@@ -451,6 +581,7 @@ class Campaigns(SyncAPIResource):
         daily_limit: NotGivenOr[int] = NOT_GIVEN,
         unsubscribe_header: NotGivenOr[bool] = NOT_GIVEN,
         risky_emails: NotGivenOr[bool] = NOT_GIVEN,
+        unsubscribe_mode: NotGivenOr[str] = NOT_GIVEN,
         cc: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         bcc: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         start_date: NotGivenOr[str] = NOT_GIVEN,
@@ -462,6 +593,34 @@ class Campaigns(SyncAPIResource):
         schedule_windows: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
         email_tags: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         folders: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        contact_order_by: NotGivenOr[str] = NOT_GIVEN,
+        contact_order_dir: NotGivenOr[str] = NOT_GIVEN,
+        contact_order_field: NotGivenOr[str] = NOT_GIVEN,
+        sender_strategy: NotGivenOr[str] = NOT_GIVEN,
+        rotation_mode: NotGivenOr[str] = NOT_GIVEN,
+        ramp_enabled: NotGivenOr[bool] = NOT_GIVEN,
+        ramp_start: NotGivenOr[int] = NOT_GIVEN,
+        ramp_increment: NotGivenOr[int] = NOT_GIVEN,
+        ramp_ceiling: NotGivenOr[int] = NOT_GIVEN,
+        esp_match_mode: NotGivenOr[str] = NOT_GIVEN,
+        max_new_leads_per_day: NotGivenOr[int] = NOT_GIVEN,
+        prioritize_new_leads: NotGivenOr[bool] = NOT_GIVEN,
+        continuous: NotGivenOr[bool] = NOT_GIVEN,
+        tracking_domain: NotGivenOr[str] = NOT_GIVEN,
+        utm_tracking: NotGivenOr[bool] = NOT_GIVEN,
+        utm_source: NotGivenOr[str] = NOT_GIVEN,
+        utm_medium: NotGivenOr[str] = NOT_GIVEN,
+        utm_campaign: NotGivenOr[str] = NOT_GIVEN,
+        guardrail_enabled: NotGivenOr[bool] = NOT_GIVEN,
+        guardrail_bounce_rate_max: NotGivenOr[float] = NOT_GIVEN,
+        guardrail_complaint_rate_max: NotGivenOr[float] = NOT_GIVEN,
+        guardrail_reply_rate_min: NotGivenOr[float] = NOT_GIVEN,
+        guardrail_min_sample: NotGivenOr[int] = NOT_GIVEN,
+        guardrail_window_days: NotGivenOr[int] = NOT_GIVEN,
+        steps: NotGivenOr[Sequence[Mapping[str, Any]]] = NOT_GIVEN,
+        variants: NotGivenOr[Sequence[Mapping[str, Any]]] = NOT_GIVEN,
+        senders: NotGivenOr[Sequence[Mapping[str, Any]]] = NOT_GIVEN,
+        advanced_overrides: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> Campaign:
         """Create a campaign.
@@ -471,6 +630,8 @@ class Campaigns(SyncAPIResource):
 
         Args:
             name: A human-readable name for the campaign.
+            kind: ``"sequence"`` (default) or ``"one_time"``, a single message with no
+                follow-ups. Fixed at creation.
             description: An optional longer description.
             stop_on_reply: Stop sequencing a contact once they reply.
             open_tracking: Enable open tracking.
@@ -479,6 +640,8 @@ class Campaigns(SyncAPIResource):
             daily_limit: Max emails per day across the campaign.
             unsubscribe_header: Add a ``List-Unsubscribe`` header.
             risky_emails: Allow sending to addresses flagged as risky.
+            unsubscribe_mode: The in-body opt-out appended after the signature:
+                ``inherit`` (the workspace default), ``text``, ``link`` or ``off``.
             cc: Addresses to CC on every send.
             bcc: Addresses to BCC on every send.
             start_date: RFC 3339 date the campaign may start sending.
@@ -491,12 +654,50 @@ class Campaigns(SyncAPIResource):
                 *days*/*start_time*/*end_time*.
             email_tags: Mailbox tags to draw senders from.
             folders: Folder ids to file the campaign under.
+            contact_order_by: Which contact ordering leads are drawn in.
+            contact_order_dir: ``asc`` or ``desc``.
+            contact_order_field: A custom field to order by.
+            sender_strategy: ``tags`` (senders resolved from *email_tags*) or
+                ``explicit`` (the campaign's own sender pool).
+            rotation_mode: How volume spreads across the chosen mailboxes.
+            ramp_enabled: Ramp the campaign's daily volume up over time.
+            ramp_start: The first day's ramp ceiling.
+            ramp_increment: How much the ramp ceiling rises each day.
+            ramp_ceiling: Where the ramp stops rising.
+            esp_match_mode: ESP matching: ``off``, ``prefer`` or ``strict``.
+            max_new_leads_per_day: New-lead throttle; ``0`` is unlimited.
+            prioritize_new_leads: Send to new leads before continuing older ones.
+            continuous: Keep the campaign active when it runs out of leads: it waits,
+                idle, for more instead of finishing.
+            tracking_domain: A campaign-scoped tracking domain, honored once verified.
+            utm_tracking: Append UTM parameters to every link in the body.
+            utm_source: The ``utm_source`` value (default ``"warmbly"``).
+            utm_medium: The ``utm_medium`` value (default ``"email"``).
+            utm_campaign: The ``utm_campaign`` value (default: the campaign name).
+            guardrail_enabled: Auto-pause the campaign the moment a rate band is
+                breached.
+            guardrail_bounce_rate_max: Pause at or above this bounce rate; ``0``
+                disables the rule.
+            guardrail_complaint_rate_max: Pause at or above this complaint rate; ``0``
+                disables the rule.
+            guardrail_reply_rate_min: Pause *below* this reply rate; ``0`` disables the
+                rule.
+            guardrail_min_sample: The smallest sample a guardrail rule will act on.
+            guardrail_window_days: The rolling window the rates are measured over.
+            steps: Initial sequence steps, in order; they can also be added later with
+                :meth:`create_step`.
+            variants: A/B variants for the first step.
+            senders: The explicit sender pool, for ``sender_strategy="explicit"``.
+            advanced_overrides: Per-campaign overrides of the organization's outreach
+                settings.
         """
         return self._post(
             "/campaigns",
             cast_to=Campaign,
             body=_campaign_body(
+                for_create=True,
                 name=name,
+                kind=kind,
                 description=description,
                 stop_on_reply=stop_on_reply,
                 open_tracking=open_tracking,
@@ -505,6 +706,7 @@ class Campaigns(SyncAPIResource):
                 daily_limit=daily_limit,
                 unsubscribe_header=unsubscribe_header,
                 risky_emails=risky_emails,
+                unsubscribe_mode=unsubscribe_mode,
                 cc=cc,
                 bcc=bcc,
                 start_date=start_date,
@@ -516,6 +718,34 @@ class Campaigns(SyncAPIResource):
                 schedule_windows=schedule_windows,
                 email_tags=email_tags,
                 folders=folders,
+                contact_order_by=contact_order_by,
+                contact_order_dir=contact_order_dir,
+                contact_order_field=contact_order_field,
+                sender_strategy=sender_strategy,
+                rotation_mode=rotation_mode,
+                ramp_enabled=ramp_enabled,
+                ramp_start=ramp_start,
+                ramp_increment=ramp_increment,
+                ramp_ceiling=ramp_ceiling,
+                esp_match_mode=esp_match_mode,
+                max_new_leads_per_day=max_new_leads_per_day,
+                prioritize_new_leads=prioritize_new_leads,
+                continuous=continuous,
+                tracking_domain=tracking_domain,
+                utm_tracking=utm_tracking,
+                utm_source=utm_source,
+                utm_medium=utm_medium,
+                utm_campaign=utm_campaign,
+                guardrail_enabled=guardrail_enabled,
+                guardrail_bounce_rate_max=guardrail_bounce_rate_max,
+                guardrail_complaint_rate_max=guardrail_complaint_rate_max,
+                guardrail_reply_rate_min=guardrail_reply_rate_min,
+                guardrail_min_sample=guardrail_min_sample,
+                guardrail_window_days=guardrail_window_days,
+                steps=steps,
+                variants=variants,
+                senders=senders,
+                advanced_overrides=advanced_overrides,
             ),
             options=options,
         )
@@ -556,6 +786,46 @@ class Campaigns(SyncAPIResource):
             "/campaigns-overview", cast_to=CampaignsOverview, options=options
         )
 
+    def estimate(
+        self,
+        *,
+        segment_ids: Sequence[str],
+        email_tag_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        daily_limit: NotGivenOr[int] = NOT_GIVEN,
+        days: NotGivenOr[int] = NOT_GIVEN,
+        timezone: NotGivenOr[str] = NOT_GIVEN,
+        start_date: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> CampaignEstimate:
+        """Project an audience against a sender pool before a campaign exists.
+
+        Answers "how many people is this, and how long will reaching them
+        take" without writing anything.
+
+        Args:
+            segment_ids: The segments making up the audience.
+            email_tag_ids: Mailbox tags the senders would be drawn from.
+            daily_limit: The per-campaign daily cap to project under.
+            days: Weekday bitmask for the sending window.
+            timezone: IANA timezone the schedule is interpreted in.
+            start_date: RFC 3339 date sending would start.
+        """
+        return self._post(
+            "/campaigns-estimate",
+            cast_to=CampaignEstimate,
+            body=drop_not_given(
+                {
+                    "segment_ids": list(segment_ids),
+                    "email_tag_ids": email_tag_ids,
+                    "daily_limit": daily_limit,
+                    "days": days,
+                    "timezone": timezone,
+                    "start_date": start_date,
+                }
+            ),
+            options=options,
+        )
+
     def preview_template(
         self,
         *,
@@ -563,6 +833,10 @@ class Campaigns(SyncAPIResource):
         body_html: NotGivenOr[str] = NOT_GIVEN,
         body_plain: NotGivenOr[str] = NOT_GIVEN,
         contact: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        contact_id: NotGivenOr[str] = NOT_GIVEN,
+        campaign_id: NotGivenOr[str] = NOT_GIVEN,
+        account_id: NotGivenOr[str] = NOT_GIVEN,
+        step_id: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> CampaignTemplatePreview:
         """Render subject/body exactly as the send path would. No side effects.
@@ -574,6 +848,15 @@ class Campaigns(SyncAPIResource):
             contact: Overrides for the sample contact the preview renders
                 against (``first_name``, ``last_name``, ``email``, ``company``,
                 ``phone``, ``custom_fields``).
+            contact_id: A real contact of the organization to render for,
+                instead of the built-in sample. Needs ``read_contacts``.
+            campaign_id: The campaign whose opt-out footer, plain-text setting
+                and attachments apply.
+            account_id: The mailbox whose signature applies, and which is
+                reported back as the sender.
+            step_id: The step being previewed, so the attachment list is the
+                one that step actually sends. Omitted lists the campaign-wide
+                files only.
         """
         return self._post(
             "/campaign-template-preview",
@@ -584,6 +867,10 @@ class Campaigns(SyncAPIResource):
                     "body_html": body_html,
                     "body_plain": body_plain,
                     "contact": contact,
+                    "contact_id": contact_id,
+                    "campaign_id": campaign_id,
+                    "account_id": account_id,
+                    "step_id": step_id,
                 }
             ),
             options=options,
@@ -600,8 +887,8 @@ class Campaigns(SyncAPIResource):
         campaign_id: str,
         *,
         name: NotGivenOr[str] = NOT_GIVEN,
-        description: NotGivenOr[str] = NOT_GIVEN,
         status: NotGivenOr[str] = NOT_GIVEN,
+        description: NotGivenOr[str] = NOT_GIVEN,
         stop_on_reply: NotGivenOr[bool] = NOT_GIVEN,
         open_tracking: NotGivenOr[bool] = NOT_GIVEN,
         link_tracking: NotGivenOr[bool] = NOT_GIVEN,
@@ -609,6 +896,7 @@ class Campaigns(SyncAPIResource):
         daily_limit: NotGivenOr[int] = NOT_GIVEN,
         unsubscribe_header: NotGivenOr[bool] = NOT_GIVEN,
         risky_emails: NotGivenOr[bool] = NOT_GIVEN,
+        unsubscribe_mode: NotGivenOr[str] = NOT_GIVEN,
         cc: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         bcc: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         start_date: NotGivenOr[str] = NOT_GIVEN,
@@ -632,21 +920,89 @@ class Campaigns(SyncAPIResource):
         esp_match_mode: NotGivenOr[str] = NOT_GIVEN,
         max_new_leads_per_day: NotGivenOr[int] = NOT_GIVEN,
         prioritize_new_leads: NotGivenOr[bool] = NOT_GIVEN,
+        continuous: NotGivenOr[bool] = NOT_GIVEN,
         tracking_domain: NotGivenOr[str] = NOT_GIVEN,
+        utm_tracking: NotGivenOr[bool] = NOT_GIVEN,
+        utm_source: NotGivenOr[str] = NOT_GIVEN,
+        utm_medium: NotGivenOr[str] = NOT_GIVEN,
+        utm_campaign: NotGivenOr[str] = NOT_GIVEN,
+        guardrail_enabled: NotGivenOr[bool] = NOT_GIVEN,
+        guardrail_bounce_rate_max: NotGivenOr[float] = NOT_GIVEN,
+        guardrail_complaint_rate_max: NotGivenOr[float] = NOT_GIVEN,
+        guardrail_reply_rate_min: NotGivenOr[float] = NOT_GIVEN,
+        guardrail_min_sample: NotGivenOr[int] = NOT_GIVEN,
+        guardrail_window_days: NotGivenOr[int] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> Campaign:
         """Update a campaign.
 
         The explicit sender *list* is edited with :meth:`set_senders`; only the
         strategy and rotation toggles ride this call.
+
+        Args:
+            campaign_id: The campaign id.
+            name: A new name for the campaign.
+            status: The campaign status to move to.
+            description: An optional longer description.
+            stop_on_reply: Stop sequencing a contact once they reply.
+            open_tracking: Enable open tracking.
+            link_tracking: Enable link/click tracking.
+            text_only: Send plain text only.
+            daily_limit: Max emails per day across the campaign.
+            unsubscribe_header: Add a ``List-Unsubscribe`` header.
+            risky_emails: Allow sending to addresses flagged as risky.
+            unsubscribe_mode: The in-body opt-out appended after the signature:
+                ``inherit`` (the workspace default), ``text``, ``link`` or ``off``.
+            cc: Addresses to CC on every send.
+            bcc: Addresses to BCC on every send.
+            start_date: RFC 3339 date the campaign may start sending.
+            end_date: RFC 3339 date the campaign stops sending.
+            timezone: IANA timezone the schedule is interpreted in.
+            days: Weekday bitmask for the sending window.
+            start_time: Daily window start (``"HH:MM"``).
+            end_time: Daily window end (``"HH:MM"``).
+            schedule_windows: Per-day windows; supersedes
+                *days*/*start_time*/*end_time*.
+            email_tags: Mailbox tags to draw senders from.
+            folders: Folder ids to file the campaign under.
+            contact_order_by: Which contact ordering leads are drawn in.
+            contact_order_dir: ``asc`` or ``desc``.
+            contact_order_field: A custom field to order by.
+            sender_strategy: ``tags`` (senders resolved from *email_tags*) or
+                ``explicit`` (the campaign's own sender pool).
+            rotation_mode: How volume spreads across the chosen mailboxes.
+            ramp_enabled: Ramp the campaign's daily volume up over time.
+            ramp_start: The first day's ramp ceiling.
+            ramp_increment: How much the ramp ceiling rises each day.
+            ramp_ceiling: Where the ramp stops rising.
+            esp_match_mode: ESP matching: ``off``, ``prefer`` or ``strict``.
+            max_new_leads_per_day: New-lead throttle; ``0`` is unlimited.
+            prioritize_new_leads: Send to new leads before continuing older ones.
+            continuous: Keep the campaign active when it runs out of leads: it waits,
+                idle, for more instead of finishing.
+            tracking_domain: A campaign-scoped tracking domain, honored once verified.
+            utm_tracking: Append UTM parameters to every link in the body.
+            utm_source: The ``utm_source`` value (default ``"warmbly"``).
+            utm_medium: The ``utm_medium`` value (default ``"email"``).
+            utm_campaign: The ``utm_campaign`` value (default: the campaign name).
+            guardrail_enabled: Auto-pause the campaign the moment a rate band is
+                breached.
+            guardrail_bounce_rate_max: Pause at or above this bounce rate; ``0``
+                disables the rule.
+            guardrail_complaint_rate_max: Pause at or above this complaint rate; ``0``
+                disables the rule.
+            guardrail_reply_rate_min: Pause *below* this reply rate; ``0`` disables the
+                rule.
+            guardrail_min_sample: The smallest sample a guardrail rule will act on.
+            guardrail_window_days: The rolling window the rates are measured over.
         """
         return self._patch(
             f"/campaigns/{campaign_id}",
             cast_to=Campaign,
             body=_campaign_body(
                 name=name,
-                description=description,
                 status=status,
+                description=description,
                 stop_on_reply=stop_on_reply,
                 open_tracking=open_tracking,
                 link_tracking=link_tracking,
@@ -654,6 +1010,7 @@ class Campaigns(SyncAPIResource):
                 daily_limit=daily_limit,
                 unsubscribe_header=unsubscribe_header,
                 risky_emails=risky_emails,
+                unsubscribe_mode=unsubscribe_mode,
                 cc=cc,
                 bcc=bcc,
                 start_date=start_date,
@@ -677,7 +1034,18 @@ class Campaigns(SyncAPIResource):
                 esp_match_mode=esp_match_mode,
                 max_new_leads_per_day=max_new_leads_per_day,
                 prioritize_new_leads=prioritize_new_leads,
+                continuous=continuous,
                 tracking_domain=tracking_domain,
+                utm_tracking=utm_tracking,
+                utm_source=utm_source,
+                utm_medium=utm_medium,
+                utm_campaign=utm_campaign,
+                guardrail_enabled=guardrail_enabled,
+                guardrail_bounce_rate_max=guardrail_bounce_rate_max,
+                guardrail_complaint_rate_max=guardrail_complaint_rate_max,
+                guardrail_reply_rate_min=guardrail_reply_rate_min,
+                guardrail_min_sample=guardrail_min_sample,
+                guardrail_window_days=guardrail_window_days,
             ),
             options=options,
         )
@@ -688,6 +1056,29 @@ class Campaigns(SyncAPIResource):
         """Delete a campaign."""
         return self._delete(
             f"/campaigns/{campaign_id}", cast_to=CampaignDeleted, options=options
+        )
+
+    def duplicate(
+        self,
+        campaign_id: str,
+        *,
+        name: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> Campaign:
+        """Create a draft copy of a campaign's configuration.
+
+        The copy carries the settings and the sequence, not the leads or the
+        sending history.
+
+        Args:
+            campaign_id: The campaign to copy.
+            name: A name for the copy. Omitted, the server derives one.
+        """
+        return self._post(
+            f"/campaigns/{campaign_id}/duplicate",
+            cast_to=Campaign,
+            body=drop_not_given({"name": name}),
+            options=options,
         )
 
     # -- advanced settings ---------------------------------------------------
@@ -1012,6 +1403,52 @@ class Campaigns(SyncAPIResource):
             options=options,
         )
 
+    # -- linked segments + forms --------------------------------------------
+    def list_segments(
+        self, campaign_id: str, *, options: RequestOptions | None = None
+    ) -> CampaignSegments:
+        """List the segments linked to a campaign, with live counts."""
+        return self._get(
+            f"/campaigns/{campaign_id}/segments",
+            cast_to=CampaignSegments,
+            options=options,
+        )
+
+    def set_segments(
+        self,
+        campaign_id: str,
+        *,
+        segment_ids: Sequence[str],
+        options: RequestOptions | None = None,
+    ) -> CampaignSegments:
+        """Replace a campaign's linked segments.
+
+        A linked segment is a live audience source: its members are enrolled as
+        leads immediately and kept current as the segment changes. This is the
+        desired final set, so a retry is safe; pass ``[]`` to detach every
+        segment.
+
+        Args:
+            campaign_id: The campaign id.
+            segment_ids: The segments to link, at most 20.
+        """
+        return self._put(
+            f"/campaigns/{campaign_id}/segments",
+            cast_to=CampaignSegments,
+            body={"segment_ids": list(segment_ids)},
+            options=options,
+        )
+
+    def list_forms(
+        self, campaign_id: str, *, options: RequestOptions | None = None
+    ) -> CampaignForms:
+        """Report how the forms linked from a campaign performed for it."""
+        return self._get(
+            f"/campaigns/{campaign_id}/forms",
+            cast_to=CampaignForms,
+            options=options,
+        )
+
     def verify_tracking_domain(
         self, campaign_id: str, *, options: RequestOptions | None = None
     ) -> CampaignTrackingDomainStatus:
@@ -1112,6 +1549,7 @@ class AsyncCampaigns(AsyncAPIResource):
         self,
         *,
         name: str,
+        kind: NotGivenOr[str] = NOT_GIVEN,
         description: NotGivenOr[str] = NOT_GIVEN,
         stop_on_reply: NotGivenOr[bool] = NOT_GIVEN,
         open_tracking: NotGivenOr[bool] = NOT_GIVEN,
@@ -1120,6 +1558,7 @@ class AsyncCampaigns(AsyncAPIResource):
         daily_limit: NotGivenOr[int] = NOT_GIVEN,
         unsubscribe_header: NotGivenOr[bool] = NOT_GIVEN,
         risky_emails: NotGivenOr[bool] = NOT_GIVEN,
+        unsubscribe_mode: NotGivenOr[str] = NOT_GIVEN,
         cc: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         bcc: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         start_date: NotGivenOr[str] = NOT_GIVEN,
@@ -1131,6 +1570,34 @@ class AsyncCampaigns(AsyncAPIResource):
         schedule_windows: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
         email_tags: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         folders: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        contact_order_by: NotGivenOr[str] = NOT_GIVEN,
+        contact_order_dir: NotGivenOr[str] = NOT_GIVEN,
+        contact_order_field: NotGivenOr[str] = NOT_GIVEN,
+        sender_strategy: NotGivenOr[str] = NOT_GIVEN,
+        rotation_mode: NotGivenOr[str] = NOT_GIVEN,
+        ramp_enabled: NotGivenOr[bool] = NOT_GIVEN,
+        ramp_start: NotGivenOr[int] = NOT_GIVEN,
+        ramp_increment: NotGivenOr[int] = NOT_GIVEN,
+        ramp_ceiling: NotGivenOr[int] = NOT_GIVEN,
+        esp_match_mode: NotGivenOr[str] = NOT_GIVEN,
+        max_new_leads_per_day: NotGivenOr[int] = NOT_GIVEN,
+        prioritize_new_leads: NotGivenOr[bool] = NOT_GIVEN,
+        continuous: NotGivenOr[bool] = NOT_GIVEN,
+        tracking_domain: NotGivenOr[str] = NOT_GIVEN,
+        utm_tracking: NotGivenOr[bool] = NOT_GIVEN,
+        utm_source: NotGivenOr[str] = NOT_GIVEN,
+        utm_medium: NotGivenOr[str] = NOT_GIVEN,
+        utm_campaign: NotGivenOr[str] = NOT_GIVEN,
+        guardrail_enabled: NotGivenOr[bool] = NOT_GIVEN,
+        guardrail_bounce_rate_max: NotGivenOr[float] = NOT_GIVEN,
+        guardrail_complaint_rate_max: NotGivenOr[float] = NOT_GIVEN,
+        guardrail_reply_rate_min: NotGivenOr[float] = NOT_GIVEN,
+        guardrail_min_sample: NotGivenOr[int] = NOT_GIVEN,
+        guardrail_window_days: NotGivenOr[int] = NOT_GIVEN,
+        steps: NotGivenOr[Sequence[Mapping[str, Any]]] = NOT_GIVEN,
+        variants: NotGivenOr[Sequence[Mapping[str, Any]]] = NOT_GIVEN,
+        senders: NotGivenOr[Sequence[Mapping[str, Any]]] = NOT_GIVEN,
+        advanced_overrides: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> Campaign:
         """Create a campaign.
@@ -1140,6 +1607,8 @@ class AsyncCampaigns(AsyncAPIResource):
 
         Args:
             name: A human-readable name for the campaign.
+            kind: ``"sequence"`` (default) or ``"one_time"``, a single message with no
+                follow-ups. Fixed at creation.
             description: An optional longer description.
             stop_on_reply: Stop sequencing a contact once they reply.
             open_tracking: Enable open tracking.
@@ -1148,6 +1617,8 @@ class AsyncCampaigns(AsyncAPIResource):
             daily_limit: Max emails per day across the campaign.
             unsubscribe_header: Add a ``List-Unsubscribe`` header.
             risky_emails: Allow sending to addresses flagged as risky.
+            unsubscribe_mode: The in-body opt-out appended after the signature:
+                ``inherit`` (the workspace default), ``text``, ``link`` or ``off``.
             cc: Addresses to CC on every send.
             bcc: Addresses to BCC on every send.
             start_date: RFC 3339 date the campaign may start sending.
@@ -1160,12 +1631,50 @@ class AsyncCampaigns(AsyncAPIResource):
                 *days*/*start_time*/*end_time*.
             email_tags: Mailbox tags to draw senders from.
             folders: Folder ids to file the campaign under.
+            contact_order_by: Which contact ordering leads are drawn in.
+            contact_order_dir: ``asc`` or ``desc``.
+            contact_order_field: A custom field to order by.
+            sender_strategy: ``tags`` (senders resolved from *email_tags*) or
+                ``explicit`` (the campaign's own sender pool).
+            rotation_mode: How volume spreads across the chosen mailboxes.
+            ramp_enabled: Ramp the campaign's daily volume up over time.
+            ramp_start: The first day's ramp ceiling.
+            ramp_increment: How much the ramp ceiling rises each day.
+            ramp_ceiling: Where the ramp stops rising.
+            esp_match_mode: ESP matching: ``off``, ``prefer`` or ``strict``.
+            max_new_leads_per_day: New-lead throttle; ``0`` is unlimited.
+            prioritize_new_leads: Send to new leads before continuing older ones.
+            continuous: Keep the campaign active when it runs out of leads: it waits,
+                idle, for more instead of finishing.
+            tracking_domain: A campaign-scoped tracking domain, honored once verified.
+            utm_tracking: Append UTM parameters to every link in the body.
+            utm_source: The ``utm_source`` value (default ``"warmbly"``).
+            utm_medium: The ``utm_medium`` value (default ``"email"``).
+            utm_campaign: The ``utm_campaign`` value (default: the campaign name).
+            guardrail_enabled: Auto-pause the campaign the moment a rate band is
+                breached.
+            guardrail_bounce_rate_max: Pause at or above this bounce rate; ``0``
+                disables the rule.
+            guardrail_complaint_rate_max: Pause at or above this complaint rate; ``0``
+                disables the rule.
+            guardrail_reply_rate_min: Pause *below* this reply rate; ``0`` disables the
+                rule.
+            guardrail_min_sample: The smallest sample a guardrail rule will act on.
+            guardrail_window_days: The rolling window the rates are measured over.
+            steps: Initial sequence steps, in order; they can also be added later with
+                :meth:`create_step`.
+            variants: A/B variants for the first step.
+            senders: The explicit sender pool, for ``sender_strategy="explicit"``.
+            advanced_overrides: Per-campaign overrides of the organization's outreach
+                settings.
         """
         return await self._post(
             "/campaigns",
             cast_to=Campaign,
             body=_campaign_body(
+                for_create=True,
                 name=name,
+                kind=kind,
                 description=description,
                 stop_on_reply=stop_on_reply,
                 open_tracking=open_tracking,
@@ -1174,6 +1683,7 @@ class AsyncCampaigns(AsyncAPIResource):
                 daily_limit=daily_limit,
                 unsubscribe_header=unsubscribe_header,
                 risky_emails=risky_emails,
+                unsubscribe_mode=unsubscribe_mode,
                 cc=cc,
                 bcc=bcc,
                 start_date=start_date,
@@ -1185,6 +1695,34 @@ class AsyncCampaigns(AsyncAPIResource):
                 schedule_windows=schedule_windows,
                 email_tags=email_tags,
                 folders=folders,
+                contact_order_by=contact_order_by,
+                contact_order_dir=contact_order_dir,
+                contact_order_field=contact_order_field,
+                sender_strategy=sender_strategy,
+                rotation_mode=rotation_mode,
+                ramp_enabled=ramp_enabled,
+                ramp_start=ramp_start,
+                ramp_increment=ramp_increment,
+                ramp_ceiling=ramp_ceiling,
+                esp_match_mode=esp_match_mode,
+                max_new_leads_per_day=max_new_leads_per_day,
+                prioritize_new_leads=prioritize_new_leads,
+                continuous=continuous,
+                tracking_domain=tracking_domain,
+                utm_tracking=utm_tracking,
+                utm_source=utm_source,
+                utm_medium=utm_medium,
+                utm_campaign=utm_campaign,
+                guardrail_enabled=guardrail_enabled,
+                guardrail_bounce_rate_max=guardrail_bounce_rate_max,
+                guardrail_complaint_rate_max=guardrail_complaint_rate_max,
+                guardrail_reply_rate_min=guardrail_reply_rate_min,
+                guardrail_min_sample=guardrail_min_sample,
+                guardrail_window_days=guardrail_window_days,
+                steps=steps,
+                variants=variants,
+                senders=senders,
+                advanced_overrides=advanced_overrides,
             ),
             options=options,
         )
@@ -1227,6 +1765,46 @@ class AsyncCampaigns(AsyncAPIResource):
             "/campaigns-overview", cast_to=CampaignsOverview, options=options
         )
 
+    async def estimate(
+        self,
+        *,
+        segment_ids: Sequence[str],
+        email_tag_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        daily_limit: NotGivenOr[int] = NOT_GIVEN,
+        days: NotGivenOr[int] = NOT_GIVEN,
+        timezone: NotGivenOr[str] = NOT_GIVEN,
+        start_date: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> CampaignEstimate:
+        """Project an audience against a sender pool before a campaign exists.
+
+        Answers "how many people is this, and how long will reaching them
+        take" without writing anything.
+
+        Args:
+            segment_ids: The segments making up the audience.
+            email_tag_ids: Mailbox tags the senders would be drawn from.
+            daily_limit: The per-campaign daily cap to project under.
+            days: Weekday bitmask for the sending window.
+            timezone: IANA timezone the schedule is interpreted in.
+            start_date: RFC 3339 date sending would start.
+        """
+        return await self._post(
+            "/campaigns-estimate",
+            cast_to=CampaignEstimate,
+            body=drop_not_given(
+                {
+                    "segment_ids": list(segment_ids),
+                    "email_tag_ids": email_tag_ids,
+                    "daily_limit": daily_limit,
+                    "days": days,
+                    "timezone": timezone,
+                    "start_date": start_date,
+                }
+            ),
+            options=options,
+        )
+
     async def preview_template(
         self,
         *,
@@ -1234,6 +1812,10 @@ class AsyncCampaigns(AsyncAPIResource):
         body_html: NotGivenOr[str] = NOT_GIVEN,
         body_plain: NotGivenOr[str] = NOT_GIVEN,
         contact: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        contact_id: NotGivenOr[str] = NOT_GIVEN,
+        campaign_id: NotGivenOr[str] = NOT_GIVEN,
+        account_id: NotGivenOr[str] = NOT_GIVEN,
+        step_id: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> CampaignTemplatePreview:
         """Render subject/body exactly as the send path would. No side effects.
@@ -1245,6 +1827,15 @@ class AsyncCampaigns(AsyncAPIResource):
             contact: Overrides for the sample contact the preview renders
                 against (``first_name``, ``last_name``, ``email``, ``company``,
                 ``phone``, ``custom_fields``).
+            contact_id: A real contact of the organization to render for,
+                instead of the built-in sample. Needs ``read_contacts``.
+            campaign_id: The campaign whose opt-out footer, plain-text setting
+                and attachments apply.
+            account_id: The mailbox whose signature applies, and which is
+                reported back as the sender.
+            step_id: The step being previewed, so the attachment list is the
+                one that step actually sends. Omitted lists the campaign-wide
+                files only.
         """
         return await self._post(
             "/campaign-template-preview",
@@ -1255,6 +1846,10 @@ class AsyncCampaigns(AsyncAPIResource):
                     "body_html": body_html,
                     "body_plain": body_plain,
                     "contact": contact,
+                    "contact_id": contact_id,
+                    "campaign_id": campaign_id,
+                    "account_id": account_id,
+                    "step_id": step_id,
                 }
             ),
             options=options,
@@ -1273,8 +1868,8 @@ class AsyncCampaigns(AsyncAPIResource):
         campaign_id: str,
         *,
         name: NotGivenOr[str] = NOT_GIVEN,
-        description: NotGivenOr[str] = NOT_GIVEN,
         status: NotGivenOr[str] = NOT_GIVEN,
+        description: NotGivenOr[str] = NOT_GIVEN,
         stop_on_reply: NotGivenOr[bool] = NOT_GIVEN,
         open_tracking: NotGivenOr[bool] = NOT_GIVEN,
         link_tracking: NotGivenOr[bool] = NOT_GIVEN,
@@ -1282,6 +1877,7 @@ class AsyncCampaigns(AsyncAPIResource):
         daily_limit: NotGivenOr[int] = NOT_GIVEN,
         unsubscribe_header: NotGivenOr[bool] = NOT_GIVEN,
         risky_emails: NotGivenOr[bool] = NOT_GIVEN,
+        unsubscribe_mode: NotGivenOr[str] = NOT_GIVEN,
         cc: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         bcc: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         start_date: NotGivenOr[str] = NOT_GIVEN,
@@ -1305,21 +1901,89 @@ class AsyncCampaigns(AsyncAPIResource):
         esp_match_mode: NotGivenOr[str] = NOT_GIVEN,
         max_new_leads_per_day: NotGivenOr[int] = NOT_GIVEN,
         prioritize_new_leads: NotGivenOr[bool] = NOT_GIVEN,
+        continuous: NotGivenOr[bool] = NOT_GIVEN,
         tracking_domain: NotGivenOr[str] = NOT_GIVEN,
+        utm_tracking: NotGivenOr[bool] = NOT_GIVEN,
+        utm_source: NotGivenOr[str] = NOT_GIVEN,
+        utm_medium: NotGivenOr[str] = NOT_GIVEN,
+        utm_campaign: NotGivenOr[str] = NOT_GIVEN,
+        guardrail_enabled: NotGivenOr[bool] = NOT_GIVEN,
+        guardrail_bounce_rate_max: NotGivenOr[float] = NOT_GIVEN,
+        guardrail_complaint_rate_max: NotGivenOr[float] = NOT_GIVEN,
+        guardrail_reply_rate_min: NotGivenOr[float] = NOT_GIVEN,
+        guardrail_min_sample: NotGivenOr[int] = NOT_GIVEN,
+        guardrail_window_days: NotGivenOr[int] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> Campaign:
         """Update a campaign.
 
         The explicit sender *list* is edited with :meth:`set_senders`; only the
         strategy and rotation toggles ride this call.
+
+        Args:
+            campaign_id: The campaign id.
+            name: A new name for the campaign.
+            status: The campaign status to move to.
+            description: An optional longer description.
+            stop_on_reply: Stop sequencing a contact once they reply.
+            open_tracking: Enable open tracking.
+            link_tracking: Enable link/click tracking.
+            text_only: Send plain text only.
+            daily_limit: Max emails per day across the campaign.
+            unsubscribe_header: Add a ``List-Unsubscribe`` header.
+            risky_emails: Allow sending to addresses flagged as risky.
+            unsubscribe_mode: The in-body opt-out appended after the signature:
+                ``inherit`` (the workspace default), ``text``, ``link`` or ``off``.
+            cc: Addresses to CC on every send.
+            bcc: Addresses to BCC on every send.
+            start_date: RFC 3339 date the campaign may start sending.
+            end_date: RFC 3339 date the campaign stops sending.
+            timezone: IANA timezone the schedule is interpreted in.
+            days: Weekday bitmask for the sending window.
+            start_time: Daily window start (``"HH:MM"``).
+            end_time: Daily window end (``"HH:MM"``).
+            schedule_windows: Per-day windows; supersedes
+                *days*/*start_time*/*end_time*.
+            email_tags: Mailbox tags to draw senders from.
+            folders: Folder ids to file the campaign under.
+            contact_order_by: Which contact ordering leads are drawn in.
+            contact_order_dir: ``asc`` or ``desc``.
+            contact_order_field: A custom field to order by.
+            sender_strategy: ``tags`` (senders resolved from *email_tags*) or
+                ``explicit`` (the campaign's own sender pool).
+            rotation_mode: How volume spreads across the chosen mailboxes.
+            ramp_enabled: Ramp the campaign's daily volume up over time.
+            ramp_start: The first day's ramp ceiling.
+            ramp_increment: How much the ramp ceiling rises each day.
+            ramp_ceiling: Where the ramp stops rising.
+            esp_match_mode: ESP matching: ``off``, ``prefer`` or ``strict``.
+            max_new_leads_per_day: New-lead throttle; ``0`` is unlimited.
+            prioritize_new_leads: Send to new leads before continuing older ones.
+            continuous: Keep the campaign active when it runs out of leads: it waits,
+                idle, for more instead of finishing.
+            tracking_domain: A campaign-scoped tracking domain, honored once verified.
+            utm_tracking: Append UTM parameters to every link in the body.
+            utm_source: The ``utm_source`` value (default ``"warmbly"``).
+            utm_medium: The ``utm_medium`` value (default ``"email"``).
+            utm_campaign: The ``utm_campaign`` value (default: the campaign name).
+            guardrail_enabled: Auto-pause the campaign the moment a rate band is
+                breached.
+            guardrail_bounce_rate_max: Pause at or above this bounce rate; ``0``
+                disables the rule.
+            guardrail_complaint_rate_max: Pause at or above this complaint rate; ``0``
+                disables the rule.
+            guardrail_reply_rate_min: Pause *below* this reply rate; ``0`` disables the
+                rule.
+            guardrail_min_sample: The smallest sample a guardrail rule will act on.
+            guardrail_window_days: The rolling window the rates are measured over.
         """
         return await self._patch(
             f"/campaigns/{campaign_id}",
             cast_to=Campaign,
             body=_campaign_body(
                 name=name,
-                description=description,
                 status=status,
+                description=description,
                 stop_on_reply=stop_on_reply,
                 open_tracking=open_tracking,
                 link_tracking=link_tracking,
@@ -1327,6 +1991,7 @@ class AsyncCampaigns(AsyncAPIResource):
                 daily_limit=daily_limit,
                 unsubscribe_header=unsubscribe_header,
                 risky_emails=risky_emails,
+                unsubscribe_mode=unsubscribe_mode,
                 cc=cc,
                 bcc=bcc,
                 start_date=start_date,
@@ -1350,7 +2015,18 @@ class AsyncCampaigns(AsyncAPIResource):
                 esp_match_mode=esp_match_mode,
                 max_new_leads_per_day=max_new_leads_per_day,
                 prioritize_new_leads=prioritize_new_leads,
+                continuous=continuous,
                 tracking_domain=tracking_domain,
+                utm_tracking=utm_tracking,
+                utm_source=utm_source,
+                utm_medium=utm_medium,
+                utm_campaign=utm_campaign,
+                guardrail_enabled=guardrail_enabled,
+                guardrail_bounce_rate_max=guardrail_bounce_rate_max,
+                guardrail_complaint_rate_max=guardrail_complaint_rate_max,
+                guardrail_reply_rate_min=guardrail_reply_rate_min,
+                guardrail_min_sample=guardrail_min_sample,
+                guardrail_window_days=guardrail_window_days,
             ),
             options=options,
         )
@@ -1361,6 +2037,29 @@ class AsyncCampaigns(AsyncAPIResource):
         """Delete a campaign."""
         return await self._delete(
             f"/campaigns/{campaign_id}", cast_to=CampaignDeleted, options=options
+        )
+
+    async def duplicate(
+        self,
+        campaign_id: str,
+        *,
+        name: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> Campaign:
+        """Create a draft copy of a campaign's configuration.
+
+        The copy carries the settings and the sequence, not the leads or the
+        sending history.
+
+        Args:
+            campaign_id: The campaign to copy.
+            name: A name for the copy. Omitted, the server derives one.
+        """
+        return await self._post(
+            f"/campaigns/{campaign_id}/duplicate",
+            cast_to=Campaign,
+            body=drop_not_given({"name": name}),
+            options=options,
         )
 
     # -- advanced settings ---------------------------------------------------
@@ -1682,6 +2381,52 @@ class AsyncCampaigns(AsyncAPIResource):
             f"/campaigns/{campaign_id}/senders",
             cast_to=CampaignSenders,
             body={"senders": [dict(s) for s in senders]},
+            options=options,
+        )
+
+    # -- linked segments + forms --------------------------------------------
+    async def list_segments(
+        self, campaign_id: str, *, options: RequestOptions | None = None
+    ) -> CampaignSegments:
+        """List the segments linked to a campaign, with live counts."""
+        return await self._get(
+            f"/campaigns/{campaign_id}/segments",
+            cast_to=CampaignSegments,
+            options=options,
+        )
+
+    async def set_segments(
+        self,
+        campaign_id: str,
+        *,
+        segment_ids: Sequence[str],
+        options: RequestOptions | None = None,
+    ) -> CampaignSegments:
+        """Replace a campaign's linked segments.
+
+        A linked segment is a live audience source: its members are enrolled as
+        leads immediately and kept current as the segment changes. This is the
+        desired final set, so a retry is safe; pass ``[]`` to detach every
+        segment.
+
+        Args:
+            campaign_id: The campaign id.
+            segment_ids: The segments to link, at most 20.
+        """
+        return await self._put(
+            f"/campaigns/{campaign_id}/segments",
+            cast_to=CampaignSegments,
+            body={"segment_ids": list(segment_ids)},
+            options=options,
+        )
+
+    async def list_forms(
+        self, campaign_id: str, *, options: RequestOptions | None = None
+    ) -> CampaignForms:
+        """Report how the forms linked from a campaign performed for it."""
+        return await self._get(
+            f"/campaigns/{campaign_id}/forms",
+            cast_to=CampaignForms,
             options=options,
         )
 

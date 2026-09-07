@@ -31,7 +31,8 @@ class OutreachSettings(BaseModel):
 
     Each attribute is one branch of the settings tree: bounce handling, task
     reliability, A/B defaults, reply-intent keywords, send-time optimization,
-    preflight checks, and which dashboard panels are shown.
+    preflight checks, the workspace opt-out footer, and which dashboard panels
+    are shown.
     """
 
     bounce_pipeline: dict[str, Any] | None = None
@@ -40,6 +41,7 @@ class OutreachSettings(BaseModel):
     reply_intent: dict[str, Any] | None = None
     send_time_optimization: dict[str, Any] | None = None
     preflight: dict[str, Any] | None = None
+    unsubscribe: dict[str, Any] | None = None
     dashboard: dict[str, Any] | None = None
     custom: dict[str, Any] | None = None
 
@@ -66,7 +68,11 @@ class Outreach(SyncAPIResource):
         result back.
 
         Args:
-            settings: The full settings tree.
+            settings: The full settings tree. The ``unsubscribe`` branch is the
+                workspace default for the opt-out appended after the signature
+                of every campaign email (``mode`` of ``text``, ``link`` or
+                ``off``, plus the copy); a campaign's own ``unsubscribe_mode``
+                overrides it.
         """
         return self._patch(
             "/outreach/settings",
@@ -100,7 +106,11 @@ class AsyncOutreach(AsyncAPIResource):
         result back.
 
         Args:
-            settings: The full settings tree.
+            settings: The full settings tree. The ``unsubscribe`` branch is the
+                workspace default for the opt-out appended after the signature
+                of every campaign email (``mode`` of ``text``, ``link`` or
+                ``off``, plus the copy); a campaign's own ``unsubscribe_mode``
+                overrides it.
         """
         return await self._patch(
             "/outreach/settings",

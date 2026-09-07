@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from .advisor import Advisor, AsyncAdvisor
 from .ai_skills import AISkills, AsyncAISkills
+from .ai_tools import AITools, AsyncAITools
 from .analytics import Analytics, AsyncAnalytics
 from .api_keys import ApiKeys, AsyncApiKeys
 from .audit_logs import AsyncAuditLogs, AuditLogs
@@ -13,6 +14,7 @@ from .contacts import AsyncContacts, Contacts
 from .crm import AsyncCrm, Crm
 from .deliverability import AsyncDeliverability, Deliverability
 from .emails import AsyncEmails, Emails
+from .forms import AsyncForms, Forms
 from .generation import AsyncGeneration, Generation
 from .groups import (
     AsyncCategories,
@@ -31,6 +33,8 @@ from .meetings import AsyncMeetings, Meetings
 from .oauth_applications import AsyncOAuthApplications, OAuthApplications
 from .outreach import AsyncOutreach, Outreach
 from .plans import AsyncPlans, Plans
+from .segments import AsyncSegments, Segments
+from .suppressions import AsyncSuppressions, Suppressions
 from .tasks import AsyncTasks, Tasks
 from .teams import AsyncTeams, Teams
 from .templates import AsyncTemplates, Templates
@@ -46,10 +50,12 @@ from .webhooks import (
 
 __all__ = [
     "AISkills",
+    "AITools",
     "Advisor",
     "Analytics",
     "ApiKeys",
     "AsyncAISkills",
+    "AsyncAITools",
     "AsyncAdvisor",
     "AsyncAnalytics",
     "AsyncApiKeys",
@@ -62,6 +68,7 @@ __all__ = [
     "AsyncDeliverability",
     "AsyncEmails",
     "AsyncFolders",
+    "AsyncForms",
     "AsyncGeneration",
     "AsyncGroups",
     "AsyncIntegrations",
@@ -71,6 +78,8 @@ __all__ = [
     "AsyncOAuthApplications",
     "AsyncOutreach",
     "AsyncPlans",
+    "AsyncSegments",
+    "AsyncSuppressions",
     "AsyncTags",
     "AsyncTasks",
     "AsyncTeams",
@@ -88,6 +97,7 @@ __all__ = [
     "Deliverability",
     "Emails",
     "Folders",
+    "Forms",
     "Generation",
     "Groups",
     "Integrations",
@@ -97,6 +107,8 @@ __all__ = [
     "OAuthApplications",
     "Outreach",
     "Plans",
+    "Segments",
+    "Suppressions",
     "Tags",
     "Tasks",
     "Teams",

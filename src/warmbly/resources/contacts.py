@@ -26,6 +26,7 @@ __all__ = [
     "AsyncContacts",
     "Contact",
     "ContactActivity",
+    "ContactCampaignState",
     "ContactDeleted",
     "ContactDetail",
     "ContactImportPreview",
@@ -35,8 +36,11 @@ __all__ = [
     "ContactNoteDeleted",
     "ContactResearchRun",
     "ContactSearchPage",
+    "ContactSegment",
     "ContactSentEmail",
     "ContactTimelineEntry",
+    "ContactVerificationOverview",
+    "ContactVerificationRequested",
     "Contacts",
     "ContactsAdded",
     "CustomFieldKeys",
@@ -47,8 +51,14 @@ __all__ = [
 class Contact(BaseModel):
     """A contact (lead).
 
-    ``verification_status`` reflects the last address verification;
-    ``esp_provider`` the mailbox provider the address resolves to.
+    ``verification_status`` is the last address verdict (``valid``, ``risky``,
+    ``invalid`` or ``unknown``) and the campaign send path drops ``invalid``
+    addresses before a worker touches them. ``verification_source`` says who
+    produced the verdict (``probe``, ``provider``, ``imported``, ``manual``),
+    ``verification_provider`` names the backend or vocabulary behind it, and
+    ``verification_confidence`` is how sure the platform is, 0 to 100, scored
+    from the check plus what real mail to the address actually did.
+    ``esp_provider`` is the mailbox provider the address resolves to.
     """
 
     id: str
@@ -64,6 +74,10 @@ class Contact(BaseModel):
     verification_status: str | None = None
     verification_reason: str | None = None
     verification_checked_at: str | None = None
+    verification_source: str | None = None
+    verification_provider: str | None = None
+    verification_sub_status: str | None = None
+    verification_confidence: int | None = None
     is_catch_all: bool | None = None
     esp_provider: str | None = None
     esp_resolved_at: str | None = None
@@ -73,14 +87,24 @@ class Contact(BaseModel):
 
 
 class ContactDetail(Contact):
-    """A contact plus its engagement roll-up and suppression state.
+    """A contact plus its engagement roll-up and first-touch attribution.
 
     ``suppression`` is non-``None`` when the address is suppressed, in which
-    case campaigns skip it.
+    case campaigns skip it. ``verification`` explains the verdict: the reasons
+    behind it and the observations it was scored from. ``source`` is where the
+    contact first came from (``manual``, ``campaign``, ``import``,
+    ``sheet_sync``, ``api``, ``ai_assistant``, ``form``, ``automation``, or
+    ``unknown`` for a row created before attribution existed) and never
+    changes; ``source_detail`` is the free-form specifics, such as the file
+    name or the automation's name.
     """
 
     engagement: dict[str, Any] | None = None
     suppression: dict[str, Any] | None = None
+    verification: dict[str, Any] | None = None
+    source: str | None = None
+    source_detail: str | None = None
+    first_seen_at: str | None = None
 
 
 class ContactDeleted(BaseModel):
@@ -179,30 +203,80 @@ class ContactSentEmail(BaseModel):
     opened_at: str | None = None
     clicked_at: str | None = None
     replied_at: str | None = None
+    bounced_at: str | None = None
 
 
 class ContactTimelineEntry(BaseModel):
-    """One entry in a contact's merged timeline (permissive)."""
+    """One entry in a contact's merged timeline.
 
-    id: str | None = None
+    ``type`` is the event kind (``email_sent``, ``email_opened``,
+    ``email_clicked``, ``email_replied``, ``email_bounced``,
+    ``reply_received``, ``deliverability``, ``suppressed``, ``note``,
+    ``meeting_booked`` / ``_rescheduled`` / ``_canceled``, ``contact_created``,
+    ``campaign_added`` / ``_removed``, ``category_added`` / ``_removed``,
+    ``form_submitted`` or ``page_hit``) and ``at`` is when it happened; the
+    rest of the fields are whichever ones that kind carries.
+
+    On an open or a click, ``machine`` is ``True`` when the hit came from an
+    automated fetcher — a mail privacy proxy, a security gateway walking the
+    links — rather than a person, with ``machine_reason`` naming the rule that
+    caught it, and ``origin`` describing the client and location it came from.
+    ``link`` is the exact link behind a click, and ``page_hit`` the page view
+    behind a ``page_hit`` event.
+    """
+
     type: str | None = None
-    occurred_at: str | None = None
-    data: dict[str, Any] | None = None
+    at: str | None = None
+    email_account_id: str | None = None
+    email_account_email: str | None = None
+    email_account_name: str | None = None
+    campaign_id: str | None = None
+    campaign_name: str | None = None
+    step_id: str | None = None
+    step_name: str | None = None
+    task_id: str | None = None
+    subject: str | None = None
+    reason: str | None = None
+    source: str | None = None
+    source_detail: str | None = None
+    provider: str | None = None
+    intent: str | None = None
+    content: str | None = None
+    scheduled_for: str | None = None
+    join_url: str | None = None
+    meeting_state: str | None = None
+    category_id: str | None = None
+    category_title: str | None = None
+    form_id: str | None = None
+    form_name: str | None = None
+    page_hit: dict[str, Any] | None = None
+    machine: bool | None = None
+    machine_reason: str | None = None
+    origin: dict[str, Any] | None = None
+    link: dict[str, Any] | None = None
 
 
 class ContactResearchRun(BaseModel):
-    """One AI research run against a contact."""
+    """One AI research run against a contact.
+
+    ``result`` carries the findings (company, person, signals, hooks, custom
+    field updates, notes) and is empty while the run is still queued;
+    ``error`` explains a failed one.
+    """
 
     id: str | None = None
+    org_id: str | None = None
     contact_id: str | None = None
-    organization_id: str | None = None
-    objective: str | None = None
+    requested_by: str | None = None
     status: str | None = None
+    objective: str | None = None
     result: dict[str, Any] | None = None
+    error: str | None = None
     credits_charged: int | None = None
-    model: str | None = None
+    model_used: str | None = None
+    tokens_used: int | None = None
     created_at: str | None = None
-    completed_at: str | None = None
+    updated_at: str | None = None
 
 
 class ResearchBatchQueued(BaseModel):
@@ -212,11 +286,18 @@ class ResearchBatchQueued(BaseModel):
 
 
 class ContactImportPreview(BaseModel):
-    """A parsed preview of an upload, before any rows are written."""
+    """A parsed preview of an upload, before any rows are written.
+
+    ``suggested_mapping`` is the server's guess at which column fills which
+    contact field; correct it and pass the result as the ``mapping`` of
+    :meth:`Contacts.import_commit`.
+    """
 
     filename: str | None = None
-    headers: Sequence[str] = []
-    rows: Sequence[dict[str, Any]] = []
+    format: str | None = None
+    columns: Sequence[str] = []
+    has_header: bool | None = None
+    sample_rows: Sequence[Sequence[str]] = []
     total_rows: int | None = None
     suggested_mapping: Sequence[dict[str, Any]] = []
 
@@ -230,6 +311,80 @@ class ContactImportResult(BaseModel):
     skipped: int | None = None
     failed: int | None = None
     errors: Sequence[dict[str, Any]] = []
+    errors_truncated: bool | None = None
+    quality: dict[str, Any] | None = None
+    started_at: str | None = None
+    ended_at: str | None = None
+
+
+class ContactCampaignState(BaseModel):
+    """One campaign a contact is a lead of, with its progress through it.
+
+    ``steps`` is the flow with this contact's per-step stamps; ``next`` is the
+    action the scheduler would take next, derived on read, and is ``None`` once
+    the flow has ended for the contact, in which case ``ended_reason`` says
+    why.
+    """
+
+    campaign_id: str | None = None
+    campaign_name: str | None = None
+    campaign_status: str | None = None
+    lead_status: str | None = None
+    failure_reason: str | None = None
+    steps: Sequence[dict[str, Any]] = []
+    completed_steps: int | None = None
+    total_steps: int | None = None
+    current_step: dict[str, Any] | None = None
+    last_action: str | None = None
+    last_action_at: str | None = None
+    next: dict[str, Any] | None = None
+    ended_reason: str | None = None
+
+
+class ContactSegment(BaseModel):
+    """One segment of the organization, and this contact's place in it.
+
+    ``member`` is whether the contact is in the segment right now; ``mode`` is
+    ``"include"`` or ``"exclude"`` when a manual override decides that, and
+    empty when the conditions alone do.
+    """
+
+    id: str | None = None
+    name: str | None = None
+    color: str | None = None
+    mode: str | None = None
+    member: bool | None = None
+
+
+class ContactVerificationOverview(BaseModel):
+    """Who checks this workspace's addresses, and the contacts by verdict.
+
+    ``provider`` is ``"builtin"`` or the connected paid provider.
+    ``provider_error`` is set when a paid provider is connected but unusable
+    (bad key, no credits), in which case the built-in check is in use.
+    ``builtin_ready`` says whether the in-house probe can reach mail servers
+    from this instance; without it the check still covers syntax, MX and
+    disposable domains.
+    """
+
+    provider: str | None = None
+    connection_id: str | None = None
+    credits: int | None = None
+    provider_error: str | None = None
+    builtin_ready: bool | None = None
+    counts: dict[str, int] | None = None
+
+
+class ContactVerificationRequested(BaseModel):
+    """How many contacts a verification action touched.
+
+    ``queued`` is ``True`` for the ``verify`` action: the check runs in the
+    background and each contact updates as its verdict lands.
+    """
+
+    affected: int | None = None
+    action: str | None = None
+    queued: bool | None = None
 
 
 def _search_body(
@@ -238,7 +393,10 @@ def _search_body(
     custom_field_filters: NotGivenOr[Sequence[Mapping[str, Any]]],
     campaign_ids: NotGivenOr[Sequence[str]],
     lead_status: NotGivenOr[str],
+    engagement: NotGivenOr[str],
     category_ids: NotGivenOr[Sequence[str]],
+    segment_ids: NotGivenOr[Sequence[str]],
+    verification_status: NotGivenOr[str],
     min_campaigns: NotGivenOr[int],
     max_campaigns: NotGivenOr[int],
     subscribed: NotGivenOr[bool],
@@ -256,7 +414,10 @@ def _search_body(
             "custom_field_filters": custom_field_filters,
             "campaign_ids": campaign_ids,
             "lead_status": lead_status,
+            "engagement": engagement,
             "category_ids": category_ids,
+            "segment_ids": segment_ids,
+            "verification_status": verification_status,
             "min_campaigns": min_campaigns,
             "max_campaigns": max_campaigns,
             "subscribed": subscribed,
@@ -318,7 +479,19 @@ class Contacts(SyncAPIResource):
         Args:
             contacts: One mapping per contact (``first_name``, ``last_name``,
                 ``email``, ``company``, ``phone``, ``campaigns``,
-                ``categories``, ``custom_fields``).
+                ``categories``, ``segments``, ``custom_fields``,
+                ``subscribed``, ``verification_status``,
+                ``verification_provider``).
+
+        Note:
+            ``segments`` joins the contact to those segments as an *include*
+            override, so it belongs whatever the conditions say.
+            ``verification_status`` is a verdict you already hold, in Warmbly's
+            vocabulary or any provider's the platform knows;
+            ``verification_provider`` names that vocabulary. It is stored as an
+            imported verdict, which the background check leaves alone until it
+            ages out. Contacts created through an API key are always stamped
+            with the ``api`` source.
         """
         return self._post(
             "/contacts",
@@ -334,7 +507,10 @@ class Contacts(SyncAPIResource):
         custom_field_filters: NotGivenOr[Sequence[Mapping[str, Any]]] = NOT_GIVEN,
         campaign_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         lead_status: NotGivenOr[str] = NOT_GIVEN,
+        engagement: NotGivenOr[str] = NOT_GIVEN,
         category_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        segment_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        verification_status: NotGivenOr[str] = NOT_GIVEN,
         min_campaigns: NotGivenOr[int] = NOT_GIVEN,
         max_campaigns: NotGivenOr[int] = NOT_GIVEN,
         subscribed: NotGivenOr[bool] = NOT_GIVEN,
@@ -361,7 +537,12 @@ class Contacts(SyncAPIResource):
                 custom-field predicate.
             campaign_ids: Contacts must be in *all* these campaigns.
             lead_status: Derived lead status; requires exactly one campaign id.
+            engagement: Lead engagement (``opened``, ``not_opened``, ...),
+                ANDed with *lead_status*; also requires exactly one campaign id.
             category_ids: Contacts must carry *all* these categories.
+            segment_ids: Contacts must be members of *all* these segments.
+            verification_status: Address verdict: ``valid``, ``risky``,
+                ``invalid`` or ``unknown``.
             subscribed: Filter by subscription state.
             sort_by: e.g. ``"first_name ASC"`` or ``"campaign_count DESC"``.
             reverse: Invert the sort direction.
@@ -377,7 +558,10 @@ class Contacts(SyncAPIResource):
                 custom_field_filters=custom_field_filters,
                 campaign_ids=campaign_ids,
                 lead_status=lead_status,
+                engagement=engagement,
                 category_ids=category_ids,
+                segment_ids=segment_ids,
+                verification_status=verification_status,
                 min_campaigns=min_campaigns,
                 max_campaigns=max_campaigns,
                 subscribed=subscribed,
@@ -400,6 +584,68 @@ class Contacts(SyncAPIResource):
             "/contacts/lookup",
             cast_to=ContactLookup,
             query={"email": email},
+            options=options,
+        )
+
+    def list_campaigns(
+        self, contact_id: str, *, options: RequestOptions | None = None
+    ) -> SyncCursorPage[ContactCampaignState]:
+        """List the campaigns a contact is a lead of, with its progress."""
+        return self._get_api_list(
+            f"/contacts/{contact_id}/campaigns",
+            model=ContactCampaignState,
+            options=options,
+        )
+
+    def list_segments(
+        self, contact_id: str, *, options: RequestOptions | None = None
+    ) -> SyncCursorPage[ContactSegment]:
+        """List every segment of the organization and this contact's place in it."""
+        return self._get_api_list(
+            f"/contacts/{contact_id}/segments",
+            model=ContactSegment,
+            options=options,
+        )
+
+    # -- address verification ------------------------------------------------
+    def verification(
+        self, *, options: RequestOptions | None = None
+    ) -> ContactVerificationOverview:
+        """Report who verifies this workspace's addresses, and the verdicts."""
+        return self._get(
+            "/contacts/verification",
+            cast_to=ContactVerificationOverview,
+            options=options,
+        )
+
+    def request_verification(
+        self,
+        *,
+        action: str,
+        contacts: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        campaign_id: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> ContactVerificationRequested:
+        """Re-check contacts, or record a manual verdict on them.
+
+        Args:
+            action: ``"verify"`` to queue a background re-check,
+                ``"mark_deliverable"`` or ``"mark_undeliverable"`` to record a
+                verdict outright.
+            contacts: The contact ids to act on, at most 1000 per request.
+            campaign_id: Instead of listing ids, select every lead of this
+                campaign that verification refused.
+        """
+        return self._post(
+            "/contacts/verification",
+            cast_to=ContactVerificationRequested,
+            body=drop_not_given(
+                {
+                    "action": action,
+                    "contacts": contacts,
+                    "campaign_id": campaign_id,
+                }
+            ),
             options=options,
         )
 
@@ -633,17 +879,27 @@ class Contacts(SyncAPIResource):
         contact_id: str,
         *,
         limit: NotGivenOr[int] = NOT_GIVEN,
+        cursor: NotGivenOr[str] = NOT_GIVEN,
         before: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> SyncCursorPage[ContactTimelineEntry]:
         """List a contact's merged timeline, newest first.
 
-        Paged with a ``before`` timestamp; ``limit`` caps at 200.
+        Iterating the page follows ``pagination.next_cursor`` on its own;
+        ``limit`` caps at 200.
+
+        Args:
+            contact_id: The contact id.
+            limit: Page size, 1 to 200 (default 50).
+            cursor: An opaque cursor from a previous page.
+            before: Deprecated. Returns the events strictly older than this
+                RFC 3339 timestamp, which can skip events sharing an instant
+                with the page boundary. Ignored when *cursor* is set.
         """
         return self._get_api_list(
             f"/contacts/{contact_id}/timeline",
             model=ContactTimelineEntry,
-            query={"limit": limit, "before": before},
+            query={"limit": limit, "cursor": cursor, "before": before},
             options=options,
         )
 
@@ -744,7 +1000,8 @@ class Contacts(SyncAPIResource):
             file: The raw CSV/XLSX bytes (the same file you previewed).
             filename: The filename.
             import_options: Column mapping, dedup strategy, target campaign,
-                and categories. Serialized into the ``options`` form field.
+                categories, and ``segment_ids`` the imported contacts join.
+                Serialized into the ``options`` form field.
             content_type: The file's MIME type.
             options: Per-request transport overrides.
         """
@@ -817,7 +1074,19 @@ class AsyncContacts(AsyncAPIResource):
         Args:
             contacts: One mapping per contact (``first_name``, ``last_name``,
                 ``email``, ``company``, ``phone``, ``campaigns``,
-                ``categories``, ``custom_fields``).
+                ``categories``, ``segments``, ``custom_fields``,
+                ``subscribed``, ``verification_status``,
+                ``verification_provider``).
+
+        Note:
+            ``segments`` joins the contact to those segments as an *include*
+            override, so it belongs whatever the conditions say.
+            ``verification_status`` is a verdict you already hold, in Warmbly's
+            vocabulary or any provider's the platform knows;
+            ``verification_provider`` names that vocabulary. It is stored as an
+            imported verdict, which the background check leaves alone until it
+            ages out. Contacts created through an API key are always stamped
+            with the ``api`` source.
         """
         return await self._post(
             "/contacts",
@@ -833,7 +1102,10 @@ class AsyncContacts(AsyncAPIResource):
         custom_field_filters: NotGivenOr[Sequence[Mapping[str, Any]]] = NOT_GIVEN,
         campaign_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         lead_status: NotGivenOr[str] = NOT_GIVEN,
+        engagement: NotGivenOr[str] = NOT_GIVEN,
         category_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        segment_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        verification_status: NotGivenOr[str] = NOT_GIVEN,
         min_campaigns: NotGivenOr[int] = NOT_GIVEN,
         max_campaigns: NotGivenOr[int] = NOT_GIVEN,
         subscribed: NotGivenOr[bool] = NOT_GIVEN,
@@ -860,7 +1132,12 @@ class AsyncContacts(AsyncAPIResource):
                 custom-field predicate.
             campaign_ids: Contacts must be in *all* these campaigns.
             lead_status: Derived lead status; requires exactly one campaign id.
+            engagement: Lead engagement (``opened``, ``not_opened``, ...),
+                ANDed with *lead_status*; also requires exactly one campaign id.
             category_ids: Contacts must carry *all* these categories.
+            segment_ids: Contacts must be members of *all* these segments.
+            verification_status: Address verdict: ``valid``, ``risky``,
+                ``invalid`` or ``unknown``.
             subscribed: Filter by subscription state.
             sort_by: e.g. ``"first_name ASC"`` or ``"campaign_count DESC"``.
             reverse: Invert the sort direction.
@@ -876,7 +1153,10 @@ class AsyncContacts(AsyncAPIResource):
                 custom_field_filters=custom_field_filters,
                 campaign_ids=campaign_ids,
                 lead_status=lead_status,
+                engagement=engagement,
                 category_ids=category_ids,
+                segment_ids=segment_ids,
+                verification_status=verification_status,
                 min_campaigns=min_campaigns,
                 max_campaigns=max_campaigns,
                 subscribed=subscribed,
@@ -899,6 +1179,68 @@ class AsyncContacts(AsyncAPIResource):
             "/contacts/lookup",
             cast_to=ContactLookup,
             query={"email": email},
+            options=options,
+        )
+
+    def list_campaigns(
+        self, contact_id: str, *, options: RequestOptions | None = None
+    ) -> AsyncPaginator[ContactCampaignState]:
+        """List the campaigns a contact is a lead of, with its progress."""
+        return self._get_api_list(
+            f"/contacts/{contact_id}/campaigns",
+            model=ContactCampaignState,
+            options=options,
+        )
+
+    def list_segments(
+        self, contact_id: str, *, options: RequestOptions | None = None
+    ) -> AsyncPaginator[ContactSegment]:
+        """List every segment of the organization and this contact's place in it."""
+        return self._get_api_list(
+            f"/contacts/{contact_id}/segments",
+            model=ContactSegment,
+            options=options,
+        )
+
+    # -- address verification ------------------------------------------------
+    async def verification(
+        self, *, options: RequestOptions | None = None
+    ) -> ContactVerificationOverview:
+        """Report who verifies this workspace's addresses, and the verdicts."""
+        return await self._get(
+            "/contacts/verification",
+            cast_to=ContactVerificationOverview,
+            options=options,
+        )
+
+    async def request_verification(
+        self,
+        *,
+        action: str,
+        contacts: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        campaign_id: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> ContactVerificationRequested:
+        """Re-check contacts, or record a manual verdict on them.
+
+        Args:
+            action: ``"verify"`` to queue a background re-check,
+                ``"mark_deliverable"`` or ``"mark_undeliverable"`` to record a
+                verdict outright.
+            contacts: The contact ids to act on, at most 1000 per request.
+            campaign_id: Instead of listing ids, select every lead of this
+                campaign that verification refused.
+        """
+        return await self._post(
+            "/contacts/verification",
+            cast_to=ContactVerificationRequested,
+            body=drop_not_given(
+                {
+                    "action": action,
+                    "contacts": contacts,
+                    "campaign_id": campaign_id,
+                }
+            ),
             options=options,
         )
 
@@ -1132,17 +1474,27 @@ class AsyncContacts(AsyncAPIResource):
         contact_id: str,
         *,
         limit: NotGivenOr[int] = NOT_GIVEN,
+        cursor: NotGivenOr[str] = NOT_GIVEN,
         before: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> AsyncPaginator[ContactTimelineEntry]:
         """List a contact's merged timeline, newest first.
 
-        Paged with a ``before`` timestamp; ``limit`` caps at 200.
+        Iterating the page follows ``pagination.next_cursor`` on its own;
+        ``limit`` caps at 200.
+
+        Args:
+            contact_id: The contact id.
+            limit: Page size, 1 to 200 (default 50).
+            cursor: An opaque cursor from a previous page.
+            before: Deprecated. Returns the events strictly older than this
+                RFC 3339 timestamp, which can skip events sharing an instant
+                with the page boundary. Ignored when *cursor* is set.
         """
         return self._get_api_list(
             f"/contacts/{contact_id}/timeline",
             model=ContactTimelineEntry,
-            query={"limit": limit, "before": before},
+            query={"limit": limit, "cursor": cursor, "before": before},
             options=options,
         )
 
@@ -1243,7 +1595,8 @@ class AsyncContacts(AsyncAPIResource):
             file: The raw CSV/XLSX bytes (the same file you previewed).
             filename: The filename.
             import_options: Column mapping, dedup strategy, target campaign,
-                and categories. Serialized into the ``options`` form field.
+                categories, and ``segment_ids`` the imported contacts join.
+                Serialized into the ``options`` form field.
             content_type: The file's MIME type.
             options: Per-request transport overrides.
         """

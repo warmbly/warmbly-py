@@ -17,6 +17,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
+from pydantic import Field
+
 from .._models import BaseModel
 from .._pagination import AsyncPaginator, SyncCursorPage
 from .._resource import AsyncAPIResource, SyncAPIResource
@@ -66,32 +68,37 @@ class MessagePreview(BaseModel):
 
 
 class Message(BaseModel):
-    """A full stored message, as returned by ``retrieve`` and ``thread``."""
+    """A full stored message, as returned by :meth:`Unibox.retrieve`.
+
+    Distinct from :class:`MessagePreview`, which is the row shape the list and
+    thread endpoints return: this one carries the addresses under their header
+    names and the message body. ``body_truncated`` marks a message whose stored
+    body could not be read, in which case ``body_plain`` holds only the preview
+    snippet — show a notice rather than presenting it as the whole message.
+    ``body_html`` is sanitized for display before it leaves the API.
+    """
 
     id: str
-    email_id: str | None = None
     thread_id: str | None = None
+    parent_id: str | None = None
     message_id: str | None = None
     gmail_id: str | None = None
-    parent_id: str | None = None
-    mailbox: int | None = None
     uid: int | None = None
     mod_seq: int | None = None
     flags: Sequence[str] = []
-    from_addr: Sequence[str] = []
-    to_addr: Sequence[str] = []
+    from_: Sequence[str] = Field(default=[], alias="from")
+    to: Sequence[str] = []
     cc: Sequence[str] = []
     bcc: Sequence[str] = []
-    reply_to: Sequence[str] = []
+    reply_to: Sequence[str] = Field(default=[], alias="ReplyTo")
     in_reply_to: Sequence[str] = []
     subject: str | None = None
-    snippet: str | None = None
     size: int | None = None
-    seen: bool | None = None
+    date: str | None = None
     internal_date: str | None = None
-    sent_date: str | None = None
-    created_at: str | None = None
-    updated_at: str | None = None
+    body_plain: str | None = None
+    body_html: str | None = None
+    body_truncated: bool | None = None
 
 
 class UnseenCount(BaseModel):
@@ -101,7 +108,12 @@ class UnseenCount(BaseModel):
 
 
 class UniboxOverview(BaseModel):
-    """Roll-up counts behind the inbox scope rail and metric strip."""
+    """Roll-up counts behind the inbox scope rail and metric strip.
+
+    ``folders`` carries an ``{"folder", "unread", "total"}`` entry per
+    canonical folder (``inbox``, ``sent``, ``drafts``, ``archive``, ``spam``,
+    ``trash``).
+    """
 
     total: int | None = None
     unread: int | None = None
@@ -112,6 +124,7 @@ class UniboxOverview(BaseModel):
     awaiting_agent_draft: int | None = None
     scheduled_pending: int | None = None
     scheduled_pending_max: int | None = None
+    folders: Sequence[dict[str, Any]] = []
     mailboxes: Sequence[dict[str, Any]] = []
     tags: Sequence[dict[str, Any]] = []
     categories: Sequence[dict[str, Any]] = []
@@ -283,6 +296,7 @@ def _list_query(
     limit: NotGivenOr[int],
     cursor: NotGivenOr[str],
     email_ids: NotGivenOr[Sequence[str]],
+    folder: NotGivenOr[str],
     direction: NotGivenOr[str],
     from_: NotGivenOr[str],
     address: NotGivenOr[str],
@@ -306,6 +320,7 @@ def _list_query(
         "limit": limit,
         "cursor": cursor,
         "email_ids": ",".join(email_ids) if is_given(email_ids) else NOT_GIVEN,
+        "folder": folder,
         "direction": direction,
         "from": from_,
         "address": address,
@@ -414,6 +429,7 @@ class Unibox(SyncAPIResource):
         limit: NotGivenOr[int] = NOT_GIVEN,
         cursor: NotGivenOr[str] = NOT_GIVEN,
         email_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        folder: NotGivenOr[str] = NOT_GIVEN,
         direction: NotGivenOr[str] = NOT_GIVEN,
         from_: NotGivenOr[str] = NOT_GIVEN,
         address: NotGivenOr[str] = NOT_GIVEN,
@@ -434,6 +450,9 @@ class Unibox(SyncAPIResource):
             limit: Page size.
             cursor: Pagination cursor.
             email_ids: Restrict to these mailbox (email account) ids.
+            folder: Canonical folder scope: ``inbox``, ``sent``, ``drafts``,
+                ``archive``, ``spam`` or ``trash``. Omit for every folder
+                except ``spam`` and ``trash``.
             direction: ``"sent"`` or ``"received"``.
             from_: Match the sender address.
             address: Match either side of the conversation.
@@ -455,6 +474,7 @@ class Unibox(SyncAPIResource):
                 limit=limit,
                 cursor=cursor,
                 email_ids=email_ids,
+                folder=folder,
                 direction=direction,
                 from_=from_,
                 address=address,
@@ -485,16 +505,20 @@ class Unibox(SyncAPIResource):
         limit: NotGivenOr[int] = NOT_GIVEN,
         cursor: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
-    ) -> SyncCursorPage[Message]:
+    ) -> SyncCursorPage[MessagePreview]:
         """List a conversation's messages, oldest first (auto-paginating).
+
+        Rows carry the same shape as the inbox list; fetch a message with
+        :meth:`retrieve` for its body.
 
         Args:
             thread_id: The thread to expand.
-            email_id: The mailbox the thread belongs to.
+            email_id: The mailbox the thread belongs to. Omit to read the
+                thread across every mailbox in the organization.
         """
         return self._get_api_list(
             "/unibox/thread",
-            model=Message,
+            model=MessagePreview,
             query={
                 "thread_id": thread_id,
                 "email_id": email_id,
@@ -556,7 +580,8 @@ class Unibox(SyncAPIResource):
     def mark_seen(
         self,
         *,
-        email_ids: Sequence[str],
+        email_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        folder: NotGivenOr[str] = NOT_GIVEN,
         seen: bool = True,
         options: RequestOptions | None = None,
     ) -> SeenResult:
@@ -564,12 +589,22 @@ class Unibox(SyncAPIResource):
 
         Args:
             email_ids: The message ids to update (max 500).
+            folder: Instead of listing ids, mark every unread message in this
+                folder across the whole workspace.
             seen: ``True`` to mark read, ``False`` to mark unread.
         """
         return self._patch(
             "/unibox/seen",
             cast_to=SeenResult,
-            body={"email_ids": list(email_ids), "seen": seen},
+            body=drop_not_given(
+                {
+                    "email_ids": (
+                        list(email_ids) if is_given(email_ids) else NOT_GIVEN
+                    ),
+                    "folder": folder,
+                    "seen": seen,
+                }
+            ),
             options=options,
         )
 
@@ -879,6 +914,7 @@ class AsyncUnibox(AsyncAPIResource):
         limit: NotGivenOr[int] = NOT_GIVEN,
         cursor: NotGivenOr[str] = NOT_GIVEN,
         email_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        folder: NotGivenOr[str] = NOT_GIVEN,
         direction: NotGivenOr[str] = NOT_GIVEN,
         from_: NotGivenOr[str] = NOT_GIVEN,
         address: NotGivenOr[str] = NOT_GIVEN,
@@ -899,6 +935,9 @@ class AsyncUnibox(AsyncAPIResource):
             limit: Page size.
             cursor: Pagination cursor.
             email_ids: Restrict to these mailbox (email account) ids.
+            folder: Canonical folder scope: ``inbox``, ``sent``, ``drafts``,
+                ``archive``, ``spam`` or ``trash``. Omit for every folder
+                except ``spam`` and ``trash``.
             direction: ``"sent"`` or ``"received"``.
             from_: Match the sender address.
             address: Match either side of the conversation.
@@ -920,6 +959,7 @@ class AsyncUnibox(AsyncAPIResource):
                 limit=limit,
                 cursor=cursor,
                 email_ids=email_ids,
+                folder=folder,
                 direction=direction,
                 from_=from_,
                 address=address,
@@ -952,16 +992,20 @@ class AsyncUnibox(AsyncAPIResource):
         limit: NotGivenOr[int] = NOT_GIVEN,
         cursor: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
-    ) -> AsyncPaginator[Message]:
+    ) -> AsyncPaginator[MessagePreview]:
         """List a conversation's messages, oldest first (auto-paginating).
+
+        Rows carry the same shape as the inbox list; fetch a message with
+        :meth:`retrieve` for its body.
 
         Args:
             thread_id: The thread to expand.
-            email_id: The mailbox the thread belongs to.
+            email_id: The mailbox the thread belongs to. Omit to read the
+                thread across every mailbox in the organization.
         """
         return self._get_api_list(
             "/unibox/thread",
-            model=Message,
+            model=MessagePreview,
             query={
                 "thread_id": thread_id,
                 "email_id": email_id,
@@ -1027,7 +1071,8 @@ class AsyncUnibox(AsyncAPIResource):
     async def mark_seen(
         self,
         *,
-        email_ids: Sequence[str],
+        email_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        folder: NotGivenOr[str] = NOT_GIVEN,
         seen: bool = True,
         options: RequestOptions | None = None,
     ) -> SeenResult:
@@ -1035,12 +1080,22 @@ class AsyncUnibox(AsyncAPIResource):
 
         Args:
             email_ids: The message ids to update (max 500).
+            folder: Instead of listing ids, mark every unread message in this
+                folder across the whole workspace.
             seen: ``True`` to mark read, ``False`` to mark unread.
         """
         return await self._patch(
             "/unibox/seen",
             cast_to=SeenResult,
-            body={"email_ids": list(email_ids), "seen": seen},
+            body=drop_not_given(
+                {
+                    "email_ids": (
+                        list(email_ids) if is_given(email_ids) else NOT_GIVEN
+                    ),
+                    "folder": folder,
+                    "seen": seen,
+                }
+            ),
             options=options,
         )
 

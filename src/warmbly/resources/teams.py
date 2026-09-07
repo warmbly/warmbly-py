@@ -29,17 +29,16 @@ __all__ = [
 
 
 class TeamMember(BaseModel):
-    """A member of a team (permissive)."""
+    """One membership row of a team.
+
+    ``user_id`` is the junction key; ``email`` and ``name`` are joined from the
+    user record for display.
+    """
 
     user_id: str | None = None
-    team_id: str | None = None
     email: str | None = None
     name: str | None = None
-    first_name: str | None = None
-    last_name: str | None = None
-    avatar: str | None = None
-    role: str | None = None
-    created_at: str | None = None
+    added_at: str | None = None
 
 
 class Team(BaseModel):
