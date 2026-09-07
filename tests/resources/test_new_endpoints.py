@@ -888,3 +888,24 @@ def test_corrected_model_shapes(client: Warmbly) -> None:
     team = next(iter(client.teams.list()))
     assert team.members[0].added_at == "2026-08-01T00:00:00Z"
     assert _last(teams).method == "GET"
+
+
+@respx.mock
+def test_start_reports_waiting_for_leads(client: Warmbly) -> None:
+    """A continuous campaign can start active-but-idle, with nothing to send."""
+    idle = respx.post(f"{BASE_URL}/campaigns/camp_1/start").mock(
+        return_value=httpx.Response(
+            200, json={"status": "started", "waiting_for_leads": True}
+        )
+    )
+    started = client.campaigns.start("camp_1")
+    assert started.status == "started"
+    assert started.waiting_for_leads is True
+    assert _last(idle).url.path == "/v1/campaigns/camp_1/start"
+
+    stopped = respx.post(f"{BASE_URL}/campaigns/camp_1/stop").mock(
+        return_value=httpx.Response(200, json={"status": "stopped"})
+    )
+    # Stop does not report the flag, so it stays None rather than False.
+    assert client.campaigns.stop("camp_1").waiting_for_leads is None
+    assert _last(stopped).method == "POST"

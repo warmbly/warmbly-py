@@ -150,9 +150,15 @@ class CampaignsOverview(BaseModel):
 
 
 class CampaignRunState(BaseModel):
-    """The result of starting or stopping a campaign."""
+    """The result of starting or stopping a campaign.
+
+    ``waiting_for_leads`` is ``True`` when a continuous campaign started with
+    nothing left to send: it is active and idle, waiting for leads, rather than
+    sending. Only :meth:`Campaigns.start` reports it.
+    """
 
     status: str | None = None
+    waiting_for_leads: bool | None = None
 
 
 class CampaignAdvanced(BaseModel):
