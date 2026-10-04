@@ -1,0 +1,1 @@
+Add `analytics.direct()` for hand-written mail volume and tracking, `analytics.inbox_tagging()` for reviewing automatic inbox-tagging verdicts, and `analytics.warmup_placement()` for where warmup mail landed per day and recipient provider.

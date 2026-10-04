@@ -54,6 +54,7 @@ from .resources import (
     AsyncMeetings,
     AsyncOAuthApplications,
     AsyncOutreach,
+    AsyncPlacement,
     AsyncPlans,
     AsyncSegments,
     AsyncSuppressions,
@@ -82,6 +83,7 @@ from .resources import (
     Meetings,
     OAuthApplications,
     Outreach,
+    Placement,
     Plans,
     Segments,
     Suppressions,
@@ -280,6 +282,10 @@ class Warmbly(SyncAPIClient):
         return Suppressions(self)
 
     @cached_property
+    def placement(self) -> Placement:
+        return Placement(self)
+
+    @cached_property
     def ai_tools(self) -> AITools:
         return AITools(self)
 
@@ -441,6 +447,10 @@ class AsyncWarmbly(AsyncAPIClient):
     @cached_property
     def suppressions(self) -> AsyncSuppressions:
         return AsyncSuppressions(self)
+
+    @cached_property
+    def placement(self) -> AsyncPlacement:
+        return AsyncPlacement(self)
 
     @cached_property
     def ai_tools(self) -> AsyncAITools:
