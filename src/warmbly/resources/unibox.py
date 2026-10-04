@@ -34,6 +34,7 @@ __all__ = [
     "ComposeDraftDeleted",
     "ComposeDraftSaved",
     "ComposeResult",
+    "FolderMoveResult",
     "GeneratedDraft",
     "Message",
     "MessagePreview",
@@ -65,6 +66,7 @@ class MessagePreview(BaseModel):
     message_count: int | None = None
     has_unread: bool | None = None
     labels: Sequence[dict[str, Any]] = []
+    answers_mailbox_id: str | None = None
 
 
 class Message(BaseModel):
@@ -79,6 +81,8 @@ class Message(BaseModel):
     """
 
     id: str
+    email_id: str | None = None
+    folder: str | None = None
     thread_id: str | None = None
     parent_id: str | None = None
     message_id: str | None = None
@@ -121,6 +125,8 @@ class UniboxOverview(BaseModel):
     week: int | None = None
     snoozed: int | None = None
     awaiting_reply: int | None = None
+    automated: int | None = None
+    automated_unread: int | None = None
     awaiting_agent_draft: int | None = None
     scheduled_pending: int | None = None
     scheduled_pending_max: int | None = None
@@ -143,7 +149,17 @@ class SeenResult(BaseModel):
     """The echo of a bulk mark-seen request."""
 
     email_ids: Sequence[str] = []
+    thread_ids: Sequence[str] | None = None
+    folder: str | None = None
     seen: bool | None = None
+
+
+class FolderMoveResult(BaseModel):
+    """The echo of a unibox filing request (:meth:`Unibox.move_folder`)."""
+
+    email_ids: Sequence[str] | None = None
+    thread_ids: Sequence[str] | None = None
+    folder: str | None = None
 
 
 class SendResult(BaseModel):
@@ -250,7 +266,12 @@ class AgentDraftDiscarded(BaseModel):
 
 
 class Snooze(BaseModel):
-    """A thread hidden from the inbox until ``snoozed_until``."""
+    """A thread hidden from the inbox until ``snoozed_until``.
+
+    A request that names more than one thread (or uses ``thread_ids``) is
+    answered with ``data``, one :class:`Snooze` per thread, instead of a
+    single row.
+    """
 
     id: str | None = None
     user_id: str | None = None
@@ -258,6 +279,7 @@ class Snooze(BaseModel):
     snoozed_until: str | None = None
     created_at: str | None = None
     updated_at: str | None = None
+    data: Sequence[Snooze] | None = None
 
 
 class SnoozeDeleted(BaseModel):
@@ -309,6 +331,8 @@ def _list_query(
     category_ids: NotGivenOr[Sequence[str]],
     since: NotGivenOr[str],
     until: NotGivenOr[str],
+    include_archived: NotGivenOr[bool],
+    automated: NotGivenOr[bool],
 ) -> dict[str, Any]:
     """Build the ``GET /unibox`` query string.
 
@@ -335,6 +359,10 @@ def _list_query(
         ),
         "since": since,
         "until": until,
+        "include_archived": "true" if include_archived is True else NOT_GIVEN,
+        "automated": "true"
+        if automated is True
+        else ("false" if automated is False else NOT_GIVEN),
     }
 
 
@@ -351,6 +379,7 @@ def _reply_body(
     thread_id: NotGivenOr[str],
     send_mode: NotGivenOr[str],
     scheduled_at: NotGivenOr[str],
+    forward_message_id: NotGivenOr[str],
 ) -> dict[str, Any]:
     return drop_not_given(
         {
@@ -361,6 +390,7 @@ def _reply_body(
             "subject": subject,
             "body_html": body_html,
             "body_plain": body_plain,
+            "forward_message_id": forward_message_id,
             "in_reply_to": list(in_reply_to) if is_given(in_reply_to) else NOT_GIVEN,
             "thread_id": thread_id,
             "send_mode": send_mode,
@@ -442,6 +472,8 @@ class Unibox(SyncAPIResource):
         category_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         since: NotGivenOr[str] = NOT_GIVEN,
         until: NotGivenOr[str] = NOT_GIVEN,
+        include_archived: NotGivenOr[bool] = NOT_GIVEN,
+        automated: NotGivenOr[bool] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> SyncCursorPage[MessagePreview]:
         """List inbox messages, newest first (auto-paginating).
@@ -451,8 +483,8 @@ class Unibox(SyncAPIResource):
             cursor: Pagination cursor.
             email_ids: Restrict to these mailbox (email account) ids.
             folder: Canonical folder scope: ``inbox``, ``sent``, ``drafts``,
-                ``archive``, ``spam`` or ``trash``. Omit for every folder
-                except ``spam`` and ``trash``.
+                ``archive``, ``spam`` or ``trash``. Omit for every working
+                folder (``spam``, ``trash`` and ``archive`` stay out).
             direction: ``"sent"`` or ``"received"``.
             from_: Match the sender address.
             address: Match either side of the conversation.
@@ -466,6 +498,10 @@ class Unibox(SyncAPIResource):
             category_ids: Only threads carrying any of these labels.
             since: Lower bound on the message date (RFC 3339).
             until: Upper bound on the message date (RFC 3339).
+            include_archived: Put archived conversations back into an unscoped
+                listing. Ignored when *folder* is set.
+            automated: ``True`` for only conversations no person wrote in,
+                ``False`` to leave them out. Omit for both.
         """
         return self._get_api_list(
             "/unibox",
@@ -487,6 +523,8 @@ class Unibox(SyncAPIResource):
                 category_ids=category_ids,
                 since=since,
                 until=until,
+                include_archived=include_archived,
+                automated=automated,
             ),
             options=options,
         )
@@ -581,6 +619,7 @@ class Unibox(SyncAPIResource):
         self,
         *,
         email_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        thread_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         folder: NotGivenOr[str] = NOT_GIVEN,
         seen: bool = True,
         options: RequestOptions | None = None,
@@ -589,6 +628,8 @@ class Unibox(SyncAPIResource):
 
         Args:
             email_ids: The message ids to update (max 500).
+            thread_ids: Whole conversations to update (max 500). Each entry
+                is a thread id, or a message id for mail with no thread.
             folder: Instead of listing ids, mark every unread message in this
                 folder across the whole workspace.
             seen: ``True`` to mark read, ``False`` to mark unread.
@@ -601,8 +642,50 @@ class Unibox(SyncAPIResource):
                     "email_ids": (
                         list(email_ids) if is_given(email_ids) else NOT_GIVEN
                     ),
+                    "thread_ids": (
+                        list(thread_ids) if is_given(thread_ids) else NOT_GIVEN
+                    ),
                     "folder": folder,
                     "seen": seen,
+                }
+            ),
+            options=options,
+        )
+
+    def move_folder(
+        self,
+        *,
+        folder: str,
+        email_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        thread_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> FolderMoveResult:
+        """File messages or whole conversations into one folder.
+
+        Requires the ``WRITE_UNIBOX`` permission. Archive is ``"archive"``,
+        Delete is ``"trash"`` and Move to inbox is ``"inbox"``; no other
+        folder can be filed into. Mailboxes with ``relay_folder_moves`` on
+        have the move mirrored at the provider. The body names the
+        destination, so retries are safe.
+
+        Args:
+            folder: ``"inbox"``, ``"archive"`` or ``"trash"``.
+            email_ids: Message ids to file (max 500).
+            thread_ids: Conversations to file (max 500). Each entry is a
+                thread id, or a message id for mail with no thread.
+        """
+        return self._patch(
+            "/unibox/folder",
+            cast_to=FolderMoveResult,
+            body=drop_not_given(
+                {
+                    "email_ids": (
+                        list(email_ids) if is_given(email_ids) else NOT_GIVEN
+                    ),
+                    "thread_ids": (
+                        list(thread_ids) if is_given(thread_ids) else NOT_GIVEN
+                    ),
+                    "folder": folder,
                 }
             ),
             options=options,
@@ -623,9 +706,10 @@ class Unibox(SyncAPIResource):
         thread_id: NotGivenOr[str] = NOT_GIVEN,
         send_mode: NotGivenOr[str] = NOT_GIVEN,
         scheduled_at: NotGivenOr[str] = NOT_GIVEN,
+        forward_message_id: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> SendResult:
-        """Send a reply from a connected mailbox.
+        """Send a reply, or a forward, from a connected mailbox.
 
         Args:
             email_account_id: The mailbox to send from.
@@ -638,6 +722,9 @@ class Unibox(SyncAPIResource):
             send_mode: ``"instant"`` (the default) or ``"scheduled"``.
             scheduled_at: When to send, for ``send_mode="scheduled"``
                 (RFC 3339).
+            forward_message_id: Make the send a forward of this stored
+                message. Needs ``READ_UNIBOX`` as well as ``WRITE_UNIBOX``,
+                and the message's mailbox must be allowed for the key.
         """
         return self._post(
             "/unibox/reply",
@@ -654,6 +741,7 @@ class Unibox(SyncAPIResource):
                 thread_id=thread_id,
                 send_mode=send_mode,
                 scheduled_at=scheduled_at,
+                forward_message_id=forward_message_id,
             ),
             options=options,
         )
@@ -851,30 +939,57 @@ class Unibox(SyncAPIResource):
     def snooze(
         self,
         *,
-        thread_id: str,
         snoozed_until: str,
+        thread_id: NotGivenOr[str] = NOT_GIVEN,
+        thread_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> Snooze:
-        """Hide a thread from the inbox until *snoozed_until* (RFC 3339).
+        """Hide conversations from the inbox until *snoozed_until* (RFC 3339).
 
         Snoozing an already-snoozed thread moves the wake time rather than
-        creating a second snooze.
+        creating a second snooze. Name one conversation with *thread_id*, or a
+        whole selection with *thread_ids* (naming both snoozes the union). A
+        single conversation answers with its row; several answer with
+        ``data``, one :class:`Snooze` per conversation.
         """
+        if not is_given(thread_id) and not is_given(thread_ids):
+            raise ValueError("snooze() needs thread_id or thread_ids")
         return self._post(
             "/unibox/snooze",
             cast_to=Snooze,
-            body={"thread_id": thread_id, "snoozed_until": snoozed_until},
+            body=drop_not_given(
+                {
+                    "thread_id": thread_id,
+                    "thread_ids": (
+                        list(thread_ids) if is_given(thread_ids) else NOT_GIVEN
+                    ),
+                    "snoozed_until": snoozed_until,
+                }
+            ),
             options=options,
         )
 
     def unsnooze(
-        self, *, thread_id: str, options: RequestOptions | None = None
+        self,
+        *,
+        thread_id: NotGivenOr[str] = NOT_GIVEN,
+        thread_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        options: RequestOptions | None = None,
     ) -> SnoozeDeleted:
-        """Un-snooze a thread. Succeeds even if it was not snoozed."""
+        """Un-snooze one or more conversations. Succeeds even if none was snoozed.
+
+        Pass *thread_id*, or *thread_ids* to wake a selection in one call
+        (sent comma-joined).
+        """
+        ids = ([thread_id] if is_given(thread_id) else []) + (
+            list(thread_ids) if is_given(thread_ids) else []
+        )
+        if not ids:
+            raise ValueError("unsnooze() needs thread_id or thread_ids")
         return self._delete(
             "/unibox/snooze",
             cast_to=SnoozeDeleted,
-            query={"thread_id": thread_id},
+            query={"thread_id": ",".join(ids)},
             options=options,
         )
 
@@ -927,6 +1042,8 @@ class AsyncUnibox(AsyncAPIResource):
         category_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         since: NotGivenOr[str] = NOT_GIVEN,
         until: NotGivenOr[str] = NOT_GIVEN,
+        include_archived: NotGivenOr[bool] = NOT_GIVEN,
+        automated: NotGivenOr[bool] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> AsyncPaginator[MessagePreview]:
         """List inbox messages, newest first (auto-paginating).
@@ -936,8 +1053,8 @@ class AsyncUnibox(AsyncAPIResource):
             cursor: Pagination cursor.
             email_ids: Restrict to these mailbox (email account) ids.
             folder: Canonical folder scope: ``inbox``, ``sent``, ``drafts``,
-                ``archive``, ``spam`` or ``trash``. Omit for every folder
-                except ``spam`` and ``trash``.
+                ``archive``, ``spam`` or ``trash``. Omit for every working
+                folder (``spam``, ``trash`` and ``archive`` stay out).
             direction: ``"sent"`` or ``"received"``.
             from_: Match the sender address.
             address: Match either side of the conversation.
@@ -951,6 +1068,10 @@ class AsyncUnibox(AsyncAPIResource):
             category_ids: Only threads carrying any of these labels.
             since: Lower bound on the message date (RFC 3339).
             until: Upper bound on the message date (RFC 3339).
+            include_archived: Put archived conversations back into an unscoped
+                listing. Ignored when *folder* is set.
+            automated: ``True`` for only conversations no person wrote in,
+                ``False`` to leave them out. Omit for both.
         """
         return self._get_api_list(
             "/unibox",
@@ -972,6 +1093,8 @@ class AsyncUnibox(AsyncAPIResource):
                 category_ids=category_ids,
                 since=since,
                 until=until,
+                include_archived=include_archived,
+                automated=automated,
             ),
             options=options,
         )
@@ -1072,6 +1195,7 @@ class AsyncUnibox(AsyncAPIResource):
         self,
         *,
         email_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        thread_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         folder: NotGivenOr[str] = NOT_GIVEN,
         seen: bool = True,
         options: RequestOptions | None = None,
@@ -1080,6 +1204,8 @@ class AsyncUnibox(AsyncAPIResource):
 
         Args:
             email_ids: The message ids to update (max 500).
+            thread_ids: Whole conversations to update (max 500). Each entry
+                is a thread id, or a message id for mail with no thread.
             folder: Instead of listing ids, mark every unread message in this
                 folder across the whole workspace.
             seen: ``True`` to mark read, ``False`` to mark unread.
@@ -1092,8 +1218,50 @@ class AsyncUnibox(AsyncAPIResource):
                     "email_ids": (
                         list(email_ids) if is_given(email_ids) else NOT_GIVEN
                     ),
+                    "thread_ids": (
+                        list(thread_ids) if is_given(thread_ids) else NOT_GIVEN
+                    ),
                     "folder": folder,
                     "seen": seen,
+                }
+            ),
+            options=options,
+        )
+
+    async def move_folder(
+        self,
+        *,
+        folder: str,
+        email_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        thread_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> FolderMoveResult:
+        """File messages or whole conversations into one folder.
+
+        Requires the ``WRITE_UNIBOX`` permission. Archive is ``"archive"``,
+        Delete is ``"trash"`` and Move to inbox is ``"inbox"``; no other
+        folder can be filed into. Mailboxes with ``relay_folder_moves`` on
+        have the move mirrored at the provider. The body names the
+        destination, so retries are safe.
+
+        Args:
+            folder: ``"inbox"``, ``"archive"`` or ``"trash"``.
+            email_ids: Message ids to file (max 500).
+            thread_ids: Conversations to file (max 500). Each entry is a
+                thread id, or a message id for mail with no thread.
+        """
+        return await self._patch(
+            "/unibox/folder",
+            cast_to=FolderMoveResult,
+            body=drop_not_given(
+                {
+                    "email_ids": (
+                        list(email_ids) if is_given(email_ids) else NOT_GIVEN
+                    ),
+                    "thread_ids": (
+                        list(thread_ids) if is_given(thread_ids) else NOT_GIVEN
+                    ),
+                    "folder": folder,
                 }
             ),
             options=options,
@@ -1114,9 +1282,10 @@ class AsyncUnibox(AsyncAPIResource):
         thread_id: NotGivenOr[str] = NOT_GIVEN,
         send_mode: NotGivenOr[str] = NOT_GIVEN,
         scheduled_at: NotGivenOr[str] = NOT_GIVEN,
+        forward_message_id: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> SendResult:
-        """Send a reply from a connected mailbox.
+        """Send a reply, or a forward, from a connected mailbox.
 
         Args:
             email_account_id: The mailbox to send from.
@@ -1129,6 +1298,9 @@ class AsyncUnibox(AsyncAPIResource):
             send_mode: ``"instant"`` (the default) or ``"scheduled"``.
             scheduled_at: When to send, for ``send_mode="scheduled"``
                 (RFC 3339).
+            forward_message_id: Make the send a forward of this stored
+                message. Needs ``READ_UNIBOX`` as well as ``WRITE_UNIBOX``,
+                and the message's mailbox must be allowed for the key.
         """
         return await self._post(
             "/unibox/reply",
@@ -1145,6 +1317,7 @@ class AsyncUnibox(AsyncAPIResource):
                 thread_id=thread_id,
                 send_mode=send_mode,
                 scheduled_at=scheduled_at,
+                forward_message_id=forward_message_id,
             ),
             options=options,
         )
@@ -1342,30 +1515,57 @@ class AsyncUnibox(AsyncAPIResource):
     async def snooze(
         self,
         *,
-        thread_id: str,
         snoozed_until: str,
+        thread_id: NotGivenOr[str] = NOT_GIVEN,
+        thread_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> Snooze:
-        """Hide a thread from the inbox until *snoozed_until* (RFC 3339).
+        """Hide conversations from the inbox until *snoozed_until* (RFC 3339).
 
         Snoozing an already-snoozed thread moves the wake time rather than
-        creating a second snooze.
+        creating a second snooze. Name one conversation with *thread_id*, or a
+        whole selection with *thread_ids* (naming both snoozes the union). A
+        single conversation answers with its row; several answer with
+        ``data``, one :class:`Snooze` per conversation.
         """
+        if not is_given(thread_id) and not is_given(thread_ids):
+            raise ValueError("snooze() needs thread_id or thread_ids")
         return await self._post(
             "/unibox/snooze",
             cast_to=Snooze,
-            body={"thread_id": thread_id, "snoozed_until": snoozed_until},
+            body=drop_not_given(
+                {
+                    "thread_id": thread_id,
+                    "thread_ids": (
+                        list(thread_ids) if is_given(thread_ids) else NOT_GIVEN
+                    ),
+                    "snoozed_until": snoozed_until,
+                }
+            ),
             options=options,
         )
 
     async def unsnooze(
-        self, *, thread_id: str, options: RequestOptions | None = None
+        self,
+        *,
+        thread_id: NotGivenOr[str] = NOT_GIVEN,
+        thread_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        options: RequestOptions | None = None,
     ) -> SnoozeDeleted:
-        """Un-snooze a thread. Succeeds even if it was not snoozed."""
+        """Un-snooze one or more conversations. Succeeds even if none was snoozed.
+
+        Pass *thread_id*, or *thread_ids* to wake a selection in one call
+        (sent comma-joined).
+        """
+        ids = ([thread_id] if is_given(thread_id) else []) + (
+            list(thread_ids) if is_given(thread_ids) else []
+        )
+        if not ids:
+            raise ValueError("unsnooze() needs thread_id or thread_ids")
         return await self._delete(
             "/unibox/snooze",
             cast_to=SnoozeDeleted,
-            query={"thread_id": thread_id},
+            query={"thread_id": ",".join(ids)},
             options=options,
         )
 

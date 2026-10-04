@@ -52,7 +52,7 @@ class ApiKey(BaseModel):
 
 
 class ApiKeyDeleted(BaseModel):
-    """The result of revoking an API key."""
+    """The result of revoking (``revoked``) or permanently removing (``deleted``) an API key."""
 
     status: str | None = None
 
@@ -205,6 +205,21 @@ class ApiKeys(SyncAPIResource):
             f"/api-keys/{api_key_id}",
             cast_to=ApiKeyDeleted,
             query=query,
+            options=options,
+        )
+
+    def delete_permanently(
+        self, api_key_id: str, *, options: RequestOptions | None = None
+    ) -> ApiKeyDeleted:
+        """Permanently remove a revoked or expired API key and its usage logs.
+
+        Requires the ``API_KEYS`` permission. Revoking (:meth:`delete`) ends a
+        key; this removes the record, and only works once the key is no longer
+        active. The response ``status`` is ``"deleted"``.
+        """
+        return self._delete(
+            f"/api-keys/{api_key_id}/permanent",
+            cast_to=ApiKeyDeleted,
             options=options,
         )
 
@@ -382,6 +397,21 @@ class AsyncApiKeys(AsyncAPIResource):
             f"/api-keys/{api_key_id}",
             cast_to=ApiKeyDeleted,
             query=query,
+            options=options,
+        )
+
+    async def delete_permanently(
+        self, api_key_id: str, *, options: RequestOptions | None = None
+    ) -> ApiKeyDeleted:
+        """Permanently remove a revoked or expired API key and its usage logs.
+
+        Requires the ``API_KEYS`` permission. Revoking (:meth:`delete`) ends a
+        key; this removes the record, and only works once the key is no longer
+        active. The response ``status`` is ``"deleted"``.
+        """
+        return await self._delete(
+            f"/api-keys/{api_key_id}/permanent",
+            cast_to=ApiKeyDeleted,
             options=options,
         )
 
