@@ -1,0 +1,1 @@
+Added the `GatewayEvent` constants `WARMUP_PLACEMENT`, `PLACEMENT_TEST_UPDATED`, `MAILBOX_IMPORT_PROGRESS`, `CONTACT_IMPORT_PROGRESS`, `DIRECT_EMAIL_OPENED` and `DIRECT_EMAIL_CLICKED`. Each documents its payload fields and the member permission the server requires to receive it.

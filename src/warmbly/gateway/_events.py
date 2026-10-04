@@ -66,12 +66,21 @@ class GatewayEvent:
     EMAIL_RECEIVED = "EMAIL_RECEIVED"
     EMAIL_UPDATED = "EMAIL_UPDATED"
     EMAIL_DELETED = "EMAIL_DELETED"
+    #: A one-off (non-campaign) email was opened. Needs ``view_analytics``;
+    #: carries ``email_account_id`` instead of a ``campaign_id``.
+    DIRECT_EMAIL_OPENED = "DIRECT_EMAIL_OPENED"
+    #: A one-off (non-campaign) email's link was clicked. Needs ``view_analytics``.
+    DIRECT_EMAIL_CLICKED = "DIRECT_EMAIL_CLICKED"
 
     # Contact events.
     CONTACT_CREATED = "CONTACT_CREATED"
     CONTACT_UPDATED = "CONTACT_UPDATED"
     CONTACT_DELETED = "CONTACT_DELETED"
     CONTACTS_RELOAD = "CONTACTS_RELOAD"
+    #: A background contact import moved. Carries ``org_id``, ``import_id`` and
+    #: ``status`` (``queued``, ``running``, ``completed``, ``failed`` or
+    #: ``cancelled``); refetch the import on receipt. Needs ``view_contacts``.
+    CONTACT_IMPORT_PROGRESS = "CONTACT_IMPORT_PROGRESS"
 
     # Hosted forms and website tracking.
     FORM_SUBMISSION_CREATED = "FORM_SUBMISSION_CREATED"
@@ -85,6 +94,19 @@ class GatewayEvent:
     ACCOUNT_HEALTH_CHANGED = "ACCOUNT_HEALTH_CHANGED"
     #: A mailbox's import progress or fair-use hold changed.
     ACCOUNT_SYNC_STATE = "ACCOUNT_SYNC_STATE"
+    #: A partner found one of the workspace's warmup emails; ``status`` is
+    #: ``inbox``, ``tabs`` or ``spam``. Needs ``manage_emails``.
+    WARMUP_PLACEMENT = "WARMUP_PLACEMENT"
+    #: A mailbox import moved. Carries ``org_id``, ``import_id`` and ``status``
+    #: (``running``, ``completed`` or ``cancelled``); refetch the import on
+    #: receipt. Needs ``manage_emails``.
+    MAILBOX_IMPORT_PROGRESS = "MAILBOX_IMPORT_PROGRESS"
+
+    # Inbox placement tests.
+    #: A placement test (``test_id``) or batch (``batch_id``) started, got a
+    #: verdict for a copy, or finished. Carries ``org_id``, ``status`` and, for
+    #: a campaign step test, ``campaign_id``. Needs ``view_analytics``.
+    PLACEMENT_TEST_UPDATED = "PLACEMENT_TEST_UPDATED"
 
     # Bulk-operation events.
     BULK_STARTED = "BULK_STARTED"

@@ -19,6 +19,7 @@ from ._exceptions import (
     AuthenticationError,
     BadRequestError,
     ConflictError,
+    ErrorCode,
     GatewayError,
     InternalServerError,
     NotFoundError,
@@ -100,4 +101,5 @@ __all__ = [  # noqa: RUF022 - grouped by category for readability
     "ServiceUnavailableError",
     "OAuthError",
     "GatewayError",
+    "ErrorCode",
 ]

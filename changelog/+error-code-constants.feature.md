@@ -1,0 +1,1 @@
+Added `ErrorCode`, constants for the machine-readable `code` values in API error responses (for example `ErrorCode.REAUTH_REQUIRED` and `ErrorCode.PASSWORD_BREACHED`), and `APIError.requires_reauth`, which is true when the server wants a recent re-authentication at `POST /auth/reauth` before a sensitive account change.
