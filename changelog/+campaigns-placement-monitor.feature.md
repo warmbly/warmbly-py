@@ -1,1 +1,0 @@
-`campaigns.placement_monitor()`, `set_placement_monitor()` and `delete_placement_monitor()` read, create or update, and remove a campaign's scheduled inbox-placement test (`PlacementMonitor`: interval, panel, alert threshold, pause on alert).

@@ -1,1 +1,0 @@
-`campaigns.send_plan()` returns today's sending plan for a campaign as a `CampaignSendPlan`: the configured ceiling, every limit that reduced it, the sending window, lead supply, each mailbox's day and the workspace allowance.

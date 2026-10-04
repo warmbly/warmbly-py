@@ -9,6 +9,41 @@ assembled from news fragments in `changelog/` by
 
 <!-- towncrier release notes start -->
 
+## [v0.4.0] - 2026-10-04
+
+### Added
+
+- Add `analytics.direct()` for hand-written mail volume and tracking, `analytics.inbox_tagging()` for reviewing automatic inbox-tagging verdicts, and `analytics.warmup_placement()` for where warmup mail landed per day and recipient provider.
+- Add the `placement` resource (`client.placement` and `async_client.placement`) for inbox placement tests: `overview`, `list_tests`, `get_test`, `create_test`, `cancel_test`, `list_batches`, `get_batch`, `list_batch_senders`, `preview_batch`, `create_batch`, `cancel_batch`, `coverage`, `list_seeds` and `set_seed`. List methods auto-page, and the responses of this group are unwrapped from their `{"data": ...}` envelope.
+- Added `ErrorCode`, constants for the machine-readable `code` values in API error responses (for example `ErrorCode.REAUTH_REQUIRED` and `ErrorCode.PASSWORD_BREACHED`), and `APIError.requires_reauth`, which is true when the server wants a recent re-authentication at `POST /auth/reauth` before a sensitive account change.
+- Added `api_keys.delete_permanently()` to remove a revoked or expired API key and its usage logs.
+- Added `emails.identity()` and `emails.refresh_identity()` for a mailbox's send-as addresses and signature source, `emails.update_sync()` to choose folders the sync skips, and `emails.update_direct_tracking()` for open and click tracking on direct unibox sends. `emails.sync()` now also returns `skip_folders`, the server's `folders`, and the skipped-folder counts.
+- Added `unibox.move_folder()` to archive, trash or restore messages and whole conversations. `unibox.mark_seen()` accepts `thread_ids`, `unibox.reply()` accepts `forward_message_id` to forward a stored message, and `unibox.list()` accepts `include_archived` and `automated`. Message, preview and overview models gain `email_id`, `folder`, `answers_mailbox_id`, `automated` and `automated_unread`.
+- Added the `GatewayEvent` constants `WARMUP_PLACEMENT`, `PLACEMENT_TEST_UPDATED`, `MAILBOX_IMPORT_PROGRESS`, `CONTACT_IMPORT_PROGRESS`, `DIRECT_EMAIL_OPENED` and `DIRECT_EMAIL_CLICKED`. Each documents its payload fields and the member permission the server requires to receive it.
+- Background contact imports: `contacts.create_import()`, `list_imports()`, `retrieve_import()`, `save_import_draft()`, `analyze_import()`, `start_import()`, `cancel_import()` and `download_import_failures()` upload a file once, preview and analyze a column mapping over the whole file, run the import in the background and fetch the failed rows as CSV.
+- New `email_images` resource (`list()`, `upload()`, `delete()`) for the workspace image library used in email bodies. Uploads are multipart and return a public `url` ready to place in a campaign or template.
+- Per-lead controls on a campaign: `campaigns.lead_hold()`, `pause_lead()` and `resume_lead()` park one contact's flow without unsubscribing them, and `lead_cc()`, `set_lead_cc()` and `suggest_lead_cc()` manage the colleagues copied on every email to a lead. `ContactCampaignState` now carries `sender_id`, `sender_email`, `hold` and `cc`, and a lead can have the `paused` status.
+- `campaigns.placement_monitor()`, `set_placement_monitor()` and `delete_placement_monitor()` read, create or update, and remove a campaign's scheduled inbox-placement test (`PlacementMonitor`: interval, panel, alert threshold, pause on alert).
+- `campaigns.send_plan()` returns today's sending plan for a campaign as a `CampaignSendPlan`: the configured ceiling, every limit that reduced it, the sending window, lead supply, each mailbox's day and the workspace allowance.
+- `crm.bulk_update_tasks()` and `crm.bulk_delete_tasks()` change the status or priority of, or delete, a whole selection of tasks by id or by "select all matching" filter, and report how many were affected.
+- `integrations.set_connection_signing_key()` sets (or clears) the key a Calendly or Cal.com connection's deliveries must be signed with, and `rotate_connection_inbound_url()` mints a new inbound webhook URL for it.
+- `templates.analyze()` runs the AI spam analysis on template copy and returns located findings, a suggested subject and the rules score as a `TemplateAnalysis`. It spends AI credits.
+
+### Changed
+
+- Add `price_yearly` to the `Plan` model. It is `None` for a plan that is monthly only.
+- Align the `analytics` methods with the query parameters the server reads: `dashboard` and `usage` take `period`, `warmup` takes `email_id`, `compare_campaigns` takes `ids`, `campaign_hourly` takes `date`, and `accounts` is now paged with `email_ids`, `limit` and `cursor`. The `from_` and `to` dates are whole days (`YYYY-MM-DD`), not RFC3339 timestamps. The existing arguments still work.
+- Forms gain `triage_enabled`, `FormsConfig.triage_available` and the `triage` verdict on submissions. `SegmentField` reports `option_labels`. Lead sync sources carry `segment_ids`, accept it on create and update, and `lead_sync.list_sources()` can filter by `segment_id`.
+- `EmailAccount` now carries `send_as_email`, `mail_host`, `auth_method`, `domain_grant_id`, `vendor_connection_id`, `vendor`, `avatar_url`, `track_direct_mail`, `warmup_placement`, `warmup_folder`, `warmup_retention_days` and `relay_folder_moves`, and `emails.update()` accepts `send_as_email`, `relay_folder_moves`, `warmup_placement`, `warmup_folder` and `warmup_retention_days`.
+- `campaigns.create()` and `update()` accept `entry_delay_minutes`, `Campaign` reports it and `effective_timezone`, and `create_step()` can now take the step fields (including the new `thread_reply`) in the same call. `campaigns.estimate()` accepts `start_time`, `end_time`, `step_waits` and `campaign_id` and its result reports steps, total sends, steady capacity, the bottleneck, a day by day timeline and the sender pool. `set_segments()` reports `withdrawn` and `contacted`. One-time campaigns were retired by the server, so `kind` and `CampaignsOverview.one_time` are no longer returned; the `kind` argument is still accepted and ignored.
+- `contacts.bulk_update()`, `bulk_delete()`, `request_verification()` and `research_batch()`, `integrations.push()` and `segments.set_members()` accept a "select all matching" selection (`select_all`, `filters`, `exclude`) in place of an id list, and the id limit per request is now 10000. `contacts.lookup()` takes `thread_id` and `account_id` as well as `email` and reports how it matched (`match`). `contacts.update()` can change `email`, `contacts.search()` filters by `mail_hosts`, and `Contact` reports `mail_host` and `verification_requested_at`.
+- `unibox.snooze()` and `unibox.unsnooze()` now take either `thread_id` or `thread_ids`. `snooze()` no longer requires `thread_id`, and a multi-thread snooze returns its rows under `data`; calling either without a thread id raises `ValueError`.
+
+### Documentation
+
+- Documented that a browser session connects to the gateway with the short-lived ticket from `POST /getaway`. The server now refuses any other session token with close code 4004, which the gateway client treats as fatal and does not retry.
+
+
 ## [v0.3.0] - 2026-09-07
 
 ### Added

@@ -1,1 +1,0 @@
-Added `emails.identity()` and `emails.refresh_identity()` for a mailbox's send-as addresses and signature source, `emails.update_sync()` to choose folders the sync skips, and `emails.update_direct_tracking()` for open and click tracking on direct unibox sends. `emails.sync()` now also returns `skip_folders`, the server's `folders`, and the skipped-folder counts.

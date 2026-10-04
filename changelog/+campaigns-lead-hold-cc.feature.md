@@ -1,1 +1,0 @@
-Per-lead controls on a campaign: `campaigns.lead_hold()`, `pause_lead()` and `resume_lead()` park one contact's flow without unsubscribing them, and `lead_cc()`, `set_lead_cc()` and `suggest_lead_cc()` manage the colleagues copied on every email to a lead. `ContactCampaignState` now carries `sender_id`, `sender_email`, `hold` and `cc`, and a lead can have the `paused` status.

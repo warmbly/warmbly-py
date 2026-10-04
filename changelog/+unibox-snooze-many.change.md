@@ -1,1 +1,0 @@
-`unibox.snooze()` and `unibox.unsnooze()` now take either `thread_id` or `thread_ids`. `snooze()` no longer requires `thread_id`, and a multi-thread snooze returns its rows under `data`; calling either without a thread id raises `ValueError`.

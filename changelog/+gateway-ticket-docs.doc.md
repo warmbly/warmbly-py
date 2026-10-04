@@ -1,1 +1,0 @@
-Documented that a browser session connects to the gateway with the short-lived ticket from `POST /getaway`. The server now refuses any other session token with close code 4004, which the gateway client treats as fatal and does not retry.

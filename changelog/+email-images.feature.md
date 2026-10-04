@@ -1,1 +1,0 @@
-New `email_images` resource (`list()`, `upload()`, `delete()`) for the workspace image library used in email bodies. Uploads are multipart and return a public `url` ready to place in a campaign or template.

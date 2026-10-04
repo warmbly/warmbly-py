@@ -1,1 +1,0 @@
-`EmailAccount` now carries `send_as_email`, `mail_host`, `auth_method`, `domain_grant_id`, `vendor_connection_id`, `vendor`, `avatar_url`, `track_direct_mail`, `warmup_placement`, `warmup_folder`, `warmup_retention_days` and `relay_folder_moves`, and `emails.update()` accepts `send_as_email`, `relay_folder_moves`, `warmup_placement`, `warmup_folder` and `warmup_retention_days`.

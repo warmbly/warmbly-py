@@ -1,1 +1,0 @@
-`integrations.set_connection_signing_key()` sets (or clears) the key a Calendly or Cal.com connection's deliveries must be signed with, and `rotate_connection_inbound_url()` mints a new inbound webhook URL for it.

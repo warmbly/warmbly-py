@@ -1,1 +1,0 @@
-Forms gain `triage_enabled`, `FormsConfig.triage_available` and the `triage` verdict on submissions. `SegmentField` reports `option_labels`. Lead sync sources carry `segment_ids`, accept it on create and update, and `lead_sync.list_sources()` can filter by `segment_id`.
