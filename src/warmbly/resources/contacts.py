@@ -19,7 +19,7 @@ from typing import Any
 from .._models import BaseModel
 from .._pagination import AsyncPaginator, SyncCursorPage
 from .._resource import AsyncAPIResource, SyncAPIResource
-from .._types import NOT_GIVEN, NotGivenOr, RequestOptions
+from .._types import NOT_GIVEN, NotGiven, NotGivenOr, RequestOptions
 from .._utils import drop_not_given
 
 __all__ = [
@@ -29,6 +29,8 @@ __all__ = [
     "ContactCampaignState",
     "ContactDeleted",
     "ContactDetail",
+    "ContactImport",
+    "ContactImportAnalysis",
     "ContactImportPreview",
     "ContactImportResult",
     "ContactLookup",
@@ -58,7 +60,11 @@ class Contact(BaseModel):
     ``verification_provider`` names the backend or vocabulary behind it, and
     ``verification_confidence`` is how sure the platform is, 0 to 100, scored
     from the check plus what real mail to the address actually did.
-    ``esp_provider`` is the mailbox provider the address resolves to.
+    ``mail_host`` is who hosts the contact's inbox, read from the domain's MX
+    (empty until the sweep has run) and ``esp_provider`` is that host's family
+    (``gmail``, ``outlook`` or ``other``). ``verification_requested_at`` is set
+    while a member-requested re-check waits to run; the verdict stands until it
+    lands.
     """
 
     id: str
@@ -79,6 +85,8 @@ class Contact(BaseModel):
     verification_sub_status: str | None = None
     verification_confidence: int | None = None
     is_catch_all: bool | None = None
+    verification_requested_at: str | None = None
+    mail_host: str | None = None
     esp_provider: str | None = None
     esp_resolved_at: str | None = None
     campaign_lead: dict[str, Any] | None = None
@@ -141,9 +149,16 @@ class ContactSearchPage(BaseModel):
 
 
 class ContactLookup(BaseModel):
-    """The result of looking a contact up by email address."""
+    """The result of resolving a sender to a contact.
+
+    ``contact`` is ``None`` when nothing matched. ``match`` says how it
+    resolved: ``email`` when the sender's address is the contact's, ``thread``
+    when the thread answers a campaign send to the contact and the reply came
+    from another address.
+    """
 
     contact: Contact | None = None
+    match: str | None = None
 
 
 class CustomFieldKeys(BaseModel):
@@ -186,7 +201,12 @@ class ContactActivity(BaseModel):
 
 
 class ContactSentEmail(BaseModel):
-    """An email sent to a contact, with its engagement timestamps."""
+    """An email sent to a contact, with its engagement timestamps.
+
+    ``opened_at`` is a person's open. An automated fetch (a client prefetch, a
+    security gateway) lands in ``machine_opened_at`` instead, so the two are
+    never mistaken for each other.
+    """
 
     task_id: str | None = None
     status: str | None = None
@@ -201,6 +221,7 @@ class ContactSentEmail(BaseModel):
     step_id: str | None = None
     step_name: str | None = None
     opened_at: str | None = None
+    machine_opened_at: str | None = None
     clicked_at: str | None = None
     replied_at: str | None = None
     bounced_at: str | None = None
@@ -290,7 +311,12 @@ class ContactImportPreview(BaseModel):
 
     ``suggested_mapping`` is the server's guess at which column fills which
     contact field; correct it and pass the result as the ``mapping`` of
-    :meth:`Contacts.import_commit`.
+    :meth:`Contacts.import_commit`. ``inferred_columns`` are the indexes whose
+    suggestion came from content judgment rather than the header, worth a second
+    look; ``column_stats`` describes each column over the whole file (``filled``,
+    ``distinct``, ``samples``) and ``mapping_source`` is ``"saved"`` when the
+    workspace confirmed a mapping for these exact headers before. The last two
+    are set by background imports (:meth:`Contacts.create_import`).
     """
 
     filename: str | None = None
@@ -300,6 +326,9 @@ class ContactImportPreview(BaseModel):
     sample_rows: Sequence[Sequence[str]] = []
     total_rows: int | None = None
     suggested_mapping: Sequence[dict[str, Any]] = []
+    inferred_columns: Sequence[int] = []
+    column_stats: Sequence[dict[str, Any]] = []
+    mapping_source: str | None = None
 
 
 class ContactImportResult(BaseModel):
@@ -312,9 +341,73 @@ class ContactImportResult(BaseModel):
     failed: int | None = None
     errors: Sequence[dict[str, Any]] = []
     errors_truncated: bool | None = None
+    segments_pinned: bool | None = None
     quality: dict[str, Any] | None = None
     started_at: str | None = None
     ended_at: str | None = None
+
+
+class ContactImport(BaseModel):
+    """One background import of a contact file.
+
+    ``status`` is ``draft`` (uploaded, waiting for a mapping and a start),
+    ``queued``, ``running``, ``completed``, ``failed`` or ``cancelled``; the
+    last three never change again. ``total`` is the data row count and
+    ``processed`` how many have settled. ``preview`` is what the column mapper
+    shows and is carried by a draft only. ``failures`` holds the first failed
+    rows once the import has finished (the whole set is in
+    :meth:`Contacts.download_import_failures`). ``segments_pinned`` is ``None``
+    when the import had no segment targets, ``True`` when every membership write
+    landed and ``False`` when one did not (the reason is among ``notes``).
+    """
+
+    id: str
+    organization_id: str | None = None
+    created_by: str | None = None
+    filename: str | None = None
+    format: str | None = None
+    status: str | None = None
+    has_header: bool | None = None
+    columns: Sequence[str] = []
+    total: int | None = None
+    processed: int | None = None
+    imported: int | None = None
+    updated: int | None = None
+    skipped: int | None = None
+    failed: int | None = None
+    options: dict[str, Any] | None = None
+    quality: dict[str, Any] | None = None
+    segments_pinned: bool | None = None
+    notes: Sequence[str] = []
+    error: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+    started_at: str | None = None
+    finished_at: str | None = None
+    preview: ContactImportPreview | None = None
+    failures: Sequence[dict[str, Any]] = []
+
+
+class ContactImportAnalysis(BaseModel):
+    """What an import would do under a mapping, read over the whole file.
+
+    Every data row lands in exactly one of ``new``, ``existing``,
+    ``duplicates_in_file``, ``invalid`` or ``conflicts`` (addresses the member
+    already holds as a contact in another workspace). ``invalid_samples`` are the
+    first rows that cannot be imported, with reasons. ``problem`` is why starting
+    would be refused as a whole (the plan's contact limit, too many new
+    categories) and is empty when it would run.
+    """
+
+    rows: int | None = None
+    new: int | None = None
+    existing: int | None = None
+    duplicates_in_file: int | None = None
+    invalid: int | None = None
+    conflicts: int | None = None
+    invalid_samples: Sequence[dict[str, Any]] = []
+    quality: dict[str, Any] | None = None
+    problem: str | None = None
 
 
 class ContactCampaignState(BaseModel):
@@ -323,7 +416,11 @@ class ContactCampaignState(BaseModel):
     ``steps`` is the flow with this contact's per-step stamps; ``next`` is the
     action the scheduler would take next, derived on read, and is ``None`` once
     the flow has ended for the contact, in which case ``ended_reason`` says
-    why.
+    why. ``sender_id`` / ``sender_email`` are the mailbox the lead's whole
+    sequence sends from, fixed when its first email went out. ``hold`` is the
+    live per-lead pause (``since``, ``until``, ``reason``, ``source``) and is
+    ``None`` when the lead is not held; ``cc`` lists the contacts copied on every
+    email to the lead. ``lead_status`` can be ``paused`` while a hold is live.
     """
 
     campaign_id: str | None = None
@@ -331,6 +428,10 @@ class ContactCampaignState(BaseModel):
     campaign_status: str | None = None
     lead_status: str | None = None
     failure_reason: str | None = None
+    sender_id: str | None = None
+    sender_email: str | None = None
+    hold: dict[str, Any] | None = None
+    cc: Sequence[dict[str, Any]] = []
     steps: Sequence[dict[str, Any]] = []
     completed_steps: int | None = None
     total_steps: int | None = None
@@ -359,7 +460,7 @@ class ContactSegment(BaseModel):
 class ContactVerificationOverview(BaseModel):
     """Who checks this workspace's addresses, and the contacts by verdict.
 
-    ``provider`` is ``"builtin"`` or the connected paid provider.
+    ``provider`` is ``"builtin"``, ``"millionverifier"`` or ``"cleanmylist"``.
     ``provider_error`` is set when a paid provider is connected but unusable
     (bad key, no credits), in which case the built-in check is in use.
     ``builtin_ready`` says whether the in-house probe can reach mail servers
@@ -379,12 +480,18 @@ class ContactVerificationRequested(BaseModel):
     """How many contacts a verification action touched.
 
     ``queued`` is ``True`` for the ``verify`` action: the check runs in the
-    background and each contact updates as its verdict lands.
+    background and each contact updates as its verdict lands. ``verifier`` names
+    who runs it (``builtin`` or the connected provider, with ``verifier_label``
+    its display name); ``verifier_error`` says why a connected provider cannot be
+    used right now, in which case the built-in check runs instead.
     """
 
     affected: int | None = None
     action: str | None = None
     queued: bool | None = None
+    verifier: str | None = None
+    verifier_label: str | None = None
+    verifier_error: str | None = None
 
 
 def _search_body(
@@ -406,6 +513,7 @@ def _search_body(
     updated_before: NotGivenOr[str],
     sort_by: NotGivenOr[str],
     reverse: NotGivenOr[bool],
+    mail_hosts: NotGivenOr[Sequence[str]] = NOT_GIVEN,
 ) -> dict[str, Any]:
     """Build the faceted contact filter body (shared by search and export)."""
     return drop_not_given(
@@ -418,6 +526,7 @@ def _search_body(
             "category_ids": category_ids,
             "segment_ids": segment_ids,
             "verification_status": verification_status,
+            "mail_hosts": mail_hosts,
             "min_campaigns": min_campaigns,
             "max_campaigns": max_campaigns,
             "subscribed": subscribed,
@@ -435,6 +544,7 @@ def _update_body(
     *,
     first_name: NotGivenOr[str],
     last_name: NotGivenOr[str],
+    email: NotGivenOr[str] = NOT_GIVEN,
     company: NotGivenOr[str],
     phone: NotGivenOr[str],
     custom_fields: NotGivenOr[Mapping[str, str]],
@@ -448,6 +558,7 @@ def _update_body(
         {
             "first_name": first_name,
             "last_name": last_name,
+            "email": email,
             "company": company,
             "phone": phone,
             "custom_fields": custom_fields,
@@ -456,6 +567,34 @@ def _update_body(
             "categories": categories,
             "add_categories": add_categories,
             "remove_categories": remove_categories,
+        }
+    )
+
+
+def _import_options_body(
+    *,
+    mapping: NotGivenOr[Sequence[Mapping[str, Any]]],
+    dedup: NotGivenOr[str],
+    has_header: NotGivenOr[bool],
+    category_ids: NotGivenOr[Sequence[str]],
+    campaign_ids: NotGivenOr[Sequence[str]],
+    segment_ids: NotGivenOr[Sequence[str]],
+    subscribed_default: NotGivenOr[bool],
+) -> dict[str, Any]:
+    """Build the import options body shared by draft save and start."""
+    return drop_not_given(
+        {
+            "mapping": (
+                [dict(m) for m in mapping]
+                if not isinstance(mapping, NotGiven)
+                else NOT_GIVEN
+            ),
+            "dedup": dedup,
+            "has_header": has_header,
+            "category_ids": category_ids,
+            "campaign_ids": campaign_ids,
+            "segment_ids": segment_ids,
+            "subscribed_default": subscribed_default,
         }
     )
 
@@ -520,6 +659,7 @@ class Contacts(SyncAPIResource):
         updated_before: NotGivenOr[str] = NOT_GIVEN,
         sort_by: NotGivenOr[str] = NOT_GIVEN,
         reverse: NotGivenOr[bool] = NOT_GIVEN,
+        mail_hosts: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         category: NotGivenOr[str] = NOT_GIVEN,
         limit: NotGivenOr[int] = NOT_GIVEN,
         cursor: NotGivenOr[str] = NOT_GIVEN,
@@ -544,8 +684,11 @@ class Contacts(SyncAPIResource):
             verification_status: Address verdict: ``valid``, ``risky``,
                 ``invalid`` or ``unknown``.
             subscribed: Filter by subscription state.
-            sort_by: e.g. ``"first_name ASC"`` or ``"campaign_count DESC"``.
-            reverse: Invert the sort direction.
+            mail_hosts: Contacts whose inbox host is any of these; an empty string
+                matches contacts not detected yet.
+            sort_by: A column name (``created_at``, ``first_name``, ``company``,
+                ...) or ``"custom:<key>"`` for a custom field.
+            reverse: Ascending when ``True``; the default is descending.
             category: A single category id, as a query filter.
             limit: Page size.
             cursor: An opaque cursor from a previous page.
@@ -571,19 +714,39 @@ class Contacts(SyncAPIResource):
                 updated_before=updated_before,
                 sort_by=sort_by,
                 reverse=reverse,
+                mail_hosts=mail_hosts,
             ),
             query={"category": category, "limit": limit, "cursor": cursor},
             options=options,
         )
 
     def lookup(
-        self, *, email: str, options: RequestOptions | None = None
+        self,
+        *,
+        email: NotGivenOr[str] = NOT_GIVEN,
+        thread_id: NotGivenOr[str] = NOT_GIVEN,
+        account_id: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
     ) -> ContactLookup:
-        """Look a contact up by email address."""
+        """Resolve a sender to a contact.
+
+        At least one of *email* and *thread_id* is required. A
+        ``"Name <addr@example.com>"`` value is reduced to the bare address. When
+        the address is not a contact's, *thread_id* resolves a sender that wrote
+        from an alias back to the lead the thread answers (``match`` is then
+        ``"thread"``). A *thread_id* reads the unibox, so the credential needs
+        the ``read_unibox`` scope as well as ``read_contacts``.
+
+        Args:
+            email: The sender's address.
+            thread_id: A unibox thread the sender wrote in.
+            account_id: Restrict the thread lookup to one mailbox (the credential
+                must be allowed to use it).
+        """
         return self._get(
             "/contacts/lookup",
             cast_to=ContactLookup,
-            query={"email": email},
+            query={"email": email, "thread_id": thread_id, "account_id": account_id},
             options=options,
         )
 
@@ -624,6 +787,9 @@ class Contacts(SyncAPIResource):
         action: str,
         contacts: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         campaign_id: NotGivenOr[str] = NOT_GIVEN,
+        select_all: NotGivenOr[bool] = NOT_GIVEN,
+        filters: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        exclude: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> ContactVerificationRequested:
         """Re-check contacts, or record a manual verdict on them.
@@ -632,9 +798,13 @@ class Contacts(SyncAPIResource):
             action: ``"verify"`` to queue a background re-check,
                 ``"mark_deliverable"`` or ``"mark_undeliverable"`` to record a
                 verdict outright.
-            contacts: The contact ids to act on, at most 1000 per request.
+            contacts: The contact ids to act on, at most 10000 per request.
             campaign_id: Instead of listing ids, select every lead of this
                 campaign that verification refused.
+            select_all: Act on every contact matching *filters* instead of the
+                listed ids (the dashboard's "select all matching").
+            filters: The same body :meth:`search` takes. Used with *select_all*.
+            exclude: Contact ids to drop from a *select_all* selection.
         """
         return self._post(
             "/contacts/verification",
@@ -644,6 +814,9 @@ class Contacts(SyncAPIResource):
                     "action": action,
                     "contacts": contacts,
                     "campaign_id": campaign_id,
+                    "all": select_all,
+                    "filters": filters,
+                    "exclude": exclude,
                 }
             ),
             options=options,
@@ -679,11 +852,15 @@ class Contacts(SyncAPIResource):
         categories: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         add_categories: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         remove_categories: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        email: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> Contact:
         """Update a contact.
 
         Args:
+            email: Replace the contact's address. It is the contact's identity, so
+                changing it drops the verification verdict and the delivery
+                evidence that belonged to the old mailbox.
             campaigns: Replacement campaign membership. Omit to leave as-is.
             categories: Replacement category set. Omit to leave as-is.
             add_categories: Diff-style add; ignored when *categories* is set.
@@ -696,6 +873,7 @@ class Contacts(SyncAPIResource):
             body=_update_body(
                 first_name=first_name,
                 last_name=last_name,
+                email=email,
                 company=company,
                 phone=phone,
                 custom_fields=custom_fields,
@@ -719,7 +897,10 @@ class Contacts(SyncAPIResource):
     def bulk_update(
         self,
         *,
-        contacts: Sequence[str],
+        contacts: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        select_all: NotGivenOr[bool] = NOT_GIVEN,
+        filters: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        exclude: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         add_campaigns: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         remove_campaigns: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         add_categories: NotGivenOr[Sequence[str]] = NOT_GIVEN,
@@ -731,7 +912,11 @@ class Contacts(SyncAPIResource):
         """Apply the same edit to many contacts at once.
 
         Args:
-            contacts: The contact ids to edit.
+            contacts: The contact ids to edit, at most 10000 per request.
+            select_all: Edit every contact matching *filters* instead of the listed
+                ids. The response then carries the count, not every updated row.
+            filters: The same body :meth:`search` takes. Used with *select_all*.
+            exclude: Contact ids to drop from a *select_all* selection.
             fields: One ``{"type", "key", "value"}`` entry per field edit.
             subscribe: Set the subscription state on every listed contact.
         """
@@ -740,7 +925,10 @@ class Contacts(SyncAPIResource):
             cast_to=ContactsAdded,
             body=drop_not_given(
                 {
-                    "contacts": list(contacts),
+                    "contacts": contacts,
+                    "all": select_all,
+                    "filters": filters,
+                    "exclude": exclude,
                     "add_campaigns": add_campaigns,
                     "remove_campaigns": remove_campaigns,
                     "add_categories": add_categories,
@@ -754,19 +942,30 @@ class Contacts(SyncAPIResource):
 
     def bulk_delete(
         self,
-        contact_ids: Sequence[str],
+        contact_ids: Sequence[str] = (),
         *,
+        select_all: bool = False,
+        filters: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        exclude: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> ContactDeleted:
         """Delete many contacts at once.
 
         Args:
-            contact_ids: The contact ids to delete, sent as a plain array.
+            contact_ids: The contact ids to delete, sent as a plain array (at most
+                10000).
+            select_all: Delete every contact matching *filters* instead of the
+                listed ids; the request then travels as a selection object.
+            filters: The same body :meth:`search` takes. Used with *select_all*.
+            exclude: Contact ids to drop from a *select_all* selection.
         """
+        body: Any = list(contact_ids)
+        if select_all:
+            body = drop_not_given({"all": True, "filters": filters, "exclude": exclude})
         return self._delete(
             "/contacts",
             cast_to=ContactDeleted,
-            body=list(contact_ids),
+            body=body,
             options=options,
         )
 
@@ -941,21 +1140,239 @@ class Contacts(SyncAPIResource):
     def research_batch(
         self,
         *,
-        contact_ids: Sequence[str],
+        contact_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         objective: NotGivenOr[str] = NOT_GIVEN,
+        select_all: NotGivenOr[bool] = NOT_GIVEN,
+        filters: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        exclude: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> ResearchBatchQueued:
         """Queue AI research for many contacts. Charges credits per run.
 
         Runs asynchronously: watch the ``AI_RESEARCH_PROGRESS`` gateway event,
         or poll :meth:`list_research`.
+
+        Args:
+            contact_ids: The contacts to research.
+            objective: What the research should find out.
+            select_all: Research every contact matching *filters* instead of the
+                listed ids.
+            filters: The same body :meth:`search` takes. Used with *select_all*.
+            exclude: Contact ids to drop from a *select_all* selection.
         """
         return self._post(
             "/contacts/research/batch",
             cast_to=ResearchBatchQueued,
             body=drop_not_given(
-                {"contact_ids": list(contact_ids), "objective": objective}
+                {
+                    "contact_ids": (
+                        list(contact_ids)
+                        if not isinstance(contact_ids, NotGiven)
+                        else NOT_GIVEN
+                    ),
+                    "objective": objective,
+                    "all": select_all,
+                    "filters": filters,
+                    "exclude": exclude,
+                }
             ),
+            options=options,
+        )
+
+    # -- background imports --------------------------------------------------
+    def create_import(
+        self,
+        *,
+        file: bytes,
+        filename: str,
+        content_type: str = "text/csv",
+        options: RequestOptions | None = None,
+    ) -> ContactImport:
+        """Upload a contact file once and get a draft import back.
+
+        The draft carries the ``preview`` the column mapper needs. Nothing is
+        written to contacts until :meth:`start_import`. Uploads are capped at
+        50 MB and 50000 rows, and a workspace can have only a few imports
+        waiting or running at once. Requires the ``write_contacts`` scope.
+
+        Args:
+            file: The raw CSV/XLSX bytes.
+            filename: The filename (its extension selects the parser).
+            content_type: The file's MIME type.
+        """
+        return self._client.request(
+            cast_to=ContactImport,
+            method="POST",
+            path="/contacts/imports",
+            files={"file": (filename, file, content_type)},
+            options=options,
+        )
+
+    def list_imports(
+        self,
+        *,
+        limit: NotGivenOr[int] = NOT_GIVEN,
+        cursor: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> SyncCursorPage[ContactImport]:
+        """List background imports, newest first (auto-paginating).
+
+        Requires the ``read_contacts`` scope.
+
+        Args:
+            limit: Page size (1-100; the server defaults to 50).
+        """
+        return self._get_api_list(
+            "/contacts/imports",
+            model=ContactImport,
+            query={"limit": limit, "cursor": cursor},
+            options=options,
+        )
+
+    def retrieve_import(
+        self, import_id: str, *, options: RequestOptions | None = None
+    ) -> ContactImport:
+        """Retrieve one import. A finished one carries its first failed rows.
+
+        Requires the ``read_contacts`` scope.
+        """
+        return self._get(
+            f"/contacts/imports/{import_id}", cast_to=ContactImport, options=options
+        )
+
+    def save_import_draft(
+        self,
+        import_id: str,
+        *,
+        mapping: NotGivenOr[Sequence[Mapping[str, Any]]] = NOT_GIVEN,
+        dedup: NotGivenOr[str] = NOT_GIVEN,
+        has_header: NotGivenOr[bool] = NOT_GIVEN,
+        category_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        campaign_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        segment_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        subscribed_default: NotGivenOr[bool] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> ContactImport:
+        """Autosave a draft's mapping and options so a reload resumes it.
+
+        Safe to repeat. Answers ``409`` once the import has started. Takes the
+        same fields as :meth:`start_import`. Requires the ``write_contacts``
+        scope.
+        """
+        return self._patch(
+            f"/contacts/imports/{import_id}",
+            cast_to=ContactImport,
+            body=_import_options_body(
+                mapping=mapping,
+                dedup=dedup,
+                has_header=has_header,
+                category_ids=category_ids,
+                campaign_ids=campaign_ids,
+                segment_ids=segment_ids,
+                subscribed_default=subscribed_default,
+            ),
+            options=options,
+        )
+
+    def analyze_import(
+        self,
+        import_id: str,
+        *,
+        mapping: Sequence[Mapping[str, Any]],
+        has_header: NotGivenOr[bool] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> ContactImportAnalysis:
+        """Report what a draft would do under a mapping, writing nothing.
+
+        Reads the whole file and buckets every row (new, existing, duplicate,
+        invalid, conflicting). Requires the ``write_contacts`` scope.
+
+        Args:
+            mapping: One ``{"index", "target"}`` entry per column. ``target`` is
+                ``ignore``, ``email``, ``first_name``, ``last_name``, ``company``,
+                ``phone``, ``subscribed``, ``categories``, ``verification_status``
+                or ``custom`` (with ``custom_key``).
+            has_header: Whether the first row is a header.
+        """
+        return self._post(
+            f"/contacts/imports/{import_id}/analyze",
+            cast_to=ContactImportAnalysis,
+            body=drop_not_given(
+                {"mapping": [dict(m) for m in mapping], "has_header": has_header}
+            ),
+            options=options,
+        )
+
+    def start_import(
+        self,
+        import_id: str,
+        *,
+        mapping: Sequence[Mapping[str, Any]],
+        dedup: NotGivenOr[str] = NOT_GIVEN,
+        has_header: NotGivenOr[bool] = NOT_GIVEN,
+        category_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        campaign_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        segment_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        subscribed_default: NotGivenOr[bool] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> ContactImport:
+        """Queue a draft import to run in the background.
+
+        Starting an import that already started returns it unchanged, so a retry
+        is safe. Follow it with :meth:`retrieve_import`. Requires the
+        ``bulk_contacts`` scope.
+
+        Args:
+            mapping: One ``{"index", "target"}`` entry per column (see
+                :meth:`analyze_import`).
+            dedup: What to do when an address already exists: ``skip`` (the
+                default), ``update`` or ``create_duplicate``.
+            has_header: Whether the first row is a header.
+            category_ids: Categories to assign to every imported contact.
+            campaign_ids: Campaigns the imported contacts join.
+            segment_ids: Segments the imported contacts are pinned into as an
+                include override.
+            subscribed_default: What new contacts inherit when no ``subscribed``
+                column is mapped (the server defaults to ``True``).
+        """
+        return self._post(
+            f"/contacts/imports/{import_id}/start",
+            cast_to=ContactImport,
+            body=_import_options_body(
+                mapping=mapping,
+                dedup=dedup,
+                has_header=has_header,
+                category_ids=category_ids,
+                campaign_ids=campaign_ids,
+                segment_ids=segment_ids,
+                subscribed_default=subscribed_default,
+            ),
+            options=options,
+        )
+
+    def cancel_import(
+        self, import_id: str, *, options: RequestOptions | None = None
+    ) -> ContactImport:
+        """Stop an import. Rows already written stay written.
+
+        Requires the ``bulk_contacts`` scope.
+        """
+        return self._post(
+            f"/contacts/imports/{import_id}/cancel",
+            cast_to=ContactImport,
+            options=options,
+        )
+
+    def download_import_failures(
+        self, import_id: str, *, options: RequestOptions | None = None
+    ) -> bytes:
+        """Download every failed row of an import as CSV bytes.
+
+        Requires the ``read_contacts`` scope.
+        """
+        return self._get(
+            f"/contacts/imports/{import_id}/failed.csv",
+            cast_to=bytes,
             options=options,
         )
 
@@ -1115,6 +1532,7 @@ class AsyncContacts(AsyncAPIResource):
         updated_before: NotGivenOr[str] = NOT_GIVEN,
         sort_by: NotGivenOr[str] = NOT_GIVEN,
         reverse: NotGivenOr[bool] = NOT_GIVEN,
+        mail_hosts: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         category: NotGivenOr[str] = NOT_GIVEN,
         limit: NotGivenOr[int] = NOT_GIVEN,
         cursor: NotGivenOr[str] = NOT_GIVEN,
@@ -1139,8 +1557,11 @@ class AsyncContacts(AsyncAPIResource):
             verification_status: Address verdict: ``valid``, ``risky``,
                 ``invalid`` or ``unknown``.
             subscribed: Filter by subscription state.
-            sort_by: e.g. ``"first_name ASC"`` or ``"campaign_count DESC"``.
-            reverse: Invert the sort direction.
+            mail_hosts: Contacts whose inbox host is any of these; an empty string
+                matches contacts not detected yet.
+            sort_by: A column name (``created_at``, ``first_name``, ``company``,
+                ...) or ``"custom:<key>"`` for a custom field.
+            reverse: Ascending when ``True``; the default is descending.
             category: A single category id, as a query filter.
             limit: Page size.
             cursor: An opaque cursor from a previous page.
@@ -1166,19 +1587,39 @@ class AsyncContacts(AsyncAPIResource):
                 updated_before=updated_before,
                 sort_by=sort_by,
                 reverse=reverse,
+                mail_hosts=mail_hosts,
             ),
             query={"category": category, "limit": limit, "cursor": cursor},
             options=options,
         )
 
     async def lookup(
-        self, *, email: str, options: RequestOptions | None = None
+        self,
+        *,
+        email: NotGivenOr[str] = NOT_GIVEN,
+        thread_id: NotGivenOr[str] = NOT_GIVEN,
+        account_id: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
     ) -> ContactLookup:
-        """Look a contact up by email address."""
+        """Resolve a sender to a contact.
+
+        At least one of *email* and *thread_id* is required. A
+        ``"Name <addr@example.com>"`` value is reduced to the bare address. When
+        the address is not a contact's, *thread_id* resolves a sender that wrote
+        from an alias back to the lead the thread answers (``match`` is then
+        ``"thread"``). A *thread_id* reads the unibox, so the credential needs
+        the ``read_unibox`` scope as well as ``read_contacts``.
+
+        Args:
+            email: The sender's address.
+            thread_id: A unibox thread the sender wrote in.
+            account_id: Restrict the thread lookup to one mailbox (the credential
+                must be allowed to use it).
+        """
         return await self._get(
             "/contacts/lookup",
             cast_to=ContactLookup,
-            query={"email": email},
+            query={"email": email, "thread_id": thread_id, "account_id": account_id},
             options=options,
         )
 
@@ -1219,6 +1660,9 @@ class AsyncContacts(AsyncAPIResource):
         action: str,
         contacts: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         campaign_id: NotGivenOr[str] = NOT_GIVEN,
+        select_all: NotGivenOr[bool] = NOT_GIVEN,
+        filters: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        exclude: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> ContactVerificationRequested:
         """Re-check contacts, or record a manual verdict on them.
@@ -1227,9 +1671,13 @@ class AsyncContacts(AsyncAPIResource):
             action: ``"verify"`` to queue a background re-check,
                 ``"mark_deliverable"`` or ``"mark_undeliverable"`` to record a
                 verdict outright.
-            contacts: The contact ids to act on, at most 1000 per request.
+            contacts: The contact ids to act on, at most 10000 per request.
             campaign_id: Instead of listing ids, select every lead of this
                 campaign that verification refused.
+            select_all: Act on every contact matching *filters* instead of the
+                listed ids (the dashboard's "select all matching").
+            filters: The same body :meth:`search` takes. Used with *select_all*.
+            exclude: Contact ids to drop from a *select_all* selection.
         """
         return await self._post(
             "/contacts/verification",
@@ -1239,6 +1687,9 @@ class AsyncContacts(AsyncAPIResource):
                     "action": action,
                     "contacts": contacts,
                     "campaign_id": campaign_id,
+                    "all": select_all,
+                    "filters": filters,
+                    "exclude": exclude,
                 }
             ),
             options=options,
@@ -1274,11 +1725,15 @@ class AsyncContacts(AsyncAPIResource):
         categories: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         add_categories: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         remove_categories: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        email: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> Contact:
         """Update a contact.
 
         Args:
+            email: Replace the contact's address. It is the contact's identity, so
+                changing it drops the verification verdict and the delivery
+                evidence that belonged to the old mailbox.
             campaigns: Replacement campaign membership. Omit to leave as-is.
             categories: Replacement category set. Omit to leave as-is.
             add_categories: Diff-style add; ignored when *categories* is set.
@@ -1291,6 +1746,7 @@ class AsyncContacts(AsyncAPIResource):
             body=_update_body(
                 first_name=first_name,
                 last_name=last_name,
+                email=email,
                 company=company,
                 phone=phone,
                 custom_fields=custom_fields,
@@ -1314,7 +1770,10 @@ class AsyncContacts(AsyncAPIResource):
     async def bulk_update(
         self,
         *,
-        contacts: Sequence[str],
+        contacts: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        select_all: NotGivenOr[bool] = NOT_GIVEN,
+        filters: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        exclude: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         add_campaigns: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         remove_campaigns: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         add_categories: NotGivenOr[Sequence[str]] = NOT_GIVEN,
@@ -1326,7 +1785,11 @@ class AsyncContacts(AsyncAPIResource):
         """Apply the same edit to many contacts at once.
 
         Args:
-            contacts: The contact ids to edit.
+            contacts: The contact ids to edit, at most 10000 per request.
+            select_all: Edit every contact matching *filters* instead of the listed
+                ids. The response then carries the count, not every updated row.
+            filters: The same body :meth:`search` takes. Used with *select_all*.
+            exclude: Contact ids to drop from a *select_all* selection.
             fields: One ``{"type", "key", "value"}`` entry per field edit.
             subscribe: Set the subscription state on every listed contact.
         """
@@ -1335,7 +1798,10 @@ class AsyncContacts(AsyncAPIResource):
             cast_to=ContactsAdded,
             body=drop_not_given(
                 {
-                    "contacts": list(contacts),
+                    "contacts": contacts,
+                    "all": select_all,
+                    "filters": filters,
+                    "exclude": exclude,
                     "add_campaigns": add_campaigns,
                     "remove_campaigns": remove_campaigns,
                     "add_categories": add_categories,
@@ -1349,19 +1815,30 @@ class AsyncContacts(AsyncAPIResource):
 
     async def bulk_delete(
         self,
-        contact_ids: Sequence[str],
+        contact_ids: Sequence[str] = (),
         *,
+        select_all: bool = False,
+        filters: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        exclude: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> ContactDeleted:
         """Delete many contacts at once.
 
         Args:
-            contact_ids: The contact ids to delete, sent as a plain array.
+            contact_ids: The contact ids to delete, sent as a plain array (at most
+                10000).
+            select_all: Delete every contact matching *filters* instead of the
+                listed ids; the request then travels as a selection object.
+            filters: The same body :meth:`search` takes. Used with *select_all*.
+            exclude: Contact ids to drop from a *select_all* selection.
         """
+        body: Any = list(contact_ids)
+        if select_all:
+            body = drop_not_given({"all": True, "filters": filters, "exclude": exclude})
         return await self._delete(
             "/contacts",
             cast_to=ContactDeleted,
-            body=list(contact_ids),
+            body=body,
             options=options,
         )
 
@@ -1536,21 +2013,239 @@ class AsyncContacts(AsyncAPIResource):
     async def research_batch(
         self,
         *,
-        contact_ids: Sequence[str],
+        contact_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         objective: NotGivenOr[str] = NOT_GIVEN,
+        select_all: NotGivenOr[bool] = NOT_GIVEN,
+        filters: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        exclude: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> ResearchBatchQueued:
         """Queue AI research for many contacts. Charges credits per run.
 
         Runs asynchronously: watch the ``AI_RESEARCH_PROGRESS`` gateway event,
         or poll :meth:`list_research`.
+
+        Args:
+            contact_ids: The contacts to research.
+            objective: What the research should find out.
+            select_all: Research every contact matching *filters* instead of the
+                listed ids.
+            filters: The same body :meth:`search` takes. Used with *select_all*.
+            exclude: Contact ids to drop from a *select_all* selection.
         """
         return await self._post(
             "/contacts/research/batch",
             cast_to=ResearchBatchQueued,
             body=drop_not_given(
-                {"contact_ids": list(contact_ids), "objective": objective}
+                {
+                    "contact_ids": (
+                        list(contact_ids)
+                        if not isinstance(contact_ids, NotGiven)
+                        else NOT_GIVEN
+                    ),
+                    "objective": objective,
+                    "all": select_all,
+                    "filters": filters,
+                    "exclude": exclude,
+                }
             ),
+            options=options,
+        )
+
+    # -- background imports --------------------------------------------------
+    async def create_import(
+        self,
+        *,
+        file: bytes,
+        filename: str,
+        content_type: str = "text/csv",
+        options: RequestOptions | None = None,
+    ) -> ContactImport:
+        """Upload a contact file once and get a draft import back.
+
+        The draft carries the ``preview`` the column mapper needs. Nothing is
+        written to contacts until :meth:`start_import`. Uploads are capped at
+        50 MB and 50000 rows, and a workspace can have only a few imports
+        waiting or running at once. Requires the ``write_contacts`` scope.
+
+        Args:
+            file: The raw CSV/XLSX bytes.
+            filename: The filename (its extension selects the parser).
+            content_type: The file's MIME type.
+        """
+        return await self._client.request(
+            cast_to=ContactImport,
+            method="POST",
+            path="/contacts/imports",
+            files={"file": (filename, file, content_type)},
+            options=options,
+        )
+
+    def list_imports(
+        self,
+        *,
+        limit: NotGivenOr[int] = NOT_GIVEN,
+        cursor: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> AsyncPaginator[ContactImport]:
+        """List background imports, newest first (auto-paginating).
+
+        Requires the ``read_contacts`` scope.
+
+        Args:
+            limit: Page size (1-100; the server defaults to 50).
+        """
+        return self._get_api_list(
+            "/contacts/imports",
+            model=ContactImport,
+            query={"limit": limit, "cursor": cursor},
+            options=options,
+        )
+
+    async def retrieve_import(
+        self, import_id: str, *, options: RequestOptions | None = None
+    ) -> ContactImport:
+        """Retrieve one import. A finished one carries its first failed rows.
+
+        Requires the ``read_contacts`` scope.
+        """
+        return await self._get(
+            f"/contacts/imports/{import_id}", cast_to=ContactImport, options=options
+        )
+
+    async def save_import_draft(
+        self,
+        import_id: str,
+        *,
+        mapping: NotGivenOr[Sequence[Mapping[str, Any]]] = NOT_GIVEN,
+        dedup: NotGivenOr[str] = NOT_GIVEN,
+        has_header: NotGivenOr[bool] = NOT_GIVEN,
+        category_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        campaign_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        segment_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        subscribed_default: NotGivenOr[bool] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> ContactImport:
+        """Autosave a draft's mapping and options so a reload resumes it.
+
+        Safe to repeat. Answers ``409`` once the import has started. Takes the
+        same fields as :meth:`start_import`. Requires the ``write_contacts``
+        scope.
+        """
+        return await self._patch(
+            f"/contacts/imports/{import_id}",
+            cast_to=ContactImport,
+            body=_import_options_body(
+                mapping=mapping,
+                dedup=dedup,
+                has_header=has_header,
+                category_ids=category_ids,
+                campaign_ids=campaign_ids,
+                segment_ids=segment_ids,
+                subscribed_default=subscribed_default,
+            ),
+            options=options,
+        )
+
+    async def analyze_import(
+        self,
+        import_id: str,
+        *,
+        mapping: Sequence[Mapping[str, Any]],
+        has_header: NotGivenOr[bool] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> ContactImportAnalysis:
+        """Report what a draft would do under a mapping, writing nothing.
+
+        Reads the whole file and buckets every row (new, existing, duplicate,
+        invalid, conflicting). Requires the ``write_contacts`` scope.
+
+        Args:
+            mapping: One ``{"index", "target"}`` entry per column. ``target`` is
+                ``ignore``, ``email``, ``first_name``, ``last_name``, ``company``,
+                ``phone``, ``subscribed``, ``categories``, ``verification_status``
+                or ``custom`` (with ``custom_key``).
+            has_header: Whether the first row is a header.
+        """
+        return await self._post(
+            f"/contacts/imports/{import_id}/analyze",
+            cast_to=ContactImportAnalysis,
+            body=drop_not_given(
+                {"mapping": [dict(m) for m in mapping], "has_header": has_header}
+            ),
+            options=options,
+        )
+
+    async def start_import(
+        self,
+        import_id: str,
+        *,
+        mapping: Sequence[Mapping[str, Any]],
+        dedup: NotGivenOr[str] = NOT_GIVEN,
+        has_header: NotGivenOr[bool] = NOT_GIVEN,
+        category_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        campaign_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        segment_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        subscribed_default: NotGivenOr[bool] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> ContactImport:
+        """Queue a draft import to run in the background.
+
+        Starting an import that already started returns it unchanged, so a retry
+        is safe. Follow it with :meth:`retrieve_import`. Requires the
+        ``bulk_contacts`` scope.
+
+        Args:
+            mapping: One ``{"index", "target"}`` entry per column (see
+                :meth:`analyze_import`).
+            dedup: What to do when an address already exists: ``skip`` (the
+                default), ``update`` or ``create_duplicate``.
+            has_header: Whether the first row is a header.
+            category_ids: Categories to assign to every imported contact.
+            campaign_ids: Campaigns the imported contacts join.
+            segment_ids: Segments the imported contacts are pinned into as an
+                include override.
+            subscribed_default: What new contacts inherit when no ``subscribed``
+                column is mapped (the server defaults to ``True``).
+        """
+        return await self._post(
+            f"/contacts/imports/{import_id}/start",
+            cast_to=ContactImport,
+            body=_import_options_body(
+                mapping=mapping,
+                dedup=dedup,
+                has_header=has_header,
+                category_ids=category_ids,
+                campaign_ids=campaign_ids,
+                segment_ids=segment_ids,
+                subscribed_default=subscribed_default,
+            ),
+            options=options,
+        )
+
+    async def cancel_import(
+        self, import_id: str, *, options: RequestOptions | None = None
+    ) -> ContactImport:
+        """Stop an import. Rows already written stay written.
+
+        Requires the ``bulk_contacts`` scope.
+        """
+        return await self._post(
+            f"/contacts/imports/{import_id}/cancel",
+            cast_to=ContactImport,
+            options=options,
+        )
+
+    async def download_import_failures(
+        self, import_id: str, *, options: RequestOptions | None = None
+    ) -> bytes:
+        """Download every failed row of an import as CSV bytes.
+
+        Requires the ``read_contacts`` scope.
+        """
+        return await self._get(
+            f"/contacts/imports/{import_id}/failed.csv",
+            cast_to=bytes,
             options=options,
         )
 

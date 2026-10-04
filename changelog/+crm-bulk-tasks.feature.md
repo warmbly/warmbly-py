@@ -1,0 +1,1 @@
+`crm.bulk_update_tasks()` and `crm.bulk_delete_tasks()` change the status or priority of, or delete, a whole selection of tasks by id or by "select all matching" filter, and report how many were affected.

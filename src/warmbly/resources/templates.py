@@ -12,6 +12,7 @@ rewrites that order in one call.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from typing import Any
 
 from .._models import BaseModel
 from .._pagination import AsyncPaginator, SyncCursorPage
@@ -23,6 +24,7 @@ __all__ = [
     "AsyncTemplates",
     "RenderedTemplate",
     "Template",
+    "TemplateAnalysis",
     "TemplateDeleted",
     "TemplateList",
     "TemplateScore",
@@ -74,6 +76,35 @@ class TemplateScore(BaseModel):
     grade: str | None = None
     issues: Sequence[dict[str, object]] = []
     suggestions: Sequence[str] = []
+
+
+class TemplateAnalysis(BaseModel):
+    """An AI spam analysis of template copy, with the rules score alongside.
+
+    ``score`` is 0 to 100 (higher is safer) and ``verdict`` one plain sentence.
+    Each of ``findings`` is located: ``severity`` (``high``, ``warn`` or
+    ``info``), ``field`` (``subject`` or ``body``), the quoted ``text``, its
+    ``line`` and ``excerpt``, the ``issue``, a ``suggestion`` and a coarse
+    ``category``. ``rules`` is the same copy scored by the rules pass
+    (``score`` and ``issues``), read in the same request. ``judgment`` is how the
+    copy reads to its recipient and is ``None`` when that check is not available.
+    When no language model is configured the analysis is the rules score plus
+    that judgment, ``findings`` is empty and nothing is charged.
+    ``credits_charged`` is what this call cost and ``credits_remaining`` what is
+    left.
+    """
+
+    score: int | None = None
+    verdict: str | None = None
+    findings: Sequence[dict[str, Any]] = []
+    suggested_subject: str | None = None
+    improvements: Sequence[str] = []
+    rules: dict[str, Any] | None = None
+    judgment: dict[str, Any] | None = None
+    model: str | None = None
+    tokens_used: int | None = None
+    credits_remaining: int | None = None
+    credits_charged: int | None = None
 
 
 class Templates(SyncAPIResource):
@@ -231,6 +262,43 @@ class Templates(SyncAPIResource):
         )
         return self._post(
             "/templates/score", cast_to=TemplateScore, body=body, options=options
+        )
+
+    def analyze(
+        self,
+        *,
+        subject: NotGivenOr[str] = NOT_GIVEN,
+        body_html: NotGivenOr[str] = NOT_GIVEN,
+        body_plain: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> TemplateAnalysis:
+        """Analyze template content for spam risk with AI.
+
+        Where :meth:`score` gives a rules-based number, this says which word or
+        sentence is the problem, whether it is in the subject or the body, and
+        what to write instead. It spends AI credits (refunded if the provider
+        fails), so a request is sent with an idempotency key. At least one of the
+        three fields must have text, and the total is capped at 60000 characters.
+        Requires the ``write_templates`` scope, the plan's AI allowance, and
+        answers ``503`` with identifier ``ai_not_configured`` on a deployment with
+        no AI provider.
+
+        Args:
+            subject: The subject line.
+            body_html: The HTML body.
+            body_plain: The plain-text body.
+        """
+        return self._post(
+            "/templates/analyze",
+            cast_to=TemplateAnalysis,
+            body=drop_not_given(
+                {
+                    "subject": subject,
+                    "body_html": body_html,
+                    "body_plain": body_plain,
+                }
+            ),
+            options=options,
         )
 
 
@@ -393,4 +461,41 @@ class AsyncTemplates(AsyncAPIResource):
         )
         return await self._post(
             "/templates/score", cast_to=TemplateScore, body=body, options=options
+        )
+
+    async def analyze(
+        self,
+        *,
+        subject: NotGivenOr[str] = NOT_GIVEN,
+        body_html: NotGivenOr[str] = NOT_GIVEN,
+        body_plain: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> TemplateAnalysis:
+        """Analyze template content for spam risk with AI.
+
+        Where :meth:`score` gives a rules-based number, this says which word or
+        sentence is the problem, whether it is in the subject or the body, and
+        what to write instead. It spends AI credits (refunded if the provider
+        fails), so a request is sent with an idempotency key. At least one of the
+        three fields must have text, and the total is capped at 60000 characters.
+        Requires the ``write_templates`` scope, the plan's AI allowance, and
+        answers ``503`` with identifier ``ai_not_configured`` on a deployment with
+        no AI provider.
+
+        Args:
+            subject: The subject line.
+            body_html: The HTML body.
+            body_plain: The plain-text body.
+        """
+        return await self._post(
+            "/templates/analyze",
+            cast_to=TemplateAnalysis,
+            body=drop_not_given(
+                {
+                    "subject": subject,
+                    "body_html": body_html,
+                    "body_plain": body_plain,
+                }
+            ),
+            options=options,
         )

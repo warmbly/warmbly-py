@@ -13,6 +13,7 @@ from .campaigns import AsyncCampaigns, Campaigns
 from .contacts import AsyncContacts, Contacts
 from .crm import AsyncCrm, Crm
 from .deliverability import AsyncDeliverability, Deliverability
+from .email_images import AsyncEmailImages, EmailImages
 from .emails import AsyncEmails, Emails
 from .forms import AsyncForms, Forms
 from .generation import AsyncGeneration, Generation
@@ -67,6 +68,7 @@ __all__ = [
     "AsyncContacts",
     "AsyncCrm",
     "AsyncDeliverability",
+    "AsyncEmailImages",
     "AsyncEmails",
     "AsyncFolders",
     "AsyncForms",
@@ -97,6 +99,7 @@ __all__ = [
     "Contacts",
     "Crm",
     "Deliverability",
+    "EmailImages",
     "Emails",
     "Folders",
     "Forms",

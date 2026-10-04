@@ -16,7 +16,7 @@ permissively because provider shapes vary and the catalog grows.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from .._models import BaseModel
@@ -36,6 +36,7 @@ __all__ = [
     "IntegrationEventDeleted",
     "IntegrationFieldMapping",
     "IntegrationFieldMappings",
+    "IntegrationInboundUrl",
     "IntegrationRun",
     "IntegrationTestResult",
     "IntegrationWebhookSecret",
@@ -70,7 +71,12 @@ class IntegrationCatalogEntry(BaseModel):
 
 
 class IntegrationConnection(BaseModel):
-    """A configured connection to a third-party provider."""
+    """A configured connection to a third-party provider.
+
+    An automation connection's outbound HMAC signing secret is never part of
+    ``config_capabilities`` here; read it with
+    :meth:`Integrations.connection_webhook_secret`.
+    """
 
     id: str
     organization_id: str | None = None
@@ -95,6 +101,15 @@ class IntegrationConnection(BaseModel):
     last_error_at: str | None = None
     created_at: str | None = None
     updated_at: str | None = None
+
+
+class IntegrationInboundUrl(BaseModel):
+    """The freshly minted inbound webhook URL of a Calendly or Cal.com connection.
+
+    The previous URL stops working immediately.
+    """
+
+    inbound_webhook_url: str | None = None
 
 
 class IntegrationEvent(BaseModel):
@@ -461,11 +476,56 @@ class Integrations(SyncAPIResource):
             options=options,
         )
 
+    def set_connection_signing_key(
+        self,
+        connection_id: str,
+        *,
+        signing_key: str,
+        options: RequestOptions | None = None,
+    ) -> IntegrationConnectionDetail:
+        """Set the key a Calendly or Cal.com connection's deliveries are signed with.
+
+        Once a key is set, an inbound delivery must carry a valid signature as
+        well as the secret in the URL. Passing an empty string clears the key and
+        goes back to the URL secret alone. Only Calendly and Cal.com connections
+        take one (``400`` otherwise), and the key must be 8 to 512 characters.
+        Only ``connection`` is populated in the result. Requires the
+        ``integrations`` scope.
+
+        Args:
+            connection_id: The connection to configure.
+            signing_key: The provider's webhook signing key.
+        """
+        return self._put(
+            f"/integrations/connections/{connection_id}/signing-key",
+            cast_to=IntegrationConnectionDetail,
+            body={"signing_key": signing_key},
+            options=options,
+        )
+
+    def rotate_connection_inbound_url(
+        self, connection_id: str, *, options: RequestOptions | None = None
+    ) -> IntegrationInboundUrl:
+        """Mint a new inbound webhook URL for a Calendly or Cal.com connection.
+
+        The previous URL stops working immediately, so update the provider's
+        webhook settings right after. Only Calendly and Cal.com connections have
+        one (``400`` otherwise). Requires the ``integrations`` scope.
+        """
+        return self._post(
+            f"/integrations/connections/{connection_id}/rotate-inbound-url",
+            cast_to=IntegrationInboundUrl,
+            options=options,
+        )
+
     def push(
         self,
         connection_id: str,
         *,
-        contact_ids: Sequence[str],
+        contact_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        select_all: NotGivenOr[bool] = NOT_GIVEN,
+        filters: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        exclude: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> PushResult:
         """Upsert contacts into a connected CRM, synchronously.
@@ -476,11 +536,26 @@ class Integrations(SyncAPIResource):
         Args:
             connection_id: The connection to push to.
             contact_ids: The contacts to upsert.
+            select_all: Push every contact matching *filters* instead of the
+                listed ids (the dashboard's "select all matching").
+            filters: The same body ``client.contacts.search`` takes. Used with
+                *select_all*.
+            exclude: Contact ids to drop from a *select_all* selection.
+
+        A push is synchronous against the provider's API, so one request is
+        capped at 500 contacts even when the selection came from a filter.
         """
         return self._post(
             f"/integrations/connections/{connection_id}/push",
             cast_to=PushResult,
-            body={"contact_ids": list(contact_ids)},
+            body=drop_not_given(
+                {
+                    "contact_ids": contact_ids,
+                    "all": select_all,
+                    "filters": filters,
+                    "exclude": exclude,
+                }
+            ),
             options=options,
         )
 
@@ -723,11 +798,56 @@ class AsyncIntegrations(AsyncAPIResource):
             options=options,
         )
 
+    async def set_connection_signing_key(
+        self,
+        connection_id: str,
+        *,
+        signing_key: str,
+        options: RequestOptions | None = None,
+    ) -> IntegrationConnectionDetail:
+        """Set the key a Calendly or Cal.com connection's deliveries are signed with.
+
+        Once a key is set, an inbound delivery must carry a valid signature as
+        well as the secret in the URL. Passing an empty string clears the key and
+        goes back to the URL secret alone. Only Calendly and Cal.com connections
+        take one (``400`` otherwise), and the key must be 8 to 512 characters.
+        Only ``connection`` is populated in the result. Requires the
+        ``integrations`` scope.
+
+        Args:
+            connection_id: The connection to configure.
+            signing_key: The provider's webhook signing key.
+        """
+        return await self._put(
+            f"/integrations/connections/{connection_id}/signing-key",
+            cast_to=IntegrationConnectionDetail,
+            body={"signing_key": signing_key},
+            options=options,
+        )
+
+    async def rotate_connection_inbound_url(
+        self, connection_id: str, *, options: RequestOptions | None = None
+    ) -> IntegrationInboundUrl:
+        """Mint a new inbound webhook URL for a Calendly or Cal.com connection.
+
+        The previous URL stops working immediately, so update the provider's
+        webhook settings right after. Only Calendly and Cal.com connections have
+        one (``400`` otherwise). Requires the ``integrations`` scope.
+        """
+        return await self._post(
+            f"/integrations/connections/{connection_id}/rotate-inbound-url",
+            cast_to=IntegrationInboundUrl,
+            options=options,
+        )
+
     async def push(
         self,
         connection_id: str,
         *,
-        contact_ids: Sequence[str],
+        contact_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        select_all: NotGivenOr[bool] = NOT_GIVEN,
+        filters: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        exclude: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> PushResult:
         """Upsert contacts into a connected CRM, synchronously.
@@ -738,11 +858,26 @@ class AsyncIntegrations(AsyncAPIResource):
         Args:
             connection_id: The connection to push to.
             contact_ids: The contacts to upsert.
+            select_all: Push every contact matching *filters* instead of the
+                listed ids (the dashboard's "select all matching").
+            filters: The same body ``client.contacts.search`` takes. Used with
+                *select_all*.
+            exclude: Contact ids to drop from a *select_all* selection.
+
+        A push is synchronous against the provider's API, so one request is
+        capped at 500 contacts even when the selection came from a filter.
         """
         return await self._post(
             f"/integrations/connections/{connection_id}/push",
             cast_to=PushResult,
-            body={"contact_ids": list(contact_ids)},
+            body=drop_not_given(
+                {
+                    "contact_ids": contact_ids,
+                    "all": select_all,
+                    "filters": filters,
+                    "exclude": exclude,
+                }
+            ),
             options=options,
         )
 

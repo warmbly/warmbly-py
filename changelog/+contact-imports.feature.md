@@ -1,0 +1,1 @@
+Background contact imports: `contacts.create_import()`, `list_imports()`, `retrieve_import()`, `save_import_draft()`, `analyze_import()`, `start_import()`, `cancel_import()` and `download_import_failures()` upload a file once, preview and analyze a column mapping over the whole file, run the import in the background and fetch the failed rows as CSV.

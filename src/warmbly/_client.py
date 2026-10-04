@@ -44,6 +44,7 @@ from .resources import (
     AsyncContacts,
     AsyncCrm,
     AsyncDeliverability,
+    AsyncEmailImages,
     AsyncEmails,
     AsyncFolders,
     AsyncForms,
@@ -73,6 +74,7 @@ from .resources import (
     Contacts,
     Crm,
     Deliverability,
+    EmailImages,
     Emails,
     Folders,
     Forms,
@@ -196,6 +198,10 @@ class Warmbly(SyncAPIClient):
     @cached_property
     def templates(self) -> Templates:
         return Templates(self)
+
+    @cached_property
+    def email_images(self) -> EmailImages:
+        return EmailImages(self)
 
     @cached_property
     def crm(self) -> Crm:
@@ -363,6 +369,10 @@ class AsyncWarmbly(AsyncAPIClient):
     @cached_property
     def templates(self) -> AsyncTemplates:
         return AsyncTemplates(self)
+
+    @cached_property
+    def email_images(self) -> AsyncEmailImages:
+        return AsyncEmailImages(self)
 
     @cached_property
     def crm(self) -> AsyncCrm:

@@ -75,7 +75,10 @@ class SegmentField(BaseModel):
 
     ``kind`` is one of ``text``, ``enum``, ``bool``, ``date``, ``number``,
     ``category``, ``campaign`` or ``segment``; ``options`` lists the accepted
-    values of an enum field.
+    values of an enum field and ``option_labels`` names them for display where
+    the value alone is not readable (a value missing from it shows as itself).
+    ``mail_host`` (who hosts the inbox) is the provider field to filter on;
+    ``esp_provider`` is its coarser family (``gmail``, ``outlook``, ``other``).
     """
 
     field: str | None = None
@@ -83,6 +86,7 @@ class SegmentField(BaseModel):
     group: str | None = None
     kind: str | None = None
     options: Sequence[str] = []
+    option_labels: dict[str, str] = {}
 
 
 class SegmentPreview(BaseModel):
@@ -266,22 +270,38 @@ class Segments(SyncAPIResource):
         self,
         segment_id: str,
         *,
-        contacts: Sequence[str],
         mode: str,
+        contacts: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        select_all: NotGivenOr[bool] = NOT_GIVEN,
+        filters: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        exclude: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> SegmentMembersUpdated:
         """Pin contacts into or out of a segment.
 
         Args:
             segment_id: The segment id.
-            contacts: The contact ids to override.
+            contacts: The contact ids to override, at most 10000 per request.
+            select_all: Override every contact matching *filters* instead of the
+                listed ids (the dashboard's "select all matching").
+            filters: The same body ``client.contacts.search`` takes. Used with
+                *select_all*.
+            exclude: Contact ids to drop from a *select_all* selection.
             mode: ``"include"``, ``"exclude"``, or ``"auto"`` to clear the
                 override so the conditions decide again.
         """
         return self._post(
             f"/segments/{segment_id}/members",
             cast_to=SegmentMembersUpdated,
-            body={"contacts": list(contacts), "mode": mode},
+            body=drop_not_given(
+                {
+                    "contacts": contacts,
+                    "all": select_all,
+                    "filters": filters,
+                    "exclude": exclude,
+                    "mode": mode,
+                }
+            ),
             options=options,
         )
 
@@ -447,22 +467,38 @@ class AsyncSegments(AsyncAPIResource):
         self,
         segment_id: str,
         *,
-        contacts: Sequence[str],
         mode: str,
+        contacts: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        select_all: NotGivenOr[bool] = NOT_GIVEN,
+        filters: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        exclude: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> SegmentMembersUpdated:
         """Pin contacts into or out of a segment.
 
         Args:
             segment_id: The segment id.
-            contacts: The contact ids to override.
+            contacts: The contact ids to override, at most 10000 per request.
+            select_all: Override every contact matching *filters* instead of the
+                listed ids (the dashboard's "select all matching").
+            filters: The same body ``client.contacts.search`` takes. Used with
+                *select_all*.
+            exclude: Contact ids to drop from a *select_all* selection.
             mode: ``"include"``, ``"exclude"``, or ``"auto"`` to clear the
                 override so the conditions decide again.
         """
         return await self._post(
             f"/segments/{segment_id}/members",
             cast_to=SegmentMembersUpdated,
-            body={"contacts": list(contacts), "mode": mode},
+            body=drop_not_given(
+                {
+                    "contacts": contacts,
+                    "all": select_all,
+                    "filters": filters,
+                    "exclude": exclude,
+                    "mode": mode,
+                }
+            ),
             options=options,
         )
 
