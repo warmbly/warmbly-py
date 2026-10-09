@@ -111,6 +111,11 @@ async def test_bulk_delete_tasks(api: Any) -> None:
         "exclude": ["t_1"],
     }
 
+    with pytest.raises(ValueError, match="requires filters"):
+        await call(api.crm.bulk_delete_tasks, select_all=True)
+    await call(api.crm.bulk_delete_tasks, select_all=True, filters={})
+    assert json.loads(route.calls.last.request.content) == {"all": True, "filters": {}}
+
 
 # -- templates --------------------------------------------------------------
 @pytest.mark.anyio

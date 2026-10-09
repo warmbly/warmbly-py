@@ -143,6 +143,8 @@ def _csv(values: NotGivenOr[Sequence[str]]) -> NotGivenOr[str]:
     """Join a list into the comma-separated form the server expects."""
     if isinstance(values, NotGiven):
         return values
+    if isinstance(values, str):
+        return values
     return ",".join(values)
 
 

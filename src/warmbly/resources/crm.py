@@ -18,7 +18,7 @@ from typing import Any
 from .._models import BaseModel
 from .._pagination import AsyncPaginator, SyncCursorPage
 from .._resource import AsyncAPIResource, SyncAPIResource
-from .._types import NOT_GIVEN, NotGivenOr, RequestOptions
+from .._types import NOT_GIVEN, NotGivenOr, RequestOptions, is_given
 from .._utils import drop_not_given
 
 __all__ = [
@@ -1023,6 +1023,11 @@ class Crm(SyncAPIResource):
         """
         body: Any = list(tasks)
         if select_all:
+            if not is_given(filters):
+                raise ValueError(
+                    "bulk_delete_tasks(select_all=True) requires filters; "
+                    "pass {} to delete every task"
+                )
             body = drop_not_given({"all": True, "filters": filters, "exclude": exclude})
         return self._delete(
             "/crm/tasks",
@@ -1696,6 +1701,11 @@ class AsyncCrm(AsyncAPIResource):
         """
         body: Any = list(tasks)
         if select_all:
+            if not is_given(filters):
+                raise ValueError(
+                    "bulk_delete_tasks(select_all=True) requires filters; "
+                    "pass {} to delete every task"
+                )
             body = drop_not_given({"all": True, "filters": filters, "exclude": exclude})
         return await self._delete(
             "/crm/tasks",

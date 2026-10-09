@@ -148,6 +148,10 @@ def test_analytics_new_sync(client: Warmbly) -> None:
     assert params["email_ids"] == "e1,e2"
     assert params["limit"] == "5"
     assert params["cursor"] == "n"
+
+    route = _ok("/analytics/accounts", {"data": [], "pagination": {}})
+    client.analytics.accounts(email_ids="e1")
+    assert route.calls.last.request.url.params["email_ids"] == "e1"
     assert result.to_dict()["pagination"] == {}
 
     route = _ok("/analytics/usage")

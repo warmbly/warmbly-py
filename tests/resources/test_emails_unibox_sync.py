@@ -383,6 +383,8 @@ def test_unibox_snooze_variants(client: Warmbly) -> None:
     }
     with pytest.raises(ValueError):
         client.unibox.snooze(snoozed_until="2026-10-05T09:00:00Z")
+    with pytest.raises(ValueError):
+        client.unibox.snooze(thread_ids=[], snoozed_until="2026-10-05T09:00:00Z")
 
     snooze.mock(return_value=httpx.Response(200, json={"thread_id": "t1"}))
     single = client.unibox.snooze(thread_id="t1", snoozed_until="2026-10-05T09:00:00Z")
@@ -455,6 +457,8 @@ async def test_unibox_async(aclient: AsyncWarmbly) -> None:
     assert _body(snooze)["thread_ids"] == ["t1"]
     with pytest.raises(ValueError):
         await aclient.unibox.snooze(snoozed_until="2026-10-05T09:00:00Z")
+    with pytest.raises(ValueError):
+        await aclient.unibox.snooze(thread_ids=[], snoozed_until="2026-10-05T09:00:00Z")
 
     wake = respx.delete(f"{BASE_URL}/unibox/snooze").mock(
         return_value=httpx.Response(204)

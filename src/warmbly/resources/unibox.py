@@ -952,7 +952,7 @@ class Unibox(SyncAPIResource):
         single conversation answers with its row; several answer with
         ``data``, one :class:`Snooze` per conversation.
         """
-        if not is_given(thread_id) and not is_given(thread_ids):
+        if not is_given(thread_id) and not (is_given(thread_ids) and thread_ids):
             raise ValueError("snooze() needs thread_id or thread_ids")
         return self._post(
             "/unibox/snooze",
@@ -1528,7 +1528,7 @@ class AsyncUnibox(AsyncAPIResource):
         single conversation answers with its row; several answer with
         ``data``, one :class:`Snooze` per conversation.
         """
-        if not is_given(thread_id) and not is_given(thread_ids):
+        if not is_given(thread_id) and not (is_given(thread_ids) and thread_ids):
             raise ValueError("snooze() needs thread_id or thread_ids")
         return await self._post(
             "/unibox/snooze",

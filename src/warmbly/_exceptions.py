@@ -43,9 +43,8 @@ class ErrorCode:
 
     Compare against :attr:`APIError.code`, for example
     ``err.code == ErrorCode.REAUTH_REQUIRED``. The names are the server's
-    codes upper-cased. The server may add codes at any time, so always treat
-    an unrecognized ``code`` as a plain failure of its HTTP status rather than
-    an error.
+    codes upper-cased. The server may add codes at any time, so always handle
+    an unrecognized ``code`` as a generic failure of its HTTP status.
     """
 
     ADMIN_MFA_REQUIRED = "admin_mfa_required"
