@@ -159,8 +159,11 @@ class AsyncGatewayClient:
 
         Args:
             token: A bearer credential carrying the ``realtime_subscribe`` scope
-                (an API key, OAuth access token, or session JWT). It is sent in
-                the connect query string and is never logged.
+                (an API key or OAuth access token), or the short-lived ``ws`` ticket
+                from ``POST /getaway`` for a browser session. Any other session
+                token (access, refresh, password-reset) is refused with close
+                code 4004. It is sent in the connect query string and is never
+                logged.
             base_url: The gateway base URL. The ``/socket/websocket`` path and
                 version query are appended automatically.
             on_resume_failed: Optional callback invoked when the server reports a

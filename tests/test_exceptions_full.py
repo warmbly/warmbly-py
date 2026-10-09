@@ -19,6 +19,7 @@ from warmbly import (
     AuthenticationError,
     BadRequestError,
     ConflictError,
+    ErrorCode,
     GatewayError,
     InternalServerError,
     NotFoundError,
@@ -319,3 +320,55 @@ def test_entire_tree_catchable_as_warmbly_error(exc: Exception) -> None:
         assert caught is exc
     else:  # pragma: no cover - defensive
         pytest.fail("not caught as WarmblyError")
+
+
+# ---------------------------------------------------------------------------
+# ErrorCode constants and re-authentication
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("REAUTH_REQUIRED", "reauth_required"),
+        ("REAUTH_NO_FACTOR", "reauth_no_factor"),
+        ("PASSWORD_BREACHED", "password_breached"),
+        ("SSO_LINK_EXPIRED", "sso_link_expired"),
+        ("MAILBOX_GMAIL_OAUTH_DISABLED", "mailbox_gmail_oauth_disabled"),
+        ("PLACEMENT_QUOTA_EXCEEDED", "placement_quota_exceeded"),
+        ("CONTACT_EMAIL_TAKEN", "contact_email_taken"),
+        ("STORAGE_LIMIT_REACHED", "storage_limit_reached"),
+        ("BAD_REQUEST", "bad_request"),
+    ],
+)
+def test_error_code_constants(name: str, value: str) -> None:
+    assert getattr(ErrorCode, name) == value
+
+
+def test_error_code_names_are_upper_cased_values() -> None:
+    members = {k: v for k, v in vars(ErrorCode).items() if not k.startswith("_")}
+    assert len(members) > 100
+    assert all(k == v.upper() for k, v in members.items())
+
+
+def test_requires_reauth_true_for_reauth_required_403() -> None:
+    err = make_status_error(
+        status_code=403,
+        request_id="r1",
+        headers=None,
+        body={
+            "error": "Forbidden",
+            "message": "Confirm it is you before making this change.",
+            "code": "reauth_required",
+        },
+    )
+    assert isinstance(err, APIStatusError)
+    assert err.code == ErrorCode.REAUTH_REQUIRED
+    assert err.requires_reauth is True
+    assert err.message == "Confirm it is you before making this change."
+
+
+def test_requires_reauth_false_for_other_or_unknown_codes() -> None:
+    assert APIError("x", body={"code": "forbidden"}).requires_reauth is False
+    assert APIError("x", body={"code": "brand_new_code"}).requires_reauth is False
+    assert APIError("x").requires_reauth is False

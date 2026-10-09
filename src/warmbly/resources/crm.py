@@ -18,11 +18,12 @@ from typing import Any
 from .._models import BaseModel
 from .._pagination import AsyncPaginator, SyncCursorPage
 from .._resource import AsyncAPIResource, SyncAPIResource
-from .._types import NOT_GIVEN, NotGivenOr, RequestOptions
+from .._types import NOT_GIVEN, NotGivenOr, RequestOptions, is_given
 from .._utils import drop_not_given
 
 __all__ = [
     "AsyncCrm",
+    "BulkTasksAffected",
     "Crm",
     "CrmTask",
     "CrmTaskDeleted",
@@ -216,6 +217,12 @@ class TasksSummary(BaseModel):
     cancelled_count: int | None = None
     overdue_count: int | None = None
     high_priority_count: int | None = None
+
+
+class BulkTasksAffected(BaseModel):
+    """How many tasks a bulk update or delete touched."""
+
+    affected: int | None = None
 
 
 def _deal_filter(
@@ -949,6 +956,86 @@ class Crm(SyncAPIResource):
             options=options,
         )
 
+    def bulk_update_tasks(
+        self,
+        *,
+        tasks: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        select_all: NotGivenOr[bool] = NOT_GIVEN,
+        filters: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        exclude: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        status: NotGivenOr[str] = NOT_GIVEN,
+        priority: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> BulkTasksAffected:
+        """Write one status and/or priority onto a whole selection of tasks.
+
+        Name the tasks either by id (*tasks*) or as every task matching a search
+        (*select_all* with *filters*, minus *exclude*). At least one of *status*
+        and *priority* is required. A select-all is capped at 50000 tasks; past
+        that the server refuses it and you narrow the filter. The response is the
+        count, not the rows. Requires the ``write_crm`` scope.
+
+        Args:
+            tasks: The task ids to update.
+            select_all: Update every task matching *filters* instead of the ids.
+            filters: The same body :meth:`search_tasks` takes. Used with
+                *select_all*.
+            exclude: Task ids to drop from a *select_all* selection.
+            status: ``pending``, ``in_progress``, ``completed`` or ``cancelled``.
+            priority: ``low``, ``medium``, ``high`` or ``urgent``.
+        """
+        return self._patch(
+            "/crm/tasks",
+            cast_to=BulkTasksAffected,
+            body=drop_not_given(
+                {
+                    "tasks": tasks,
+                    "all": select_all,
+                    "filters": filters,
+                    "exclude": exclude,
+                    "status": status,
+                    "priority": priority,
+                }
+            ),
+            options=options,
+        )
+
+    def bulk_delete_tasks(
+        self,
+        tasks: Sequence[str] = (),
+        *,
+        select_all: bool = False,
+        filters: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        exclude: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> BulkTasksAffected:
+        """Delete a whole selection of tasks.
+
+        The ids travel as a plain array; with *select_all* the request is a
+        selection object instead. Requires the ``write_crm`` scope.
+
+        Args:
+            tasks: The task ids to delete.
+            select_all: Delete every task matching *filters* instead of the ids.
+            filters: The same body :meth:`search_tasks` takes. Used with
+                *select_all*.
+            exclude: Task ids to drop from a *select_all* selection.
+        """
+        body: Any = list(tasks)
+        if select_all:
+            if not is_given(filters):
+                raise ValueError(
+                    "bulk_delete_tasks(select_all=True) requires filters; "
+                    "pass {} to delete every task"
+                )
+            body = drop_not_given({"all": True, "filters": filters, "exclude": exclude})
+        return self._delete(
+            "/crm/tasks",
+            cast_to=BulkTasksAffected,
+            body=body,
+            options=options,
+        )
+
 
 class AsyncCrm(AsyncAPIResource):
     """Asynchronous ``crm`` resource (pipelines, deals, tasks, task types)."""
@@ -1544,5 +1631,85 @@ class AsyncCrm(AsyncAPIResource):
                 sort_by=NOT_GIVEN,
                 reverse=NOT_GIVEN,
             ),
+            options=options,
+        )
+
+    async def bulk_update_tasks(
+        self,
+        *,
+        tasks: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        select_all: NotGivenOr[bool] = NOT_GIVEN,
+        filters: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        exclude: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        status: NotGivenOr[str] = NOT_GIVEN,
+        priority: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> BulkTasksAffected:
+        """Write one status and/or priority onto a whole selection of tasks.
+
+        Name the tasks either by id (*tasks*) or as every task matching a search
+        (*select_all* with *filters*, minus *exclude*). At least one of *status*
+        and *priority* is required. A select-all is capped at 50000 tasks; past
+        that the server refuses it and you narrow the filter. The response is the
+        count, not the rows. Requires the ``write_crm`` scope.
+
+        Args:
+            tasks: The task ids to update.
+            select_all: Update every task matching *filters* instead of the ids.
+            filters: The same body :meth:`search_tasks` takes. Used with
+                *select_all*.
+            exclude: Task ids to drop from a *select_all* selection.
+            status: ``pending``, ``in_progress``, ``completed`` or ``cancelled``.
+            priority: ``low``, ``medium``, ``high`` or ``urgent``.
+        """
+        return await self._patch(
+            "/crm/tasks",
+            cast_to=BulkTasksAffected,
+            body=drop_not_given(
+                {
+                    "tasks": tasks,
+                    "all": select_all,
+                    "filters": filters,
+                    "exclude": exclude,
+                    "status": status,
+                    "priority": priority,
+                }
+            ),
+            options=options,
+        )
+
+    async def bulk_delete_tasks(
+        self,
+        tasks: Sequence[str] = (),
+        *,
+        select_all: bool = False,
+        filters: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        exclude: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> BulkTasksAffected:
+        """Delete a whole selection of tasks.
+
+        The ids travel as a plain array; with *select_all* the request is a
+        selection object instead. Requires the ``write_crm`` scope.
+
+        Args:
+            tasks: The task ids to delete.
+            select_all: Delete every task matching *filters* instead of the ids.
+            filters: The same body :meth:`search_tasks` takes. Used with
+                *select_all*.
+            exclude: Task ids to drop from a *select_all* selection.
+        """
+        body: Any = list(tasks)
+        if select_all:
+            if not is_given(filters):
+                raise ValueError(
+                    "bulk_delete_tasks(select_all=True) requires filters; "
+                    "pass {} to delete every task"
+                )
+            body = drop_not_given({"all": True, "filters": filters, "exclude": exclude})
+        return await self._delete(
+            "/crm/tasks",
+            cast_to=BulkTasksAffected,
+            body=body,
             options=options,
         )
