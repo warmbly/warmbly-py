@@ -23,7 +23,7 @@ _BODY = {
     "permissions": [{"name": "read_emails", "value": 1, "category": "read"}],
     "presets": {"read_only": 1},
     "grantable": 3,
-    "app_scopes": 8_388_607,
+    "app_scopes": APP_GRANTABLE_SCOPES,
 }
 
 
@@ -49,7 +49,7 @@ def test_permissions_masks_sync(client: Warmbly) -> None:
     )
     perms = client.api_keys.permissions()
     assert perms.grantable == 3
-    assert perms.app_scopes == 8_388_607
+    assert perms.app_scopes == APP_GRANTABLE_SCOPES
     assert perms.presets == {"read_only": 1}
 
 
@@ -61,7 +61,7 @@ async def test_permissions_masks_async(aclient: AsyncWarmbly) -> None:
     )
     perms = await aclient.api_keys.permissions()
     assert perms.grantable == 3
-    assert perms.app_scopes == 8_388_607
+    assert perms.app_scopes == APP_GRANTABLE_SCOPES
 
 
 @respx.mock

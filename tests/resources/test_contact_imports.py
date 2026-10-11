@@ -483,3 +483,26 @@ async def test_campaign_state_hold_and_cc(api: Any) -> None:
     assert states[0].sender_email == "me@example.com"
     assert states[0].hold == {"since": "2026-10-04T00:00:00Z", "source": "manual"}
     assert states[0].cc[0]["contact_id"] == "c_2"
+
+
+@pytest.mark.anyio
+@respx.mock
+async def test_bulk_delete_rejects_empty_or_mixed_selection(api: Any) -> None:
+    with pytest.raises(ValueError, match="required"):
+        await call(api.contacts.bulk_delete)
+    with pytest.raises(ValueError, match="not both"):
+        await call(api.contacts.bulk_delete, ["c_1"], select_all=True)
+
+
+@pytest.mark.anyio
+@respx.mock
+async def test_integrations_push_requires_a_selection(api: Any) -> None:
+    with pytest.raises(ValueError, match="requires contact_ids"):
+        await call(api.integrations.push, "conn_1")
+
+
+@pytest.mark.anyio
+@respx.mock
+async def test_bulk_update_tasks_select_all_requires_filters(api: Any) -> None:
+    with pytest.raises(ValueError, match="requires filters"):
+        await call(api.crm.bulk_update_tasks, select_all=True, status="done")

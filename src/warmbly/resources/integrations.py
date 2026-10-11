@@ -22,7 +22,7 @@ from typing import Any
 from .._models import BaseModel
 from .._pagination import AsyncPaginator, SyncCursorPage
 from .._resource import AsyncAPIResource, SyncAPIResource
-from .._types import NOT_GIVEN, NotGivenOr, RequestOptions
+from .._types import NOT_GIVEN, NotGivenOr, RequestOptions, is_given
 from .._utils import drop_not_given
 
 __all__ = [
@@ -622,6 +622,8 @@ class Integrations(SyncAPIResource):
         A push is synchronous against the provider's API, so one request is
         capped at 500 contacts even when the selection came from a filter.
         """
+        if not is_given(contact_ids) and select_all is not True:
+            raise ValueError("push() requires contact_ids or select_all=True")
         return self._post(
             f"/integrations/connections/{connection_id}/push",
             cast_to=PushResult,
@@ -979,6 +981,8 @@ class AsyncIntegrations(AsyncAPIResource):
         A push is synchronous against the provider's API, so one request is
         capped at 500 contacts even when the selection came from a filter.
         """
+        if not is_given(contact_ids) and select_all is not True:
+            raise ValueError("push() requires contact_ids or select_all=True")
         return await self._post(
             f"/integrations/connections/{connection_id}/push",
             cast_to=PushResult,

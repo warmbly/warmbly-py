@@ -64,3 +64,11 @@ async def test_sync_handshake_sends_oauth_header(fake_gateway: FakeGateway) -> N
         assert _request(fake_gateway).headers["X-Warmbly-Token"] == "wmat_tok"
     finally:
         await asyncio.to_thread(client.close)
+
+
+def test_handshake_logger_never_emits_debug() -> None:
+    import logging
+
+    from warmbly.gateway._connection import _HANDSHAKE_LOGGER
+
+    assert not _HANDSHAKE_LOGGER.isEnabledFor(logging.DEBUG)

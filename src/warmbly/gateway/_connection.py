@@ -17,6 +17,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import logging
 import random
 import sys
 import time
@@ -71,6 +72,12 @@ DEFAULT_BASE_URL = "wss://realtime.warmbly.com"
 _HEARTBEAT_INTERVAL = 25.0
 _SERVER_TIMEOUT = 60.0
 _OPEN_TIMEOUT = 60.0
+
+# The websockets library logs every handshake header and the request path at
+# DEBUG, which would put the credential (header or ticket) in application logs.
+# Give it a child logger pinned above DEBUG so that can never happen.
+_HANDSHAKE_LOGGER = logger.getChild("handshake")
+_HANDSHAKE_LOGGER.setLevel(logging.INFO)
 _MAX_FRAME_SIZE = 2**20
 
 #: Handshake header carrying API keys and OAuth access tokens.
@@ -325,7 +332,7 @@ class AsyncGatewayClient:
                 user_agent_header="warmbly-py",
                 open_timeout=_OPEN_TIMEOUT,
                 max_size=_MAX_FRAME_SIZE,
-                logger=logger,
+                logger=_HANDSHAKE_LOGGER,
             )
         except InvalidStatus as exc:
             code = exc.response.status_code

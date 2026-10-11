@@ -1029,9 +1029,16 @@ class Contacts(SyncAPIResource):
             filters: The same body :meth:`search` takes. Used with *select_all*.
             exclude: Contact ids to drop from a *select_all* selection.
         """
-        body: Any = list(contact_ids)
         if select_all:
-            body = drop_not_given({"all": True, "filters": filters, "exclude": exclude})
+            if contact_ids:
+                raise ValueError("pass contact_ids or select_all, not both")
+            body: Any = drop_not_given(
+                {"all": True, "filters": filters, "exclude": exclude}
+            )
+        else:
+            if not contact_ids:
+                raise ValueError("contact_ids is required unless select_all=True")
+            body = list(contact_ids)
         return self._delete(
             "/contacts",
             cast_to=ContactDeleted,
@@ -1963,9 +1970,16 @@ class AsyncContacts(AsyncAPIResource):
             filters: The same body :meth:`search` takes. Used with *select_all*.
             exclude: Contact ids to drop from a *select_all* selection.
         """
-        body: Any = list(contact_ids)
         if select_all:
-            body = drop_not_given({"all": True, "filters": filters, "exclude": exclude})
+            if contact_ids:
+                raise ValueError("pass contact_ids or select_all, not both")
+            body: Any = drop_not_given(
+                {"all": True, "filters": filters, "exclude": exclude}
+            )
+        else:
+            if not contact_ids:
+                raise ValueError("contact_ids is required unless select_all=True")
+            body = list(contact_ids)
         return await self._delete(
             "/contacts",
             cast_to=ContactDeleted,

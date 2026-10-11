@@ -30,7 +30,6 @@ RESOLUTION = {
     "held_task_id": "22222222-2222-2222-2222-222222222222",
     "held_reason": "unknown",
     "evidence_type": "operator_confirmed_sent",
-    "confirmation_reference": "ticket-42",
     "message_id": "abc@example.com",
 }
 

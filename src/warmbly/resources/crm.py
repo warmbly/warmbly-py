@@ -1334,6 +1334,8 @@ class Crm(SyncAPIResource):
             status: ``pending``, ``in_progress``, ``completed`` or ``cancelled``.
             priority: ``low``, ``medium``, ``high`` or ``urgent``.
         """
+        if select_all is True and not is_given(filters):
+            raise ValueError("select_all=True requires filters")
         return self._patch(
             "/crm/tasks",
             cast_to=BulkTasksAffected,
@@ -2341,6 +2343,8 @@ class AsyncCrm(AsyncAPIResource):
             status: ``pending``, ``in_progress``, ``completed`` or ``cancelled``.
             priority: ``low``, ``medium``, ``high`` or ``urgent``.
         """
+        if select_all is True and not is_given(filters):
+            raise ValueError("select_all=True requires filters")
         return await self._patch(
             "/crm/tasks",
             cast_to=BulkTasksAffected,

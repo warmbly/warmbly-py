@@ -182,7 +182,13 @@ Three presets are exported for the common cases, matching the ones the
 dashboard offers:
 
 ```python
-from warmbly import ALL_SCOPES, READ_ONLY_SCOPES, FULL_ACCESS_SCOPES, SCOPES
+from warmbly import (
+    ALL_SCOPES,
+    APP_GRANTABLE_SCOPES,
+    FULL_ACCESS_SCOPES,
+    READ_ONLY_SCOPES,
+    SCOPES,
+)
 
 READ_ONLY_SCOPES    # every read_* scope and nothing else
 FULL_ACCESS_SCOPES  # every scope (same as ALL_SCOPES)
