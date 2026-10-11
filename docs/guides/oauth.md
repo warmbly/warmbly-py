@@ -309,6 +309,43 @@ result = client.oauth_applications.rotate_secret("app_123")
 print(result.client_secret)   # the new wmcs_...; store it now
 ```
 
+### Logo and directory listing
+
+Upload a logo straight onto an existing application (PNG or JPG, at most 2 MB,
+at least 32 pixels a side), or clear it. Both return the updated application:
+
+```python
+with open("logo.png", "rb") as f:
+    app = client.oauth_applications.set_logo("app_123", file=f.read())
+
+app = client.oauth_applications.remove_logo("app_123")
+```
+
+An application can also be published to the community app directory. The
+listing is written whole each time; `retrieve_listing` returns `listing=None`
+while the app is unpublished:
+
+```python
+client.oauth_applications.put_listing(
+    "app_123",
+    slug="my-integration",
+    tagline="Syncs campaigns into your dashboard",
+    category="automation",
+    install_url="https://example.com/install",
+)
+
+print(client.oauth_applications.retrieve_listing("app_123").listing)
+client.oauth_applications.delete_listing("app_123")   # unpublish
+```
+
+!!! note "Who can call the application routes"
+    Every `/oauth/applications` route needs an API key with the `api_keys`
+    permission (or a dashboard session). A token issued to an OAuth
+    application is refused with `403` and the code `oauth_token_not_allowed`,
+    so an app cannot manage apps. Rotating a secret additionally asks a
+    *dashboard session* to have re-confirmed the account holder recently
+    (`reauth_required`); an API key is never asked to.
+
 ### Webhook signing secret
 
 Applications that receive webhooks have a signing secret you can read or rotate:
