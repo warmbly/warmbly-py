@@ -44,6 +44,7 @@ from .resources import (
     AsyncContacts,
     AsyncCrm,
     AsyncDeliverability,
+    AsyncEmailImages,
     AsyncEmails,
     AsyncFolders,
     AsyncForms,
@@ -54,7 +55,9 @@ from .resources import (
     AsyncMeetings,
     AsyncOAuthApplications,
     AsyncOutreach,
+    AsyncPlacement,
     AsyncPlans,
+    AsyncSalesforce,
     AsyncSegments,
     AsyncSuppressions,
     AsyncTags,
@@ -72,6 +75,7 @@ from .resources import (
     Contacts,
     Crm,
     Deliverability,
+    EmailImages,
     Emails,
     Folders,
     Forms,
@@ -82,7 +86,9 @@ from .resources import (
     Meetings,
     OAuthApplications,
     Outreach,
+    Placement,
     Plans,
+    Salesforce,
     Segments,
     Suppressions,
     Tags,
@@ -196,6 +202,10 @@ class Warmbly(SyncAPIClient):
         return Templates(self)
 
     @cached_property
+    def email_images(self) -> EmailImages:
+        return EmailImages(self)
+
+    @cached_property
     def crm(self) -> Crm:
         return Crm(self)
 
@@ -280,6 +290,14 @@ class Warmbly(SyncAPIClient):
         return Suppressions(self)
 
     @cached_property
+    def salesforce(self) -> Salesforce:
+        return Salesforce(self)
+
+    @cached_property
+    def placement(self) -> Placement:
+        return Placement(self)
+
+    @cached_property
     def ai_tools(self) -> AITools:
         return AITools(self)
 
@@ -357,6 +375,10 @@ class AsyncWarmbly(AsyncAPIClient):
     @cached_property
     def templates(self) -> AsyncTemplates:
         return AsyncTemplates(self)
+
+    @cached_property
+    def email_images(self) -> AsyncEmailImages:
+        return AsyncEmailImages(self)
 
     @cached_property
     def crm(self) -> AsyncCrm:
@@ -441,6 +463,14 @@ class AsyncWarmbly(AsyncAPIClient):
     @cached_property
     def suppressions(self) -> AsyncSuppressions:
         return AsyncSuppressions(self)
+
+    @cached_property
+    def salesforce(self) -> AsyncSalesforce:
+        return AsyncSalesforce(self)
+
+    @cached_property
+    def placement(self) -> AsyncPlacement:
+        return AsyncPlacement(self)
 
     @cached_property
     def ai_tools(self) -> AsyncAITools:

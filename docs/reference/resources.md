@@ -62,6 +62,18 @@ for campaign in client.campaigns.list():
 
 ::: warmbly.resources.suppressions.Suppressions
 
+## Salesforce
+
+::: warmbly.resources.salesforce.Salesforce
+
+## Placement
+
+::: warmbly.resources.placement.Placement
+
+## Email images
+
+::: warmbly.resources.email_images.EmailImages
+
 ## Unibox
 
 ::: warmbly.resources.unibox.Unibox

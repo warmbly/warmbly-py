@@ -34,6 +34,8 @@ class Plan(BaseModel):
         id: The plan identifier.
         name: The human-readable plan name.
         price: The list price for one ``duration``.
+        price_yearly: What ``stripe_price_id_yearly`` charges; ``None`` means the
+            plan is monthly only.
         discounted_price: The price actually charged, where a discount applies.
         duration: The billing period (e.g. ``"monthly"``, ``"yearly"``).
         savings: Percentage saved against paying per period.
@@ -59,6 +61,7 @@ class Plan(BaseModel):
     id: str
     name: str | None = None
     price: float | None = None
+    price_yearly: float | None = None
     discounted_price: float | None = None
     duration: str | None = None
     savings: int | None = None

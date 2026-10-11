@@ -158,11 +158,23 @@ except APIStatusError as exc:
 | `.message` | `APIError` | Human-readable message (from `message`/`error` in the body). |
 | `.body` | `APIError` | Parsed JSON body (`dict`), or raw text, or `None`. |
 | `.code` | `APIError` | The `code` field from the error envelope, if present. |
+| `.requires_reauth` | `APIError` | `True` for `reauth_required`: confirm at `POST /auth/reauth`, then retry. |
+| `.access_restricted` | `APIError` | `True` for `member_access_restricted`: the member's selected-resource access scope does not cover the route. |
 | `.retry_after` | `RateLimitError` | Seconds to wait before retrying (`float \| None`). |
 
 The backend error envelope looks like `{"error", "message", "code",
 "request_id"}`; `.message` and `.code` are pulled from it automatically, and
 `.request_id` comes from the response header.
+
+Compare `.code` against the `ErrorCode` constants instead of
+literals, for example `exc.code == ErrorCode.API_KEY_PERMISSIONS_EXCEED_CALLER`.
+The server may add codes at any time, so treat an unrecognized code as a plain
+failure of its HTTP status. Notable groups added recently: `crm_*` and
+`salesforce_*` (provider-mode CRM and Salesforce refusals), `member_access_*`,
+`invalid_access_*` and `too_many_access_grants` (selected-resource access),
+`api_key_*` and `oauth_token_not_allowed` (credential management),
+`invalid_listing`, `listing_*` and `app_*` (OAuth app directory), and
+`reauth_limited` / `reauth_no_factor` next to `reauth_required`.
 
 ## Rate limits and `retry_after`
 

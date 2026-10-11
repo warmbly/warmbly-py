@@ -17,6 +17,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import logging
 import random
 import sys
 import time
@@ -71,7 +72,18 @@ DEFAULT_BASE_URL = "wss://realtime.warmbly.com"
 _HEARTBEAT_INTERVAL = 25.0
 _SERVER_TIMEOUT = 60.0
 _OPEN_TIMEOUT = 60.0
+
+# The websockets library logs every handshake header and the request path at
+# DEBUG, which would put the credential (header or ticket) in application logs.
+# Give it a child logger pinned above DEBUG so that can never happen.
+_HANDSHAKE_LOGGER = logger.getChild("handshake")
+_HANDSHAKE_LOGGER.setLevel(logging.INFO)
 _MAX_FRAME_SIZE = 2**20
+
+#: Handshake header carrying API keys and OAuth access tokens.
+_TOKEN_HEADER = "X-Warmbly-Token"
+#: Prefixes of credentials that outlive a session (API key, OAuth access token).
+_LONG_LIVED_PREFIXES = ("wmbly_", "wmat_")
 
 # Reconnect backoff.
 _BACKOFF_INITIAL = 0.5
@@ -159,8 +171,13 @@ class AsyncGatewayClient:
 
         Args:
             token: A bearer credential carrying the ``realtime_subscribe`` scope
-                (an API key, OAuth access token, or session JWT). It is sent in
-                the connect query string and is never logged.
+                (an API key or OAuth access token), or the short-lived ``ws`` ticket
+                from ``POST /getaway`` for a browser session. Any other session
+                token (access, refresh, password-reset) is refused with close
+                code 4004. API keys (``wmbly_``) and OAuth tokens (``wmat_``) are
+                sent in the ``X-Warmbly-Token`` handshake header; the short-lived
+                ticket goes in the ``token`` query parameter. The token is never
+                logged.
             base_url: The gateway base URL. The ``/socket/websocket`` path and
                 version query are appended automatically.
             on_resume_failed: Optional callback invoked when the server reports a
@@ -311,11 +328,11 @@ class AsyncGatewayClient:
         try:
             ws = await connect(
                 url,
-                additional_headers={},
+                additional_headers=self._build_headers(),
                 user_agent_header="warmbly-py",
                 open_timeout=_OPEN_TIMEOUT,
                 max_size=_MAX_FRAME_SIZE,
-                logger=logger,
+                logger=_HANDSHAKE_LOGGER,
             )
         except InvalidStatus as exc:
             code = exc.response.status_code
@@ -330,9 +347,24 @@ class AsyncGatewayClient:
         self._last_heartbeat_ack = now
         logger.debug("gateway connection opened")
 
+    def _is_long_lived(self) -> bool:
+        return self._token.startswith(_LONG_LIVED_PREFIXES)
+
+    def _build_headers(self) -> dict[str, str]:
+        # API keys and OAuth tokens outlive a session, so they travel in a
+        # header (URLs end up in proxy logs). The short-lived ticket stays in
+        # the query string because it is the only credential accepted there
+        # without a deprecation warning.
+        if self._is_long_lived():
+            return {_TOKEN_HEADER: self._token}
+        return {}
+
     def _build_url(self) -> str:
+        base = f"{self._base_url}/socket/websocket"
+        if self._is_long_lived():
+            return f"{base}?vsn=2.0.0"
         token = quote(self._token, safe="")
-        return f"{self._base_url}/socket/websocket?token={token}&vsn=2.0.0"
+        return f"{base}?token={token}&vsn=2.0.0"
 
     async def close(self) -> None:
         """Close the connection and stop reconnecting.

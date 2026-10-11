@@ -12,6 +12,14 @@ call site.
 
 Scopes travel as a ``uint64`` bitmask; build one from readable names with
 :func:`warmbly.scopes_to_mask`.
+
+Who may call these routes: an **API key** holding the ``api_keys`` scope, or a
+dashboard session. A token issued to an **OAuth application** is refused on
+every route in this group, reads included, with ``403`` and the code
+``oauth_token_not_allowed``; an app cannot manage apps or credentials. Rotating
+a secret additionally asks a dashboard session to have re-confirmed the account
+holder recently (``reauth_required``, see
+:attr:`warmbly.APIError.requires_reauth`); an API key is never asked to.
 """
 
 from __future__ import annotations
@@ -27,6 +35,9 @@ from .._utils import drop_not_given
 
 __all__ = [
     "AsyncOAuthApplications",
+    "OAuthAppListing",
+    "OAuthAppListingDeleted",
+    "OAuthAppListingResponse",
     "OAuthApplication",
     "OAuthApplicationDeleted",
     "OAuthApplicationLogo",
@@ -43,7 +54,10 @@ class OAuthApplication(BaseModel):
 
     ``is_public`` marks a PKCE-only client with no secret;
     ``dynamically_registered`` marks one created through RFC 7591 dynamic
-    client registration rather than the dashboard.
+    client registration rather than the dashboard. ``suspended_at`` is set when
+    an instance operator suspended the app; the owner cannot lift that, and
+    edits to a suspended app (including its logo and listing) are refused with
+    ``409`` and the code ``app_suspended``.
     """
 
     id: str
@@ -63,6 +77,8 @@ class OAuthApplication(BaseModel):
     status: str | None = None
     is_public: bool | None = None
     dynamically_registered: bool | None = None
+    suspended_at: str | None = None
+    suspended_reason: str | None = None
     created_at: str | None = None
     updated_at: str | None = None
 
@@ -122,6 +138,48 @@ class OAuthWebhookDelivery(BaseModel):
     response_status: int | None = None
     error_reason: str | None = None
     created_at: str | None = None
+
+
+class OAuthAppListing(BaseModel):
+    """An application's page in the community app directory.
+
+    ``status`` is ``"published"`` (reachable by its link), ``"featured"``
+    (picked by an operator) or ``"hidden"`` (taken down by an operator;
+    ``status_note`` may say why). ``category`` is one of ``crm``,
+    ``automation``, ``notifications``, ``meetings``, ``data``,
+    ``verification``, ``ai`` or ``other``.
+    """
+
+    application_id: str | None = None
+    organization_id: str | None = None
+    slug: str | None = None
+    tagline: str | None = None
+    description: str | None = None
+    category: str | None = None
+    install_url: str | None = None
+    support_url: str | None = None
+    privacy_url: str | None = None
+    status: str | None = None
+    status_note: str | None = None
+    status_at: str | None = None
+    submitted_at: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+class OAuthAppListingResponse(BaseModel):
+    """The ``{"listing": ...}`` envelope of the listing routes.
+
+    ``listing`` is ``None`` when the application is not published.
+    """
+
+    listing: OAuthAppListing | None = None
+
+
+class OAuthAppListingDeleted(BaseModel):
+    """The result of unpublishing an application."""
+
+    deleted: bool | None = None
 
 
 def _application_body(
@@ -268,7 +326,12 @@ class OAuthApplications(SyncAPIResource):
     def rotate_secret(
         self, application_id: str, *, options: RequestOptions | None = None
     ) -> OAuthClientSecret:
-        """Rotate the client secret. The new secret is shown once."""
+        """Rotate the client secret. The new secret is shown once.
+
+        A dashboard session must have re-confirmed the account holder recently
+        (``reauth_required``); an API key with the ``api_keys`` scope is never
+        asked to. An OAuth app token is refused (``oauth_token_not_allowed``).
+        """
         return self._post(
             f"/oauth/applications/{application_id}/rotate-secret",
             cast_to=OAuthClientSecret,
@@ -278,7 +341,10 @@ class OAuthApplications(SyncAPIResource):
     def webhook_secret(
         self, application_id: str, *, options: RequestOptions | None = None
     ) -> WebhookSecret:
-        """Reveal the application-level webhook signing secret."""
+        """Reveal the application-level webhook signing secret.
+
+        Fresh-auth rules as for :meth:`rotate_secret`.
+        """
         return self._get(
             f"/oauth/applications/{application_id}/webhook-secret",
             cast_to=WebhookSecret,
@@ -288,7 +354,10 @@ class OAuthApplications(SyncAPIResource):
     def rotate_webhook_secret(
         self, application_id: str, *, options: RequestOptions | None = None
     ) -> WebhookSecret:
-        """Rotate the application-level webhook signing secret."""
+        """Rotate the application-level webhook signing secret.
+
+        Fresh-auth rules as for :meth:`rotate_secret`.
+        """
         return self._post(
             f"/oauth/applications/{application_id}/webhook-secret/rotate",
             cast_to=WebhookSecret,
@@ -358,6 +427,142 @@ class OAuthApplications(SyncAPIResource):
             method="POST",
             path="/oauth/application-logo",
             files={"file": (filename, file, content_type)},
+            options=options,
+        )
+
+    def set_logo(
+        self,
+        application_id: str,
+        *,
+        file: bytes,
+        filename: str = "logo.png",
+        content_type: str = "image/png",
+        options: RequestOptions | None = None,
+    ) -> OAuthApplication:
+        """Upload a logo and set it on an existing application.
+
+        Unlike :meth:`upload_logo`, which only hosts the image, this stores it
+        and updates the application in one call, then deletes the previous
+        image once nothing points at it. Returns the updated application. The
+        image must be a PNG or JPG, at most 2 MB and at least 32 pixels on each
+        side; the server re-encodes it. Answers ``409`` (``app_suspended``) for
+        a suspended app and ``403`` (``developer_access_blocked``) when the
+        workspace may not publish apps.
+
+        Requires the ``api_keys`` scope. An OAuth app token is refused
+        (``oauth_token_not_allowed``).
+
+        Args:
+            application_id: The application to change.
+            file: The raw image bytes.
+            filename: The filename to send in the multipart part.
+            content_type: The image's MIME type.
+        """
+        return self._client.request(
+            cast_to=OAuthApplication,
+            method="POST",
+            path=f"/oauth/applications/{application_id}/logo",
+            files={"file": (filename, file, content_type)},
+            options=options,
+        )
+
+    def remove_logo(
+        self, application_id: str, *, options: RequestOptions | None = None
+    ) -> OAuthApplication:
+        """Clear an application's logo and return the updated application.
+
+        Requires the ``api_keys`` scope. An OAuth app token is refused
+        (``oauth_token_not_allowed``); a suspended app answers ``409``
+        (``app_suspended``).
+        """
+        return self._delete(
+            f"/oauth/applications/{application_id}/logo",
+            cast_to=OAuthApplication,
+            options=options,
+        )
+
+    def retrieve_listing(
+        self, application_id: str, *, options: RequestOptions | None = None
+    ) -> OAuthAppListingResponse:
+        """Read the application's community-directory listing.
+
+        The response's ``listing`` is ``None`` while the app is unpublished. A
+        dynamically registered client cannot be listed (``400``,
+        ``app_not_listable``). Requires the ``api_keys`` scope. An OAuth app
+        token is refused (``oauth_token_not_allowed``).
+        """
+        return self._get(
+            f"/oauth/applications/{application_id}/listing",
+            cast_to=OAuthAppListingResponse,
+            options=options,
+        )
+
+    def put_listing(
+        self,
+        application_id: str,
+        *,
+        slug: str,
+        tagline: str,
+        category: str,
+        install_url: str,
+        description: NotGivenOr[str] = NOT_GIVEN,
+        support_url: NotGivenOr[str] = NOT_GIVEN,
+        privacy_url: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> OAuthAppListingResponse:
+        """Publish the application, or replace its listing.
+
+        The whole listing is written each time; saving identical content is a
+        no-op. The app must be active and not suspended (``400``,
+        ``app_not_listable``). A taken *slug* answers ``409``
+        (``listing_slug_taken``); a rejected field answers ``400``
+        (``invalid_listing``).
+
+        Requires the ``api_keys`` scope. An OAuth app token is refused
+        (``oauth_token_not_allowed``).
+
+        Args:
+            application_id: The application to publish.
+            slug: The listing's link: 3 to 48 lowercase letters, digits or
+                single dashes.
+            tagline: One line, at most 120 characters.
+            category: ``crm``, ``automation``, ``notifications``, ``meetings``,
+                ``data``, ``verification``, ``ai`` or ``other``.
+            install_url: The ``https`` address people start installing from.
+            description: Plain text, at most 2000 characters.
+            support_url: An ``https`` support address.
+            privacy_url: An ``https`` privacy policy address.
+        """
+        return self._put(
+            f"/oauth/applications/{application_id}/listing",
+            cast_to=OAuthAppListingResponse,
+            body=drop_not_given(
+                {
+                    "slug": slug,
+                    "tagline": tagline,
+                    "description": description,
+                    "category": category,
+                    "install_url": install_url,
+                    "support_url": support_url,
+                    "privacy_url": privacy_url,
+                }
+            ),
+            options=options,
+        )
+
+    def delete_listing(
+        self, application_id: str, *, options: RequestOptions | None = None
+    ) -> OAuthAppListingDeleted:
+        """Unpublish the application. Workspaces that installed it keep their
+        grant until they revoke it.
+
+        A listing an operator hid stays until they restore it (``409``,
+        ``listing_hidden``). Requires the ``api_keys`` scope. An OAuth app
+        token is refused (``oauth_token_not_allowed``).
+        """
+        return self._delete(
+            f"/oauth/applications/{application_id}/listing",
+            cast_to=OAuthAppListingDeleted,
             options=options,
         )
 
@@ -479,7 +684,12 @@ class AsyncOAuthApplications(AsyncAPIResource):
     async def rotate_secret(
         self, application_id: str, *, options: RequestOptions | None = None
     ) -> OAuthClientSecret:
-        """Rotate the client secret. The new secret is shown once."""
+        """Rotate the client secret. The new secret is shown once.
+
+        A dashboard session must have re-confirmed the account holder recently
+        (``reauth_required``); an API key with the ``api_keys`` scope is never
+        asked to. An OAuth app token is refused (``oauth_token_not_allowed``).
+        """
         return await self._post(
             f"/oauth/applications/{application_id}/rotate-secret",
             cast_to=OAuthClientSecret,
@@ -489,7 +699,10 @@ class AsyncOAuthApplications(AsyncAPIResource):
     async def webhook_secret(
         self, application_id: str, *, options: RequestOptions | None = None
     ) -> WebhookSecret:
-        """Reveal the application-level webhook signing secret."""
+        """Reveal the application-level webhook signing secret.
+
+        Fresh-auth rules as for :meth:`rotate_secret`.
+        """
         return await self._get(
             f"/oauth/applications/{application_id}/webhook-secret",
             cast_to=WebhookSecret,
@@ -499,7 +712,10 @@ class AsyncOAuthApplications(AsyncAPIResource):
     async def rotate_webhook_secret(
         self, application_id: str, *, options: RequestOptions | None = None
     ) -> WebhookSecret:
-        """Rotate the application-level webhook signing secret."""
+        """Rotate the application-level webhook signing secret.
+
+        Fresh-auth rules as for :meth:`rotate_secret`.
+        """
         return await self._post(
             f"/oauth/applications/{application_id}/webhook-secret/rotate",
             cast_to=WebhookSecret,
@@ -569,5 +785,141 @@ class AsyncOAuthApplications(AsyncAPIResource):
             method="POST",
             path="/oauth/application-logo",
             files={"file": (filename, file, content_type)},
+            options=options,
+        )
+
+    async def set_logo(
+        self,
+        application_id: str,
+        *,
+        file: bytes,
+        filename: str = "logo.png",
+        content_type: str = "image/png",
+        options: RequestOptions | None = None,
+    ) -> OAuthApplication:
+        """Upload a logo and set it on an existing application.
+
+        Unlike :meth:`upload_logo`, which only hosts the image, this stores it
+        and updates the application in one call, then deletes the previous
+        image once nothing points at it. Returns the updated application. The
+        image must be a PNG or JPG, at most 2 MB and at least 32 pixels on each
+        side; the server re-encodes it. Answers ``409`` (``app_suspended``) for
+        a suspended app and ``403`` (``developer_access_blocked``) when the
+        workspace may not publish apps.
+
+        Requires the ``api_keys`` scope. An OAuth app token is refused
+        (``oauth_token_not_allowed``).
+
+        Args:
+            application_id: The application to change.
+            file: The raw image bytes.
+            filename: The filename to send in the multipart part.
+            content_type: The image's MIME type.
+        """
+        return await self._client.request(
+            cast_to=OAuthApplication,
+            method="POST",
+            path=f"/oauth/applications/{application_id}/logo",
+            files={"file": (filename, file, content_type)},
+            options=options,
+        )
+
+    async def remove_logo(
+        self, application_id: str, *, options: RequestOptions | None = None
+    ) -> OAuthApplication:
+        """Clear an application's logo and return the updated application.
+
+        Requires the ``api_keys`` scope. An OAuth app token is refused
+        (``oauth_token_not_allowed``); a suspended app answers ``409``
+        (``app_suspended``).
+        """
+        return await self._delete(
+            f"/oauth/applications/{application_id}/logo",
+            cast_to=OAuthApplication,
+            options=options,
+        )
+
+    async def retrieve_listing(
+        self, application_id: str, *, options: RequestOptions | None = None
+    ) -> OAuthAppListingResponse:
+        """Read the application's community-directory listing.
+
+        The response's ``listing`` is ``None`` while the app is unpublished. A
+        dynamically registered client cannot be listed (``400``,
+        ``app_not_listable``). Requires the ``api_keys`` scope. An OAuth app
+        token is refused (``oauth_token_not_allowed``).
+        """
+        return await self._get(
+            f"/oauth/applications/{application_id}/listing",
+            cast_to=OAuthAppListingResponse,
+            options=options,
+        )
+
+    async def put_listing(
+        self,
+        application_id: str,
+        *,
+        slug: str,
+        tagline: str,
+        category: str,
+        install_url: str,
+        description: NotGivenOr[str] = NOT_GIVEN,
+        support_url: NotGivenOr[str] = NOT_GIVEN,
+        privacy_url: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> OAuthAppListingResponse:
+        """Publish the application, or replace its listing.
+
+        The whole listing is written each time; saving identical content is a
+        no-op. The app must be active and not suspended (``400``,
+        ``app_not_listable``). A taken *slug* answers ``409``
+        (``listing_slug_taken``); a rejected field answers ``400``
+        (``invalid_listing``).
+
+        Requires the ``api_keys`` scope. An OAuth app token is refused
+        (``oauth_token_not_allowed``).
+
+        Args:
+            application_id: The application to publish.
+            slug: The listing's link: 3 to 48 lowercase letters, digits or
+                single dashes.
+            tagline: One line, at most 120 characters.
+            category: ``crm``, ``automation``, ``notifications``, ``meetings``,
+                ``data``, ``verification``, ``ai`` or ``other``.
+            install_url: The ``https`` address people start installing from.
+            description: Plain text, at most 2000 characters.
+            support_url: An ``https`` support address.
+            privacy_url: An ``https`` privacy policy address.
+        """
+        return await self._put(
+            f"/oauth/applications/{application_id}/listing",
+            cast_to=OAuthAppListingResponse,
+            body=drop_not_given(
+                {
+                    "slug": slug,
+                    "tagline": tagline,
+                    "description": description,
+                    "category": category,
+                    "install_url": install_url,
+                    "support_url": support_url,
+                    "privacy_url": privacy_url,
+                }
+            ),
+            options=options,
+        )
+
+    async def delete_listing(
+        self, application_id: str, *, options: RequestOptions | None = None
+    ) -> OAuthAppListingDeleted:
+        """Unpublish the application. Workspaces that installed it keep their
+        grant until they revoke it.
+
+        A listing an operator hid stays until they restore it (``409``,
+        ``listing_hidden``). Requires the ``api_keys`` scope. An OAuth app
+        token is refused (``oauth_token_not_allowed``).
+        """
+        return await self._delete(
+            f"/oauth/applications/{application_id}/listing",
+            cast_to=OAuthAppListingDeleted,
             options=options,
         )

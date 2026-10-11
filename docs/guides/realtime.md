@@ -21,10 +21,14 @@ from warmbly import AsyncGatewayClient, GatewayClient, GatewayEvent
 
 ## Authentication and the `realtime_subscribe` scope
 
-The gateway authenticates with a bearer credential passed as `token`: an API
-key, an OAuth2 access token, or a session JWT. **The credential must carry the
-`realtime_subscribe` scope.** The token is sent in the connection query string
-and is never logged.
+The gateway authenticates with a bearer credential: an API key, an OAuth2
+access token, or the short-lived connection ticket from `POST /getaway`.
+**The credential must carry the `realtime_subscribe` scope.** The client sends
+API keys (`wmbly_...`) and OAuth access tokens (`wmat_...`) in the
+`X-Warmbly-Token` handshake header, because URLs end up in proxy and access
+logs and the server deprecates these credentials in the query string. The
+10-minute connection ticket goes in the `token` query parameter. The token is
+never logged.
 
 ```python
 gateway = AsyncGatewayClient(token="wmbly_...")
@@ -110,6 +114,18 @@ await gateway.subscribe("org:org_123", intents=["CAMPAIGN"])
 # Two families at once.
 await gateway.subscribe("org:org_123", intents=["AUTOMATION", "MEETING"])
 ```
+
+### Who receives what
+
+The org channel filters every event per member. Besides the permission gates
+(for example inbox events need `access_unibox`, billing events need
+`manage_billing`), a member restricted to selected resources, and any key or
+app acting for one, only receives events that name a granted `campaign_id` or
+`email_account_id`. Events that name no resource are dropped for them, and such
+a socket is never tracked in presence and receives no teammate `presence_state`
+or `presence_diff` frames. Authorization is refreshed about every 30 seconds, so
+a revoked grant can stay usable inside that window. `CRM_SYNCED` carries no
+resource id, so it reaches unrestricted members only.
 
 ### Leaving a topic
 
