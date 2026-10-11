@@ -1,1 +1,0 @@
-`oauth_applications.set_logo()` uploads a logo onto an existing application and `remove_logo()` clears it, both returning the updated `OAuthApplication`. `retrieve_listing()`, `put_listing()` and `delete_listing()` read, publish or replace, and unpublish the application's community directory listing (`OAuthAppListing`).
