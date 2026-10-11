@@ -1,0 +1,1 @@
+`client.salesforce` covers the native Salesforce sync under `/integrations/salesforce/{id}`: the health overview, sync settings, org metadata, users, list views and campaigns, saved imports with preview and run, the activity log with retry, and sync now.
