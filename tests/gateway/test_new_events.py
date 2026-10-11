@@ -19,6 +19,7 @@ _NEW = {
     "PLACEMENT_TEST_UPDATED",
     "MAILBOX_IMPORT_PROGRESS",
     "CONTACT_IMPORT_PROGRESS",
+    "CRM_SYNCED",
 }
 
 
@@ -45,6 +46,14 @@ def test_new_event_constants_match_server_names(name: str) -> None:
         (
             GatewayEvent.CONTACT_IMPORT_PROGRESS,
             {"org_id": "o1", "import_id": "i2", "status": "queued", "extra": [1]},
+        ),
+        (
+            GatewayEvent.CRM_SYNCED,
+            {"org_id": "o1", "objects": ["deals", "tasks"], "contact_id": "c9"},
+        ),
+        (
+            GatewayEvent.CRM_SYNCED,
+            {"org_id": "o1", "objects": ["notes"]},
         ),
         (
             GatewayEvent.WARMUP_PLACEMENT,

@@ -59,7 +59,9 @@ class Tasks(SyncAPIResource):
         """List dead-lettered send tasks.
 
         Args:
-            status: Restrict to one status.
+            status: Restrict to one status: ``pending``, ``replayed`` or
+                ``resolved`` (an authoritative worker or operator-confirmed
+                send outcome has been reconciled).
             limit: Page size (1-200; the server defaults to 100).
         """
         return self._get_api_list(
@@ -72,7 +74,14 @@ class Tasks(SyncAPIResource):
     def replay(
         self, dead_letter_id: str, *, options: RequestOptions | None = None
     ) -> DeadLetterReplayed:
-        """Re-queue a dead-lettered task. This dispatches real mail."""
+        """Re-queue a dead-lettered campaign wakeup.
+
+        Only a wakeup with durable wakeup intent can be replayed. A task that
+        was bound to a contact or sequence for sending, and any legacy or
+        imported task without verified intent, is refused with a
+        :class:`~warmbly.ConflictError` (``409``) and keeps its evidence;
+        replay never resends a message that may already have gone out.
+        """
         return self._post(
             f"/tasks/dlq/{dead_letter_id}/replay",
             cast_to=DeadLetterReplayed,
@@ -93,7 +102,9 @@ class AsyncTasks(AsyncAPIResource):
         """List dead-lettered send tasks.
 
         Args:
-            status: Restrict to one status.
+            status: Restrict to one status: ``pending``, ``replayed`` or
+                ``resolved`` (an authoritative worker or operator-confirmed
+                send outcome has been reconciled).
             limit: Page size (1-200; the server defaults to 100).
         """
         return self._get_api_list(
@@ -106,7 +117,14 @@ class AsyncTasks(AsyncAPIResource):
     async def replay(
         self, dead_letter_id: str, *, options: RequestOptions | None = None
     ) -> DeadLetterReplayed:
-        """Re-queue a dead-lettered task. This dispatches real mail."""
+        """Re-queue a dead-lettered campaign wakeup.
+
+        Only a wakeup with durable wakeup intent can be replayed. A task that
+        was bound to a contact or sequence for sending, and any legacy or
+        imported task without verified intent, is refused with a
+        :class:`~warmbly.ConflictError` (``409``) and keeps its evidence;
+        replay never resends a message that may already have gone out.
+        """
         return await self._post(
             f"/tasks/dlq/{dead_letter_id}/replay",
             cast_to=DeadLetterReplayed,

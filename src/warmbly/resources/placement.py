@@ -42,7 +42,11 @@ __all__ = [
     "PlacementContentCheck",
     "PlacementCounts",
     "PlacementCoverage",
+    "PlacementDKIMVerification",
+    "PlacementEvidence",
     "PlacementFamilyCounts",
+    "PlacementMetric",
+    "PlacementMetricInterval",
     "PlacementOverview",
     "PlacementPanelInfo",
     "PlacementResult",
@@ -79,6 +83,80 @@ class _SeedsEnvelope(BaseModel):
 # -- models -----------------------------------------------------------------
 
 
+class PlacementMetricInterval(BaseModel):
+    """A 95 percent Wilson interval, in the same unit as the metric's value."""
+
+    lower: float | None = None
+    upper: float | None = None
+
+
+class PlacementMetric(BaseModel):
+    """An instrument reading over a set of probes, never a real-recipient
+    inbox probability.
+
+    ``value`` is ``numerator / denominator`` (a ``fraction`` or ``percent``
+    according to ``unit``) and is ``None`` when the denominator is zero.
+    ``unresolved`` counts the copies left out of the denominator (pending,
+    missing, or without a classified folder). ``wilson_95_independence_interval``
+    assumes independent probes, so treat it as a lower bound on the real
+    uncertainty.
+    """
+
+    version: str | None = None
+    population: str | None = None
+    denominator_kind: str | None = None
+    unit: str | None = None
+    source: str | None = None
+    classification_policy: str | None = None
+    numerator: int | None = None
+    denominator: int | None = None
+    unresolved: int | None = None
+    window_days: int | None = None
+    window_basis: str | None = None
+    missingness_basis: str | None = None
+    value: float | None = None
+    wilson_95_independence_interval: PlacementMetricInterval | None = None
+
+
+class PlacementDKIMVerification(BaseModel):
+    """The receiver-side DKIM verdict measured on a placement copy."""
+
+    dkim: str | None = None
+    alignment: str | None = None
+    signing_domain: str | None = None
+    verifier: str | None = None
+    observed_at: str | None = None
+
+
+class PlacementEvidence(BaseModel):
+    """What the receiving mailbox's headers say about one probe.
+
+    Header values are claims: ``trust`` is ``unverified_headers`` unless the
+    result is backed by a verified ``dkim_verification``. Every verdict field
+    (``spf``, ``dkim``, ``dmarc``, ``alignment``, ``tls``,
+    ``one_click_compliance``) is ``unknown`` when it could not be read.
+    """
+
+    dkim_verification: PlacementDKIMVerification | None = None
+    version: str | None = None
+    source: str | None = None
+    trust: str | None = None
+    observed_at: str | None = None
+    spf: str | None = None
+    dkim: str | None = None
+    dmarc: str | None = None
+    alignment: str | None = None
+    tls: str | None = None
+    from_domain: str | None = None
+    envelope_domain_claim: str | None = None
+    signing_domain_claim: str | None = None
+    selector_claim: str | None = None
+    authentication_results_present: bool | None = None
+    one_click_headers_present: bool | None = None
+    one_click_signing_claim: bool | None = None
+    one_click_compliance: str | None = None
+
+
 class PlacementCounts(_PlacementModel):
     """Where a set of probes landed.
 
@@ -86,6 +164,15 @@ class PlacementCounts(_PlacementModel):
     promotions, other, spam and missing). The four rates are fractions of
     ``delivered`` between 0 and 1 and are ``None`` until something is
     delivered; ``tabs_rate`` covers Gmail's Promotions and other tabs.
+
+    ``unknown``, ``archive`` and ``custom`` count copies that were observed
+    but whose folder could not be classified as inbox, a tab or spam (a custom
+    or archive folder, or an unreadable one). ``observed_receipts`` is every
+    copy seen, ``classified_receipts`` the inbox, tab and spam ones, and
+    ``unresolved`` the copies still pending or missing.
+    ``primary_metric`` (inbox share) and ``non_spam_metric`` (not-spam share)
+    are :class:`PlacementMetric` readings over the classified copies, with a
+    confidence interval.
     """
 
     total: int | None = None
@@ -97,6 +184,14 @@ class PlacementCounts(_PlacementModel):
     missing: int | None = None
     failed: int | None = None
     cancelled: int | None = None
+    unknown: int | None = None
+    archive: int | None = None
+    custom: int | None = None
+    observed_receipts: int | None = None
+    classified_receipts: int | None = None
+    unresolved: int | None = None
+    primary_metric: PlacementMetric | None = None
+    non_spam_metric: PlacementMetric | None = None
     delivered: int | None = None
     inbox_rate: float | None = None
     tabs_rate: float | None = None
@@ -156,8 +251,11 @@ class PlacementResult(_PlacementModel):
     """One probe: one copy to one seed, as the dashboard shows it.
 
     ``seed`` is masked on the shared panels. ``folder`` is ``pending``,
-    ``inbox``, ``promotions``, ``other``, ``spam``, ``missing``, ``failed`` or
-    ``cancelled``.
+    ``inbox``, ``promotions``, ``other``, ``spam``, ``missing``, ``failed``,
+    ``cancelled``, ``unknown``, ``archive`` or ``custom``. ``first_folder`` is
+    where the copy was first observed and ``observed_at`` when;
+    ``late_observation`` is ``True`` when a copy marked ``missing`` was seen
+    afterwards. ``evidence`` carries the receiver's authentication headers.
     """
 
     seed: str | None = None
@@ -168,6 +266,10 @@ class PlacementResult(_PlacementModel):
     sent_at: str | None = None
     detected_at: str | None = None
     error: str | None = None
+    first_folder: str | None = None
+    observed_at: str | None = None
+    late_observation: bool | None = None
+    evidence: PlacementEvidence | None = None
 
 
 class PlacementContentCheck(_PlacementModel):

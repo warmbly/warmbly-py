@@ -502,7 +502,9 @@ class CampaignSendLimit(BaseModel):
 
     ``kind`` is one of ``campaign_daily_limit``, ``campaign_ramp``,
     ``warmup_graduation``, ``workspace_risk``, ``domain_auth``, ``resting``,
-    ``warmup_health_hold``, ``other_campaigns``, ``warmup_health_pace``,
+    ``warmup_health_hold``, ``send_recovery`` (a send hold awaiting evidence),
+    ``send_cooldown`` (a provider throttle), ``other_campaigns``,
+    ``warmup_health_pace``,
     ``mailbox_hours``, ``spacing``, ``sending_window``, ``not_running``,
     ``org_daily_limit``, ``new_lead_cap``, ``leads`` or ``sending_behavior``.
     """
@@ -553,7 +555,9 @@ class CampaignMailboxPlan(BaseModel):
 
     ``state`` is why it is or is not sending right now: ``sending``,
     ``budget_spent``, ``hours_closed``, ``no_working_day``, ``domain_auth``,
-    ``resting``, ``health_hold``, ``window_closed`` or ``no_worker``.
+    ``resting``, ``health_hold``, ``send_recovery``, ``send_cooldown``,
+    ``send_authority`` (another send-authority, recipient or capacity check
+    denied admission), ``window_closed`` or ``no_worker``.
     ``limited_by`` names the clamp that set ``cap_today``.
     """
 
@@ -933,7 +937,7 @@ class Campaigns(SyncAPIResource):
             open_tracking: Enable open tracking.
             link_tracking: Enable link/click tracking.
             text_only: Send plain text only.
-            daily_limit: Max emails per day across the campaign.
+            daily_limit: Campaign send ceiling per sending mailbox per UTC day, ``3`` to ``5000`` (default ``50``). It is a ceiling, not a target, and the lower of this and each mailbox's own limits wins.
             unsubscribe_header: Add a ``List-Unsubscribe`` header.
             risky_emails: Allow sending to addresses flagged as risky.
             unsubscribe_mode: The in-body opt-out appended after the signature:
@@ -1108,7 +1112,7 @@ class Campaigns(SyncAPIResource):
         Args:
             segment_ids: The segments making up the audience.
             email_tag_ids: Mailbox tags the senders would be drawn from.
-            daily_limit: The per-campaign daily cap to project under.
+            daily_limit: The per-mailbox campaign ceiling to project under (``3`` to ``5000``).
             days: Weekday bitmask for the sending window.
             timezone: IANA timezone the schedule is interpreted in.
             start_date: RFC 3339 date sending would start.
@@ -1262,7 +1266,7 @@ class Campaigns(SyncAPIResource):
             open_tracking: Enable open tracking.
             link_tracking: Enable link/click tracking.
             text_only: Send plain text only.
-            daily_limit: Max emails per day across the campaign.
+            daily_limit: Campaign send ceiling per sending mailbox per UTC day, ``3`` to ``5000`` (default ``50``). It is a ceiling, not a target, and the lower of this and each mailbox's own limits wins.
             unsubscribe_header: Add a ``List-Unsubscribe`` header.
             risky_emails: Allow sending to addresses flagged as risky.
             unsubscribe_mode: The in-body opt-out appended after the signature:
@@ -1558,7 +1562,9 @@ class Campaigns(SyncAPIResource):
     ) -> LayoutSaved:
         """Persist the sequence builder's node positions.
 
-        Cosmetic and unaudited.
+        Cosmetic and unaudited. The dashboard now lays steps out from their
+        branches and ignores stored positions, so this only matters to clients
+        that arrange the cards themselves.
 
         Args:
             positions: One ``{"id", "x", "y"}`` entry per step.
@@ -2181,7 +2187,7 @@ class AsyncCampaigns(AsyncAPIResource):
             open_tracking: Enable open tracking.
             link_tracking: Enable link/click tracking.
             text_only: Send plain text only.
-            daily_limit: Max emails per day across the campaign.
+            daily_limit: Campaign send ceiling per sending mailbox per UTC day, ``3`` to ``5000`` (default ``50``). It is a ceiling, not a target, and the lower of this and each mailbox's own limits wins.
             unsubscribe_header: Add a ``List-Unsubscribe`` header.
             risky_emails: Allow sending to addresses flagged as risky.
             unsubscribe_mode: The in-body opt-out appended after the signature:
@@ -2358,7 +2364,7 @@ class AsyncCampaigns(AsyncAPIResource):
         Args:
             segment_ids: The segments making up the audience.
             email_tag_ids: Mailbox tags the senders would be drawn from.
-            daily_limit: The per-campaign daily cap to project under.
+            daily_limit: The per-mailbox campaign ceiling to project under (``3`` to ``5000``).
             days: Weekday bitmask for the sending window.
             timezone: IANA timezone the schedule is interpreted in.
             start_date: RFC 3339 date sending would start.
@@ -2514,7 +2520,7 @@ class AsyncCampaigns(AsyncAPIResource):
             open_tracking: Enable open tracking.
             link_tracking: Enable link/click tracking.
             text_only: Send plain text only.
-            daily_limit: Max emails per day across the campaign.
+            daily_limit: Campaign send ceiling per sending mailbox per UTC day, ``3`` to ``5000`` (default ``50``). It is a ceiling, not a target, and the lower of this and each mailbox's own limits wins.
             unsubscribe_header: Add a ``List-Unsubscribe`` header.
             risky_emails: Allow sending to addresses flagged as risky.
             unsubscribe_mode: The in-body opt-out appended after the signature:
@@ -2810,7 +2816,9 @@ class AsyncCampaigns(AsyncAPIResource):
     ) -> LayoutSaved:
         """Persist the sequence builder's node positions.
 
-        Cosmetic and unaudited.
+        Cosmetic and unaudited. The dashboard now lays steps out from their
+        branches and ignores stored positions, so this only matters to clients
+        that arrange the cards themselves.
 
         Args:
             positions: One ``{"id", "x", "y"}`` entry per step.

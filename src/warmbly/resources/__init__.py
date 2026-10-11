@@ -35,6 +35,7 @@ from .oauth_applications import AsyncOAuthApplications, OAuthApplications
 from .outreach import AsyncOutreach, Outreach
 from .placement import AsyncPlacement, Placement
 from .plans import AsyncPlans, Plans
+from .salesforce import AsyncSalesforce, Salesforce
 from .segments import AsyncSegments, Segments
 from .suppressions import AsyncSuppressions, Suppressions
 from .tasks import AsyncTasks, Tasks
@@ -82,6 +83,7 @@ __all__ = [
     "AsyncOutreach",
     "AsyncPlacement",
     "AsyncPlans",
+    "AsyncSalesforce",
     "AsyncSegments",
     "AsyncSuppressions",
     "AsyncTags",
@@ -113,6 +115,7 @@ __all__ = [
     "Outreach",
     "Placement",
     "Plans",
+    "Salesforce",
     "Segments",
     "Suppressions",
     "Tags",

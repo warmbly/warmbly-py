@@ -82,6 +82,14 @@ class GatewayEvent:
     #: ``cancelled``); refetch the import on receipt. Needs ``view_contacts``.
     CONTACT_IMPORT_PROGRESS = "CONTACT_IMPORT_PROGRESS"
 
+    #: Mirrored CRM records changed (a connected CRM pushed or pulled); refetch
+    #: deals, tasks and the contact panel. Carries ``org_id``, ``objects`` (a
+    #: list of the object kinds that moved) and, when one contact is affected,
+    #: ``contact_id``. Ids only; the records stay behind their list endpoints.
+    #: No permission gate, but members restricted to selected resources never
+    #: receive it because it names no mailbox or campaign.
+    CRM_SYNCED = "CRM_SYNCED"
+
     # Hosted forms and website tracking.
     FORM_SUBMISSION_CREATED = "FORM_SUBMISSION_CREATED"
     PAGE_HIT = "PAGE_HIT"

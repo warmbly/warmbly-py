@@ -57,6 +57,7 @@ from .resources import (
     AsyncOutreach,
     AsyncPlacement,
     AsyncPlans,
+    AsyncSalesforce,
     AsyncSegments,
     AsyncSuppressions,
     AsyncTags,
@@ -87,6 +88,7 @@ from .resources import (
     Outreach,
     Placement,
     Plans,
+    Salesforce,
     Segments,
     Suppressions,
     Tags,
@@ -288,6 +290,10 @@ class Warmbly(SyncAPIClient):
         return Suppressions(self)
 
     @cached_property
+    def salesforce(self) -> Salesforce:
+        return Salesforce(self)
+
+    @cached_property
     def placement(self) -> Placement:
         return Placement(self)
 
@@ -457,6 +463,10 @@ class AsyncWarmbly(AsyncAPIClient):
     @cached_property
     def suppressions(self) -> AsyncSuppressions:
         return AsyncSuppressions(self)
+
+    @cached_property
+    def salesforce(self) -> AsyncSalesforce:
+        return AsyncSalesforce(self)
 
     @cached_property
     def placement(self) -> AsyncPlacement:

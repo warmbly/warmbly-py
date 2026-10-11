@@ -69,6 +69,11 @@ class ApiKeyPermissions(BaseModel):
 
     permissions: Sequence[PermissionInfo] = []
     presets: dict[str, int] = {}
+    #: The mask the caller may put on a key: its role's reach, or the calling
+    #: key's own permissions. ``None`` on servers that predate the field.
+    grantable: int | None = None
+    #: The mask an OAuth app may request (every permission except ``API_KEYS``).
+    app_scopes: int | None = None
 
 
 class ApiKeyUsageSummary(BaseModel):

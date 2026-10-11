@@ -21,6 +21,7 @@ from .._pagination import AsyncPaginator, SyncCursorPage
 from .._resource import AsyncAPIResource, SyncAPIResource
 from .._types import NOT_GIVEN, NotGiven, NotGivenOr, RequestOptions
 from .._utils import drop_not_given
+from .salesforce import SalesforceContactPanel
 
 __all__ = [
     "AsyncContacts",
@@ -37,6 +38,7 @@ __all__ = [
     "ContactNote",
     "ContactNoteDeleted",
     "ContactResearchRun",
+    "ContactSalesforceUnlinked",
     "ContactSearchPage",
     "ContactSegment",
     "ContactSentEmail",
@@ -476,6 +478,13 @@ class ContactVerificationOverview(BaseModel):
     counts: dict[str, int] | None = None
 
 
+class ContactSalesforceUnlinked(BaseModel):
+    """The result of dropping a contact's Salesforce link (``204 No Content``)."""
+
+    id: str | None = None
+    deleted: bool | None = None
+
+
 class ContactVerificationRequested(BaseModel):
     """How many contacts a verification action touched.
 
@@ -767,6 +776,67 @@ class Contacts(SyncAPIResource):
         return self._get_api_list(
             f"/contacts/{contact_id}/segments",
             model=ContactSegment,
+            options=options,
+        )
+
+    # -- Salesforce -----------------------------------------------------------
+    def salesforce(
+        self, contact_id: str, *, options: RequestOptions | None = None
+    ) -> SalesforceContactPanel:
+        """Retrieve the contact's Salesforce panel: linked records and deals.
+
+        Needs the ``read:crm`` scope or the view-contacts permission. Answers
+        ``503`` on an instance without the Salesforce sync.
+        """
+        return self._get(
+            f"/contacts/{contact_id}/salesforce",
+            cast_to=SalesforceContactPanel,
+            options=options,
+        )
+
+    def sync_salesforce(
+        self,
+        contact_id: str,
+        *,
+        connection_id: NotGivenOr[str] = NOT_GIVEN,
+        create_as: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> SalesforceContactPanel:
+        """Match (or create) the contact in Salesforce and push its mapped fields.
+
+        Needs the ``integrations`` scope or the use-integrations permission.
+        Matching runs first, so a retry finds the record the first attempt
+        created instead of creating another. Returns the refreshed panel.
+
+        Args:
+            contact_id: The contact to sync.
+            connection_id: The Salesforce connection to sync to, when the
+                workspace has more than one.
+            create_as: What to create when nothing matches (``"Lead"`` or
+                ``"Contact"``); the connection's setting applies when omitted.
+        """
+        body = drop_not_given({"connection_id": connection_id, "create_as": create_as})
+        return self._post(
+            f"/contacts/{contact_id}/salesforce/sync",
+            cast_to=SalesforceContactPanel,
+            body=body or None,
+            options=options,
+        )
+
+    def unlink_salesforce(
+        self, contact_id: str, link_id: str, *, options: RequestOptions | None = None
+    ) -> ContactSalesforceUnlinked:
+        """Drop a contact's link to a Salesforce record (``204 No Content``).
+
+        Needs the ``integrations`` scope or the use-integrations permission.
+
+        Args:
+            contact_id: The contact.
+            link_id: The link to drop (``SalesforcePanelRecord.link_id``).
+        """
+        return self._delete(
+            f"/contacts/{contact_id}/salesforce/links/{link_id}",
+            cast_to=ContactSalesforceUnlinked,
             options=options,
         )
 
@@ -1640,6 +1710,67 @@ class AsyncContacts(AsyncAPIResource):
         return self._get_api_list(
             f"/contacts/{contact_id}/segments",
             model=ContactSegment,
+            options=options,
+        )
+
+    # -- Salesforce -----------------------------------------------------------
+    async def salesforce(
+        self, contact_id: str, *, options: RequestOptions | None = None
+    ) -> SalesforceContactPanel:
+        """Retrieve the contact's Salesforce panel: linked records and deals.
+
+        Needs the ``read:crm`` scope or the view-contacts permission. Answers
+        ``503`` on an instance without the Salesforce sync.
+        """
+        return await self._get(
+            f"/contacts/{contact_id}/salesforce",
+            cast_to=SalesforceContactPanel,
+            options=options,
+        )
+
+    async def sync_salesforce(
+        self,
+        contact_id: str,
+        *,
+        connection_id: NotGivenOr[str] = NOT_GIVEN,
+        create_as: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> SalesforceContactPanel:
+        """Match (or create) the contact in Salesforce and push its mapped fields.
+
+        Needs the ``integrations`` scope or the use-integrations permission.
+        Matching runs first, so a retry finds the record the first attempt
+        created instead of creating another. Returns the refreshed panel.
+
+        Args:
+            contact_id: The contact to sync.
+            connection_id: The Salesforce connection to sync to, when the
+                workspace has more than one.
+            create_as: What to create when nothing matches (``"Lead"`` or
+                ``"Contact"``); the connection's setting applies when omitted.
+        """
+        body = drop_not_given({"connection_id": connection_id, "create_as": create_as})
+        return await self._post(
+            f"/contacts/{contact_id}/salesforce/sync",
+            cast_to=SalesforceContactPanel,
+            body=body or None,
+            options=options,
+        )
+
+    async def unlink_salesforce(
+        self, contact_id: str, link_id: str, *, options: RequestOptions | None = None
+    ) -> ContactSalesforceUnlinked:
+        """Drop a contact's link to a Salesforce record (``204 No Content``).
+
+        Needs the ``integrations`` scope or the use-integrations permission.
+
+        Args:
+            contact_id: The contact.
+            link_id: The link to drop (``SalesforcePanelRecord.link_id``).
+        """
+        return await self._delete(
+            f"/contacts/{contact_id}/salesforce/links/{link_id}",
+            cast_to=ContactSalesforceUnlinked,
             options=options,
         )
 

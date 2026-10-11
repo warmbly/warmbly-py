@@ -161,6 +161,8 @@ class Analytics(SyncAPIResource):
         period: NotGivenOr[str] = NOT_GIVEN,
         from_: NotGivenOr[str] = NOT_GIVEN,
         to: NotGivenOr[str] = NOT_GIVEN,
+        campaign_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        folder_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> AnalyticsResult:
         """Retrieve the top-level analytics dashboard summary.
@@ -169,9 +171,25 @@ class Analytics(SyncAPIResource):
             period: The window: ``7d`` (default), ``30d`` or ``90d``.
             from_: Ignored by the server; kept for compatibility.
             to: Ignored by the server; kept for compatibility.
+            campaign_ids: Narrow the campaign-derived sections to these
+                campaigns (UUIDs, at most 100). The response then carries a
+                ``scope`` naming what the filter resolved to. Workspace-wide
+                figures such as ``active_accounts`` are not narrowed.
+            folder_ids: Narrow to every campaign in these campaign folders
+                (UUIDs, at most 100), combined with ``campaign_ids``. A
+                malformed id or too many is a 400; a campaign or folder outside
+                a restricted caller's access is a 404.
             options: Optional per-request overrides.
         """
-        query = drop_not_given({"period": period, "from": from_, "to": to})
+        query = drop_not_given(
+            {
+                "period": period,
+                "from": from_,
+                "to": to,
+                "campaign_ids": _csv(campaign_ids),
+                "folder_ids": _csv(folder_ids),
+            }
+        )
         return self._get(
             "/analytics/dashboard",
             cast_to=AnalyticsResult,
@@ -258,8 +276,10 @@ class Analytics(SyncAPIResource):
         Args:
             from_: Start of the reporting window (``YYYY-MM-DD``). The server
                 requires both ``from_`` and ``to``.
-            to: End of the reporting window (``YYYY-MM-DD``).
-            email_id: Limit the report to one mailbox.
+            to: End of the reporting window (``YYYY-MM-DD``); a window that
+                ends before it starts is a 400.
+            email_id: Limit the report to one mailbox (a UUID; anything else is
+                a 400 rather than being ignored).
             options: Optional per-request overrides.
         """
         query = drop_not_given({"from": from_, "to": to, "email_id": email_id})
@@ -502,6 +522,8 @@ class AsyncAnalytics(AsyncAPIResource):
         period: NotGivenOr[str] = NOT_GIVEN,
         from_: NotGivenOr[str] = NOT_GIVEN,
         to: NotGivenOr[str] = NOT_GIVEN,
+        campaign_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        folder_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> AnalyticsResult:
         """Retrieve the top-level analytics dashboard summary.
@@ -510,9 +532,25 @@ class AsyncAnalytics(AsyncAPIResource):
             period: The window: ``7d`` (default), ``30d`` or ``90d``.
             from_: Ignored by the server; kept for compatibility.
             to: Ignored by the server; kept for compatibility.
+            campaign_ids: Narrow the campaign-derived sections to these
+                campaigns (UUIDs, at most 100). The response then carries a
+                ``scope`` naming what the filter resolved to. Workspace-wide
+                figures such as ``active_accounts`` are not narrowed.
+            folder_ids: Narrow to every campaign in these campaign folders
+                (UUIDs, at most 100), combined with ``campaign_ids``. A
+                malformed id or too many is a 400; a campaign or folder outside
+                a restricted caller's access is a 404.
             options: Optional per-request overrides.
         """
-        query = drop_not_given({"period": period, "from": from_, "to": to})
+        query = drop_not_given(
+            {
+                "period": period,
+                "from": from_,
+                "to": to,
+                "campaign_ids": _csv(campaign_ids),
+                "folder_ids": _csv(folder_ids),
+            }
+        )
         return await self._get(
             "/analytics/dashboard",
             cast_to=AnalyticsResult,
@@ -599,8 +637,10 @@ class AsyncAnalytics(AsyncAPIResource):
         Args:
             from_: Start of the reporting window (``YYYY-MM-DD``). The server
                 requires both ``from_`` and ``to``.
-            to: End of the reporting window (``YYYY-MM-DD``).
-            email_id: Limit the report to one mailbox.
+            to: End of the reporting window (``YYYY-MM-DD``); a window that
+                ends before it starts is a 400.
+            email_id: Limit the report to one mailbox (a UUID; anything else is
+                a 400 rather than being ignored).
             options: Optional per-request overrides.
         """
         query = drop_not_given({"from": from_, "to": to, "email_id": email_id})

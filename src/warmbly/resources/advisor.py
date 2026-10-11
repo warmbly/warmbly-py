@@ -167,7 +167,12 @@ class Advisor(SyncAPIResource):
     def apply(
         self, finding_id: str, *, options: RequestOptions | None = None
     ) -> AdvisorFinding:
-        """Apply a finding's suggested fix. This changes real configuration."""
+        """Apply a finding's suggested fix. This changes real configuration.
+
+        Needs ``read_analytics`` plus the scope of the change the fix makes. A
+        key limited to some mailboxes can only apply a fix for one of them (a
+        ``403`` otherwise).
+        """
         return self._post(
             f"/advisor/recommendations/{finding_id}/apply",
             cast_to=AdvisorFinding,
@@ -177,7 +182,11 @@ class Advisor(SyncAPIResource):
     def undo(
         self, finding_id: str, *, options: RequestOptions | None = None
     ) -> AdvisorFinding:
-        """Revert a previously applied fix."""
+        """Revert a previously applied fix.
+
+        Needs ``read_analytics`` plus the scope of the change being reverted,
+        and the same mailbox limits as :meth:`apply`.
+        """
         return self._post(
             f"/advisor/recommendations/{finding_id}/undo",
             cast_to=AdvisorFinding,
@@ -294,7 +303,12 @@ class AsyncAdvisor(AsyncAPIResource):
     async def apply(
         self, finding_id: str, *, options: RequestOptions | None = None
     ) -> AdvisorFinding:
-        """Apply a finding's suggested fix. This changes real configuration."""
+        """Apply a finding's suggested fix. This changes real configuration.
+
+        Needs ``read_analytics`` plus the scope of the change the fix makes. A
+        key limited to some mailboxes can only apply a fix for one of them (a
+        ``403`` otherwise).
+        """
         return await self._post(
             f"/advisor/recommendations/{finding_id}/apply",
             cast_to=AdvisorFinding,
@@ -304,7 +318,11 @@ class AsyncAdvisor(AsyncAPIResource):
     async def undo(
         self, finding_id: str, *, options: RequestOptions | None = None
     ) -> AdvisorFinding:
-        """Revert a previously applied fix."""
+        """Revert a previously applied fix.
+
+        Needs ``read_analytics`` plus the scope of the change being reverted,
+        and the same mailbox limits as :meth:`apply`.
+        """
         return await self._post(
             f"/advisor/recommendations/{finding_id}/undo",
             cast_to=AdvisorFinding,

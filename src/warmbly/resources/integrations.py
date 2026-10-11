@@ -27,6 +27,8 @@ from .._utils import drop_not_given
 
 __all__ = [
     "AsyncIntegrations",
+    "CommunityApp",
+    "CommunityAppPermission",
     "IntegrationBooking",
     "IntegrationCatalogEntry",
     "IntegrationConnection",
@@ -43,6 +45,46 @@ __all__ = [
     "Integrations",
     "PushResult",
 ]
+
+
+class CommunityAppPermission(BaseModel):
+    """One API permission an app asks for, spelled out."""
+
+    name: str | None = None
+    value: int | None = None
+    description: str | None = None
+    category: str | None = None
+
+
+class CommunityApp(BaseModel):
+    """A community directory listing as this workspace sees it.
+
+    ``status`` is ``published`` or ``featured``. ``listed`` means it shows in
+    discovery; an unlisted published app is only reachable by its ``slug``.
+    ``installed`` reports whether this workspace already uses it, and
+    ``scopes`` is the bitmask that ``permissions`` spells out. No credential or
+    redirect field is ever included.
+    """
+
+    application_id: str
+    slug: str | None = None
+    name: str | None = None
+    tagline: str | None = None
+    description: str | None = None
+    category: str | None = None
+    logo_url: str | None = None
+    website_url: str | None = None
+    install_url: str | None = None
+    support_url: str | None = None
+    privacy_url: str | None = None
+    developer: str | None = None
+    scopes: int | None = None
+    permissions: Sequence[CommunityAppPermission] = []
+    status: str | None = None
+    listed: bool | None = None
+    installs: int | None = None
+    installed: bool | None = None
+    published_at: str | None = None
 
 
 class IntegrationCatalogEntry(BaseModel):
@@ -264,6 +306,41 @@ class Integrations(SyncAPIResource):
             "/integrations/catalog",
             model=IntegrationCatalogEntry,
             data_key="catalog",
+            options=options,
+        )
+
+    def community(
+        self,
+        *,
+        limit: NotGivenOr[int] = NOT_GIVEN,
+        cursor: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> SyncCursorPage[CommunityApp]:
+        """List the community apps shown in discovery, featured first.
+
+        Needs read access to integrations.
+
+        Args:
+            limit: Page size, 1 to 200 (default 100).
+            cursor: An opaque cursor from a previous page.
+        """
+        return self._get_api_list(
+            "/integrations/community",
+            model=CommunityApp,
+            query=drop_not_given({"limit": limit, "cursor": cursor}),
+            options=options,
+        )
+
+    def get_community_app(
+        self, slug: str, *, options: RequestOptions | None = None
+    ) -> CommunityApp:
+        """Open a published community app by its link slug, listed or not.
+
+        Needs read access to integrations.
+        """
+        return self._get(
+            f"/integrations/community/{slug}",
+            cast_to=CommunityApp,
             options=options,
         )
 
@@ -565,7 +642,7 @@ class Integrations(SyncAPIResource):
         """List recently booked meetings from scheduling integrations.
 
         Capped at the 50 most recent. Use ``client.meetings.list()`` for the
-        full, filterable meetings list.
+        full, filterable meetings list. Requires ``read_contacts``.
         """
         return self._get_api_list(
             "/integrations/bookings",
@@ -586,6 +663,41 @@ class AsyncIntegrations(AsyncAPIResource):
             "/integrations/catalog",
             model=IntegrationCatalogEntry,
             data_key="catalog",
+            options=options,
+        )
+
+    def community(
+        self,
+        *,
+        limit: NotGivenOr[int] = NOT_GIVEN,
+        cursor: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> AsyncPaginator[CommunityApp]:
+        """List the community apps shown in discovery, featured first.
+
+        Needs read access to integrations.
+
+        Args:
+            limit: Page size, 1 to 200 (default 100).
+            cursor: An opaque cursor from a previous page.
+        """
+        return self._get_api_list(
+            "/integrations/community",
+            model=CommunityApp,
+            query=drop_not_given({"limit": limit, "cursor": cursor}),
+            options=options,
+        )
+
+    async def get_community_app(
+        self, slug: str, *, options: RequestOptions | None = None
+    ) -> CommunityApp:
+        """Open a published community app by its link slug, listed or not.
+
+        Needs read access to integrations.
+        """
+        return await self._get(
+            f"/integrations/community/{slug}",
+            cast_to=CommunityApp,
             options=options,
         )
 
@@ -887,7 +999,7 @@ class AsyncIntegrations(AsyncAPIResource):
         """List recently booked meetings from scheduling integrations.
 
         Capped at the 50 most recent. Use ``client.meetings.list()`` for the
-        full, filterable meetings list.
+        full, filterable meetings list. Requires ``read_contacts``.
         """
         return self._get_api_list(
             "/integrations/bookings",

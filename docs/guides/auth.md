@@ -186,6 +186,7 @@ from warmbly import ALL_SCOPES, READ_ONLY_SCOPES, FULL_ACCESS_SCOPES, SCOPES
 
 READ_ONLY_SCOPES    # every read_* scope and nothing else
 FULL_ACCESS_SCOPES  # every scope (same as ALL_SCOPES)
+APP_GRANTABLE_SCOPES  # what an OAuth app may request: every scope but api_keys
 SCOPES              # the name -> bit mapping, if you want to build your own
 ```
 

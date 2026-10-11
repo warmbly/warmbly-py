@@ -14,7 +14,7 @@ reachable with an API key or OAuth token and is deliberately absent here.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from .._models import BaseModel
@@ -67,6 +67,13 @@ class EmailAccount(BaseModel):
     ``inbox`` or ``archive``; ``warmup_folder`` names the destination for
     ``folder``; ``warmup_retention_days`` is ``0`` for the instance default.
     ``relay_folder_moves`` mirrors unibox filing into the mailbox itself.
+
+    ``test_mode`` is ``off``, ``diagnostic`` or ``legacy`` (or ``None`` for a
+    mailbox that predates the setting, which behaves as ``legacy``);
+    ``test_send_enabled`` and ``test_receive_enabled`` split diagnostic
+    sending from receiving. ``shared_daily_limit`` and
+    ``rolling_recipient_limit`` are optional ceilings across all outbound
+    lanes, ``None`` when the default applies.
     """
 
     id: str
@@ -89,6 +96,11 @@ class EmailAccount(BaseModel):
     vendor: str | None = None
     avatar_url: str | None = None
     campaign_limit: int | None = None
+    test_mode: str | None = None
+    test_send_enabled: bool | None = None
+    test_receive_enabled: bool | None = None
+    shared_daily_limit: int | None = None
+    rolling_recipient_limit: int | None = None
     min_wait_time: int | None = None
     reply_to: str | None = None
     tracking_domain: str | None = None
@@ -497,6 +509,12 @@ def _update_body(
     warmup_placement: NotGivenOr[str],
     warmup_folder: NotGivenOr[str],
     warmup_retention_days: NotGivenOr[int],
+    test_mode: NotGivenOr[str],
+    test_send_enabled: NotGivenOr[bool],
+    test_receive_enabled: NotGivenOr[bool],
+    shared_daily_limit: NotGivenOr[int],
+    rolling_recipient_limit: NotGivenOr[int],
+    send_recovery_resolution: NotGivenOr[Mapping[str, Any]],
 ) -> dict[str, Any]:
     return drop_not_given(
         {
@@ -526,6 +544,12 @@ def _update_body(
             "warmup_placement": warmup_placement,
             "warmup_folder": warmup_folder,
             "warmup_retention_days": warmup_retention_days,
+            "test_mode": test_mode,
+            "test_send_enabled": test_send_enabled,
+            "test_receive_enabled": test_receive_enabled,
+            "shared_daily_limit": shared_daily_limit,
+            "rolling_recipient_limit": rolling_recipient_limit,
+            "send_recovery_resolution": send_recovery_resolution,
         }
     )
 
@@ -623,6 +647,12 @@ class Emails(SyncAPIResource):
         warmup_placement: NotGivenOr[str] = NOT_GIVEN,
         warmup_folder: NotGivenOr[str] = NOT_GIVEN,
         warmup_retention_days: NotGivenOr[int] = NOT_GIVEN,
+        test_mode: NotGivenOr[str] = NOT_GIVEN,
+        test_send_enabled: NotGivenOr[bool] = NOT_GIVEN,
+        test_receive_enabled: NotGivenOr[bool] = NOT_GIVEN,
+        shared_daily_limit: NotGivenOr[int] = NOT_GIVEN,
+        rolling_recipient_limit: NotGivenOr[int] = NOT_GIVEN,
+        send_recovery_resolution: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> EmailAccount:
         """Update an account's settings.
@@ -634,7 +664,7 @@ class Emails(SyncAPIResource):
             reply_to: A ``Reply-To`` address for sends from this mailbox.
             timezone: An IANA timezone (e.g. ``"America/New_York"``).
             tags: Replacement list of tags.
-            campaign_limit: Max campaign emails per day from this mailbox.
+            campaign_limit: Cold-email safety ceiling for this mailbox across all campaigns, ``0`` to ``5000`` (default ``50``). The lower of this and the mailbox's sending-plan target wins.
             min_wait_time: Minimum minutes between sends.
             signature_plain: Plain-text signature.
             signature_html: HTML signature.
@@ -652,7 +682,10 @@ class Emails(SyncAPIResource):
             warmup_increase: Daily ramp increment.
             warmup_reply_rate: Target warmup reply rate, as a percentage.
             warmup_tag: The warmup pool tag.
-            warmup_start_time: Daily warmup window start (``"HH:MM"``).
+            warmup_start_time: Daily warmup window start (``"HH:MM"``). Checked
+                together with the end: the end must be later on the same day,
+                or the request is a 400. A patch with one of the two is
+                checked against the stored other.
             warmup_end_time: Daily warmup window end (``"HH:MM"``).
             warmup_days: Number of days in the warmup week.
             warmup_placement: Where warmup mail is filed: ``"folder"``,
@@ -661,6 +694,33 @@ class Emails(SyncAPIResource):
                 string goes back to the instance default.
             warmup_retention_days: Days warmup mail is kept before deletion;
                 ``0`` uses the instance setting.
+            test_mode: Whether this mailbox takes part in diagnostic tests:
+                ``"diagnostic"`` or ``"off"`` (new mailboxes start ``"off"``).
+                ``"legacy"`` is still accepted and keeps the historical
+                behaviour of mailboxes created before the setting existed.
+            test_send_enabled: Allow diagnostic sending. Only has an effect in
+                ``"diagnostic"`` mode.
+            test_receive_enabled: Allow diagnostic receiving, independently of
+                sending. Only has an effect in ``"diagnostic"`` mode.
+            shared_daily_limit: A positive mailbox-wide ceiling on sends per
+                calendar day across every outbound lane; ``0`` clears the
+                override.
+            rolling_recipient_limit: A positive ceiling on recipients (every
+                To, CC and BCC occurrence) in any rolling 24 hours; ``0``
+                restores the default.
+            send_recovery_resolution: Release a send hold with evidence. A
+                mapping with the exact ``held_task_id`` and ``held_reason``
+                (``authentication``, ``permanent``, ``conflict`` or
+                ``unknown``) plus an ``evidence_type``:
+                ``authentication_repaired`` or
+                ``operator_provider_confirmation`` (both with an
+                ``evidence_task_id``; the latter also needs a
+                ``confirmation_reference``), or, for ``unknown``,
+                ``operator_confirmed_sent`` (needs ``message_id``; optional
+                ``provider_msg_id`` and ``thread_id``) or
+                ``operator_confirmed_not_sent``. The server queues an audited
+                result rather than clearing the hold at once; a wrong
+                confirmation can duplicate an email.
             options: Per-request overrides.
         """
         return self._patch(
@@ -693,6 +753,12 @@ class Emails(SyncAPIResource):
                 warmup_placement=warmup_placement,
                 warmup_folder=warmup_folder,
                 warmup_retention_days=warmup_retention_days,
+                test_mode=test_mode,
+                test_send_enabled=test_send_enabled,
+                test_receive_enabled=test_receive_enabled,
+                shared_daily_limit=shared_daily_limit,
+                rolling_recipient_limit=rolling_recipient_limit,
+                send_recovery_resolution=send_recovery_resolution,
             ),
             options=options,
         )
@@ -1207,6 +1273,12 @@ class AsyncEmails(AsyncAPIResource):
         warmup_placement: NotGivenOr[str] = NOT_GIVEN,
         warmup_folder: NotGivenOr[str] = NOT_GIVEN,
         warmup_retention_days: NotGivenOr[int] = NOT_GIVEN,
+        test_mode: NotGivenOr[str] = NOT_GIVEN,
+        test_send_enabled: NotGivenOr[bool] = NOT_GIVEN,
+        test_receive_enabled: NotGivenOr[bool] = NOT_GIVEN,
+        shared_daily_limit: NotGivenOr[int] = NOT_GIVEN,
+        rolling_recipient_limit: NotGivenOr[int] = NOT_GIVEN,
+        send_recovery_resolution: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> EmailAccount:
         """Update an account's settings.
@@ -1218,7 +1290,7 @@ class AsyncEmails(AsyncAPIResource):
             reply_to: A ``Reply-To`` address for sends from this mailbox.
             timezone: An IANA timezone (e.g. ``"America/New_York"``).
             tags: Replacement list of tags.
-            campaign_limit: Max campaign emails per day from this mailbox.
+            campaign_limit: Cold-email safety ceiling for this mailbox across all campaigns, ``0`` to ``5000`` (default ``50``). The lower of this and the mailbox's sending-plan target wins.
             min_wait_time: Minimum minutes between sends.
             signature_plain: Plain-text signature.
             signature_html: HTML signature.
@@ -1236,7 +1308,10 @@ class AsyncEmails(AsyncAPIResource):
             warmup_increase: Daily ramp increment.
             warmup_reply_rate: Target warmup reply rate, as a percentage.
             warmup_tag: The warmup pool tag.
-            warmup_start_time: Daily warmup window start (``"HH:MM"``).
+            warmup_start_time: Daily warmup window start (``"HH:MM"``). Checked
+                together with the end: the end must be later on the same day,
+                or the request is a 400. A patch with one of the two is
+                checked against the stored other.
             warmup_end_time: Daily warmup window end (``"HH:MM"``).
             warmup_days: Number of days in the warmup week.
             warmup_placement: Where warmup mail is filed: ``"folder"``,
@@ -1245,6 +1320,33 @@ class AsyncEmails(AsyncAPIResource):
                 string goes back to the instance default.
             warmup_retention_days: Days warmup mail is kept before deletion;
                 ``0`` uses the instance setting.
+            test_mode: Whether this mailbox takes part in diagnostic tests:
+                ``"diagnostic"`` or ``"off"`` (new mailboxes start ``"off"``).
+                ``"legacy"`` is still accepted and keeps the historical
+                behaviour of mailboxes created before the setting existed.
+            test_send_enabled: Allow diagnostic sending. Only has an effect in
+                ``"diagnostic"`` mode.
+            test_receive_enabled: Allow diagnostic receiving, independently of
+                sending. Only has an effect in ``"diagnostic"`` mode.
+            shared_daily_limit: A positive mailbox-wide ceiling on sends per
+                calendar day across every outbound lane; ``0`` clears the
+                override.
+            rolling_recipient_limit: A positive ceiling on recipients (every
+                To, CC and BCC occurrence) in any rolling 24 hours; ``0``
+                restores the default.
+            send_recovery_resolution: Release a send hold with evidence. A
+                mapping with the exact ``held_task_id`` and ``held_reason``
+                (``authentication``, ``permanent``, ``conflict`` or
+                ``unknown``) plus an ``evidence_type``:
+                ``authentication_repaired`` or
+                ``operator_provider_confirmation`` (both with an
+                ``evidence_task_id``; the latter also needs a
+                ``confirmation_reference``), or, for ``unknown``,
+                ``operator_confirmed_sent`` (needs ``message_id``; optional
+                ``provider_msg_id`` and ``thread_id``) or
+                ``operator_confirmed_not_sent``. The server queues an audited
+                result rather than clearing the hold at once; a wrong
+                confirmation can duplicate an email.
             options: Per-request overrides.
         """
         return await self._patch(
@@ -1277,6 +1379,12 @@ class AsyncEmails(AsyncAPIResource):
                 warmup_placement=warmup_placement,
                 warmup_folder=warmup_folder,
                 warmup_retention_days=warmup_retention_days,
+                test_mode=test_mode,
+                test_send_enabled=test_send_enabled,
+                test_receive_enabled=test_receive_enabled,
+                shared_daily_limit=shared_daily_limit,
+                rolling_recipient_limit=rolling_recipient_limit,
+                send_recovery_resolution=send_recovery_resolution,
             ),
             options=options,
         )
