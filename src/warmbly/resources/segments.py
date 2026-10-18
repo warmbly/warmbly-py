@@ -22,7 +22,7 @@ from typing import Any
 from .._models import BaseModel
 from .._pagination import AsyncPaginator, SyncCursorPage
 from .._resource import AsyncAPIResource, SyncAPIResource
-from .._types import NOT_GIVEN, NotGivenOr, RequestOptions
+from .._types import NOT_GIVEN, NotGiven, NotGivenOr, RequestOptions
 from .._utils import drop_not_given
 
 __all__ = [
@@ -75,7 +75,8 @@ class SegmentField(BaseModel):
 
     ``kind`` is one of ``text``, ``enum``, ``bool``, ``date``, ``number``,
     ``category``, ``campaign`` or ``segment``; ``options`` lists the accepted
-    values of an enum field.
+    values of an enum field and ``option_labels`` names those values for
+    display where the value alone is not readable.
     """
 
     field: str | None = None
@@ -83,6 +84,7 @@ class SegmentField(BaseModel):
     group: str | None = None
     kind: str | None = None
     options: Sequence[str] = []
+    option_labels: dict[str, str] = {}
 
 
 class SegmentPreview(BaseModel):
@@ -149,6 +151,25 @@ def _segment_body(
             "conditions": conditions,
         }
     )
+
+
+def _members_body(
+    *,
+    mode: str,
+    contacts: NotGivenOr[Sequence[str]],
+    select_all: NotGivenOr[bool],
+    filters: NotGivenOr[Mapping[str, Any]],
+    exclude: NotGivenOr[Sequence[str]],
+) -> dict[str, Any]:
+    """Build the set-members body: a contact selection plus the mode."""
+    body = drop_not_given(
+        {"all": select_all, "filters": filters, "mode": mode},
+    )
+    if not isinstance(contacts, NotGiven):
+        body["contacts"] = list(contacts)
+    if not isinstance(exclude, NotGiven):
+        body["exclude"] = list(exclude)
+    return body
 
 
 class Segments(SyncAPIResource):
@@ -266,22 +287,39 @@ class Segments(SyncAPIResource):
         self,
         segment_id: str,
         *,
-        contacts: Sequence[str],
         mode: str,
+        contacts: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        select_all: NotGivenOr[bool] = NOT_GIVEN,
+        filters: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        exclude: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> SegmentMembersUpdated:
         """Pin contacts into or out of a segment.
 
+        Name the contacts either by id (``contacts``) or, with
+        ``select_all=True``, by the same filter body ``contacts.search``
+        takes (``filters``), minus the ids in ``exclude``.
+
         Args:
             segment_id: The segment id.
-            contacts: The contact ids to override.
             mode: ``"include"``, ``"exclude"``, or ``"auto"`` to clear the
                 override so the conditions decide again.
+            contacts: The contact ids to override.
+            select_all: Resolve the contacts from *filters* instead of the
+                id list.
+            filters: A contact search body; used when *select_all* is set.
+            exclude: Contact ids to drop from a *select_all* selection.
         """
         return self._post(
             f"/segments/{segment_id}/members",
             cast_to=SegmentMembersUpdated,
-            body={"contacts": list(contacts), "mode": mode},
+            body=_members_body(
+                mode=mode,
+                contacts=contacts,
+                select_all=select_all,
+                filters=filters,
+                exclude=exclude,
+            ),
             options=options,
         )
 
@@ -447,22 +485,39 @@ class AsyncSegments(AsyncAPIResource):
         self,
         segment_id: str,
         *,
-        contacts: Sequence[str],
         mode: str,
+        contacts: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        select_all: NotGivenOr[bool] = NOT_GIVEN,
+        filters: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        exclude: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> SegmentMembersUpdated:
         """Pin contacts into or out of a segment.
 
+        Name the contacts either by id (``contacts``) or, with
+        ``select_all=True``, by the same filter body ``contacts.search``
+        takes (``filters``), minus the ids in ``exclude``.
+
         Args:
             segment_id: The segment id.
-            contacts: The contact ids to override.
             mode: ``"include"``, ``"exclude"``, or ``"auto"`` to clear the
                 override so the conditions decide again.
+            contacts: The contact ids to override.
+            select_all: Resolve the contacts from *filters* instead of the
+                id list.
+            filters: A contact search body; used when *select_all* is set.
+            exclude: Contact ids to drop from a *select_all* selection.
         """
         return await self._post(
             f"/segments/{segment_id}/members",
             cast_to=SegmentMembersUpdated,
-            body={"contacts": list(contacts), "mode": mode},
+            body=_members_body(
+                mode=mode,
+                contacts=contacts,
+                select_all=select_all,
+                filters=filters,
+                exclude=exclude,
+            ),
             options=options,
         )
 

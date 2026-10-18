@@ -21,7 +21,7 @@ from pydantic import Field
 from .._models import BaseModel
 from .._pagination import AsyncPaginator, SyncCursorPage
 from .._resource import AsyncAPIResource, SyncAPIResource
-from .._types import NOT_GIVEN, NotGivenOr, RequestOptions
+from .._types import NOT_GIVEN, NotGiven, NotGivenOr, RequestOptions
 from .._utils import drop_not_given
 from .forms import CampaignFormStats
 
@@ -34,14 +34,33 @@ __all__ = [
     "CampaignAdvanced",
     "CampaignAttachment",
     "CampaignAttachmentDeleted",
+    "CampaignColdRamp",
     "CampaignDeleted",
     "CampaignEstimate",
+    "CampaignEstimateDay",
+    "CampaignEstimateSender",
+    "CampaignEstimateWarmup",
     "CampaignForms",
+    "CampaignLeadCC",
+    "CampaignLeadCCList",
+    "CampaignLeadCCSuggestion",
+    "CampaignLeadCCSuggestions",
+    "CampaignLeadHold",
+    "CampaignLeadHoldState",
+    "CampaignLeadSupply",
     "CampaignLog",
+    "CampaignMailboxPlan",
+    "CampaignOrgAllowance",
+    "CampaignPlacementMonitor",
+    "CampaignPlacementMonitorDeleted",
+    "CampaignPlacementMonitorResult",
     "CampaignPreflight",
     "CampaignRunState",
     "CampaignSegmentLink",
     "CampaignSegments",
+    "CampaignSendLimit",
+    "CampaignSendPlan",
+    "CampaignSendWindow",
     "CampaignSender",
     "CampaignSenders",
     "CampaignStep",
@@ -61,10 +80,11 @@ class Campaign(BaseModel):
     ``days`` is a weekday bitmask; ``schedule_windows`` supersedes it when
     present. ``senders`` is loaded on demand, not on the list endpoint.
 
-    ``kind`` is fixed at creation: ``"sequence"`` (the multi-step default) or
-    ``"one_time"``, a single message with no follow-ups. A ``continuous``
+    ``timezone`` is empty when the campaign follows the workspace timezone;
+    ``effective_timezone`` is the zone in use either way. A ``continuous``
     campaign that runs out of leads stays active and waits for more instead of
-    finishing, with ``idle_since`` set while it waits.
+    finishing, with ``idle_since`` set while it waits. ``entry_delay_minutes``
+    holds a contact's first email back that long after they enter the campaign.
     """
 
     id: str
@@ -73,7 +93,6 @@ class Campaign(BaseModel):
     name: str | None = None
     description: str | None = None
     status: str | None = None
-    kind: str | None = None
     stop_on_reply: bool | None = None
     open_tracking: bool | None = None
     link_tracking: bool | None = None
@@ -87,6 +106,7 @@ class Campaign(BaseModel):
     start_date: str | None = None
     end_date: str | None = None
     timezone: str | None = None
+    effective_timezone: str | None = None
     days: int | None = None
     start_time: str | None = None
     end_time: str | None = None
@@ -108,6 +128,7 @@ class Campaign(BaseModel):
     esp_match_mode: str | None = None
     max_new_leads_per_day: int | None = None
     prioritize_new_leads: bool | None = None
+    entry_delay_minutes: int | None = None
     continuous: bool | None = None
     idle_since: str | None = None
     guardrail_enabled: bool | None = None
@@ -145,7 +166,6 @@ class CampaignsOverview(BaseModel):
     paused: int | None = None
     draft: int | None = None
     completed: int | None = None
-    one_time: int | None = None
     folders: Sequence[dict[str, Any]] = []
 
 
@@ -179,7 +199,8 @@ class CampaignStep(BaseModel):
 
     ``kind`` distinguishes an email step from a non-email action step, whose
     behaviour lives in ``action``. ``wait_after`` is the delay, in days, before
-    the *next* step fires.
+    the *next* step fires. ``thread_reply`` sends the step as a reply in the
+    conversation the contact's first email opened instead of starting a new one.
     """
 
     id: str
@@ -190,6 +211,7 @@ class CampaignStep(BaseModel):
     body_sync: bool | None = None
     body_code: bool | None = None
     wait_after: int | None = None
+    thread_reply: bool | None = None
     position: int | None = None
     x: float | None = None
     y: float | None = None
@@ -346,13 +368,56 @@ class CampaignTemplatePreview(BaseModel):
     unresolved: Sequence[str] = []
 
 
+class CampaignEstimateWarmup(BaseModel):
+    """The warmup traffic that keeps running beside a campaign."""
+
+    mailboxes: int | None = None
+    per_day: int | None = None
+
+
+class CampaignEstimateDay(BaseModel):
+    """One calendar day of a campaign projection."""
+
+    date: str | None = None
+    sending_day: bool | None = None
+    capacity: int | None = None
+    sends: int | None = None
+    first_emails: int | None = None
+    follow_ups: int | None = None
+    warmup: int | None = None
+
+
+class CampaignEstimateSender(BaseModel):
+    """One mailbox's part in a campaign projection.
+
+    ``state`` is one of ``ready``, ``ramping``, ``throttled``, ``health_hold``,
+    ``domain_auth``, ``resting``, ``no_worker``, ``send_recovery``,
+    ``send_cooldown`` or ``send_authority``.
+    """
+
+    id: str | None = None
+    email: str | None = None
+    provider: str | None = None
+    state: str | None = None
+    first_day_cap: int | None = None
+    steady_cap: int | None = None
+    warmup_per_day: int | None = None
+    full_cap_at: str | None = None
+
+
 class CampaignEstimate(BaseModel):
     """A projection of an audience against a sender pool. Nothing is written.
 
     ``daily_capacity`` is the pool's per-day ceiling under the campaign limit
-    and ``remaining_today`` subtracts what those mailboxes already sent today.
-    ``sending_days`` and ``estimated_finish_at`` are ``None`` when the pool has
-    no capacity at all.
+    today and ``remaining_today`` subtracts what those mailboxes already sent
+    today. ``sending_days`` and ``estimated_finish_at`` are ``None`` when the
+    pool has no capacity at all or the projection horizon is passed.
+    ``steps`` is how many emails each contact receives and ``total_sends`` is
+    recipients times steps. ``bottleneck`` names the clamp that costs the most
+    sends on the first sending day (``campaign_limit``, ``warmup_graduation``,
+    ``spacing``, ``other_campaigns``, ``health``, ``held``,
+    ``workspace_risk``, ``org_daily_limit`` or ``sending_behavior``) and is
+    empty when the mailboxes' own caps are the limit.
     """
 
     recipients: int | None = None
@@ -361,6 +426,18 @@ class CampaignEstimate(BaseModel):
     remaining_today: int | None = None
     sending_days: int | None = None
     estimated_finish_at: str | None = None
+    steps: int | None = None
+    total_sends: int | None = None
+    first_touch_finish_at: str | None = None
+    steady_capacity: int | None = None
+    full_capacity_at: str | None = None
+    ramping: int | None = None
+    held: int | None = None
+    warmup: CampaignEstimateWarmup | None = None
+    other_campaigns_per_day: int | None = None
+    bottleneck: str | None = None
+    timeline: Sequence[CampaignEstimateDay] = []
+    senders: Sequence[CampaignEstimateSender] = []
 
 
 class CampaignSegmentLink(BaseModel):
@@ -384,12 +461,16 @@ class CampaignSegmentLink(BaseModel):
 class CampaignSegments(BaseModel):
     """A campaign's linked segments.
 
-    ``added`` is how many new leads the last replace enrolled; it is ``None``
-    when simply reading the set.
+    ``added`` is how many new leads the last replace enrolled. ``withdrawn``
+    is how many leads a detached segment brought that were taken out again, and
+    ``contacted`` how many of those the campaign had already written to, which
+    stay. All three are ``None`` when simply reading the set.
     """
 
     data: Sequence[CampaignSegmentLink] = []
     added: int | None = None
+    withdrawn: int | None = None
+    contacted: int | None = None
 
 
 class CampaignForms(BaseModel):
@@ -398,13 +479,224 @@ class CampaignForms(BaseModel):
     data: Sequence[CampaignFormStats] = []
 
 
+class CampaignLeadHold(BaseModel):
+    """A live hold parking one lead's flow inside one campaign.
+
+    ``source`` is ``manual``, ``out_of_office``, ``inbox_tagging``, ``crm`` or
+    ``cc``. ``until`` is ``None`` for a hold with no end, which only a resume
+    lifts.
+    """
+
+    since: str | None = None
+    until: str | None = None
+    reason: str | None = None
+    source: str | None = None
+
+
+class CampaignLeadHoldState(BaseModel):
+    """Whether one lead's flow in one campaign is held.
+
+    ``hold`` is ``None`` when the lead is not held.
+    """
+
+    campaign_id: str | None = None
+    contact_id: str | None = None
+    hold: CampaignLeadHold | None = None
+
+
+class CampaignLeadCC(BaseModel):
+    """A contact copied on every email one campaign sends one lead.
+
+    ``status`` says whether the next email copies them: ``active``, or
+    ``unsubscribed``, ``bounced`` or ``undeliverable`` when it is left off.
+    """
+
+    contact_id: str | None = None
+    email: str | None = None
+    first_name: str | None = None
+    last_name: str | None = None
+    company: str | None = None
+    status: str | None = None
+    bounced_at: str | None = None
+
+
+class CampaignLeadCCList(BaseModel):
+    """The contacts copied on one lead's emails in one campaign."""
+
+    campaign_id: str | None = None
+    contact_id: str | None = None
+    cc: Sequence[CampaignLeadCC] = []
+
+
+class CampaignLeadCCSuggestion(BaseModel):
+    """A contact who looks like a colleague of the lead.
+
+    ``reason`` is ``company`` when the company names match and ``domain`` when
+    only the email domain does.
+    """
+
+    contact_id: str | None = None
+    email: str | None = None
+    first_name: str | None = None
+    last_name: str | None = None
+    company: str | None = None
+    reason: str | None = None
+
+
+class CampaignLeadCCSuggestions(BaseModel):
+    """Likely colleagues of a lead, offered first when picking who to copy."""
+
+    data: Sequence[CampaignLeadCCSuggestion] = []
+
+
+class CampaignPlacementMonitor(BaseModel):
+    """A campaign's scheduled inbox placement test.
+
+    ``panel`` is ``instance``, ``workspace`` or ``cloud``. ``alert_below`` is
+    an inbox percentage (0 to 100).
+    """
+
+    id: str
+    campaign_id: str | None = None
+    created_by: str | None = None
+    enabled: bool | None = None
+    interval_days: int | None = None
+    panel: str | None = None
+    alert_below: int | None = None
+    pause_on_alert: bool | None = None
+    next_run_at: str | None = None
+    last_run_at: str | None = None
+    last_test_id: str | None = None
+    last_alert_at: str | None = None
+    last_error: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+class CampaignPlacementMonitorResult(BaseModel):
+    """A campaign's placement monitor; ``data`` is ``None`` when it has none."""
+
+    data: CampaignPlacementMonitor | None = None
+
+
+class CampaignPlacementMonitorDeleted(BaseModel):
+    """The result of removing a placement monitor (``204 No Content``)."""
+
+    id: str | None = None
+    deleted: bool | None = None
+
+
+class CampaignSendLimit(BaseModel):
+    """One clamp in a send plan's waterfall and how many emails it removed."""
+
+    kind: str | None = None
+    emails: int | None = None
+    mailboxes: int | None = None
+
+
+class CampaignSendWindow(BaseModel):
+    """The campaign's sending calendar for today."""
+
+    sending_day: bool | None = None
+    open_now: bool | None = None
+    opens_at: str | None = None
+    closes_at: str | None = None
+    minutes_left: int | None = None
+    starts_at: str | None = None
+    ends_at: str | None = None
+
+
+class CampaignLeadSupply(BaseModel):
+    """How many leads are due, which is the other half of the day's number."""
+
+    due_now: int | None = None
+    due_later_today: int | None = None
+    new_leads_due_today: int | None = None
+    waiting_on_step: int | None = None
+    waiting_on_condition: int | None = None
+    held: int | None = None
+    waiting_on_sender: int | None = None
+    new_leads_started_today: int | None = None
+    max_new_leads_per_day: int | None = None
+    next_due_at: str | None = None
+
+
+class CampaignColdRamp(BaseModel):
+    """The warmup graduation ceiling holding a mailbox below its own cap."""
+
+    ceiling: int | None = None
+    mailbox_cap: int | None = None
+    days_to_full_cap: int | None = None
+    held: bool | None = None
+
+
+class CampaignMailboxPlan(BaseModel):
+    """One mailbox's day on a campaign.
+
+    ``limited_by`` names the clamp that set ``cap_today`` and ``state`` says
+    why the mailbox is or is not sending now.
+    """
+
+    id: str | None = None
+    email: str | None = None
+    provider: str | None = None
+    configured_cap: int | None = None
+    cap_today: int | None = None
+    limited_by: str | None = None
+    sent_today: int | None = None
+    sent_by_other_campaigns: int | None = None
+    expected_remaining: int | None = None
+    state: str | None = None
+    reopens_at: str | None = None
+    health: str | None = None
+    min_gap_seconds: int | None = None
+    graduation: CampaignColdRamp | None = None
+
+
+class CampaignOrgAllowance(BaseModel):
+    """The workspace's plan-level daily campaign allowance."""
+
+    daily_limit: int | None = None
+    sent_today: int | None = None
+    remaining: int | None = None
+
+
+class CampaignSendPlan(BaseModel):
+    """What one campaign will send today and why that number is what it is.
+
+    The plan is a waterfall: ``configured_ceiling`` minus every ``limits``
+    entry minus ``sent_today`` equals ``expected_remaining``. ``bottleneck``
+    names the limit deciding ``projected_today`` and is empty when nothing
+    binds below the ceiling. ``stale`` is ``True`` when the figures come from
+    a snapshot the campaign has since outrun; a refreshed plan follows within
+    moments.
+    """
+
+    campaign_id: str | None = None
+    status: str | None = None
+    day: str | None = None
+    timezone: str | None = None
+    computed_at: str | None = None
+    stale: bool | None = None
+    configured_ceiling: int | None = None
+    projected_today: int | None = None
+    sent_today: int | None = None
+    expected_remaining: int | None = None
+    bottleneck: str | None = None
+    limits: Sequence[CampaignSendLimit] = []
+    window: CampaignSendWindow | None = None
+    leads: CampaignLeadSupply | None = None
+    mailboxes: Sequence[CampaignMailboxPlan] = []
+    organization: CampaignOrgAllowance | None = None
+    next_wake_at: str | None = None
+
+
 def _campaign_body(
     *,
     for_create: bool = False,
     name: NotGivenOr[str] = NOT_GIVEN,
     description: NotGivenOr[str] = NOT_GIVEN,
     status: NotGivenOr[str] = NOT_GIVEN,
-    kind: NotGivenOr[str] = NOT_GIVEN,
     stop_on_reply: NotGivenOr[bool] = NOT_GIVEN,
     open_tracking: NotGivenOr[bool] = NOT_GIVEN,
     link_tracking: NotGivenOr[bool] = NOT_GIVEN,
@@ -436,6 +728,7 @@ def _campaign_body(
     esp_match_mode: NotGivenOr[str] = NOT_GIVEN,
     max_new_leads_per_day: NotGivenOr[int] = NOT_GIVEN,
     prioritize_new_leads: NotGivenOr[bool] = NOT_GIVEN,
+    entry_delay_minutes: NotGivenOr[int] = NOT_GIVEN,
     continuous: NotGivenOr[bool] = NOT_GIVEN,
     tracking_domain: NotGivenOr[str] = NOT_GIVEN,
     utm_tracking: NotGivenOr[bool] = NOT_GIVEN,
@@ -464,7 +757,6 @@ def _campaign_body(
             "name": name,
             "description": description,
             "status": status,
-            "kind": kind,
             "stop_on_reply": stop_on_reply,
             "open_tracking": open_tracking,
             "link_tracking": link_tracking,
@@ -496,6 +788,7 @@ def _campaign_body(
             "esp_match_mode": esp_match_mode,
             "max_new_leads_per_day": max_new_leads_per_day,
             "prioritize_new_leads": prioritize_new_leads,
+            "entry_delay_minutes": entry_delay_minutes,
             "continuous": continuous,
             "tracking_domain": tracking_domain,
             "utm_tracking": utm_tracking,
@@ -516,6 +809,39 @@ def _campaign_body(
     )
 
 
+def _estimate_body(
+    *,
+    segment_ids: NotGivenOr[Sequence[str]],
+    campaign_id: NotGivenOr[str],
+    email_tag_ids: NotGivenOr[Sequence[str]],
+    daily_limit: NotGivenOr[int],
+    days: NotGivenOr[int],
+    timezone: NotGivenOr[str],
+    start_date: NotGivenOr[str],
+    start_time: NotGivenOr[str],
+    end_time: NotGivenOr[str],
+    step_waits: NotGivenOr[Sequence[int]],
+) -> dict[str, Any]:
+    return drop_not_given(
+        {
+            "segment_ids": (
+                segment_ids if isinstance(segment_ids, NotGiven) else list(segment_ids)
+            ),
+            "campaign_id": campaign_id,
+            "email_tag_ids": email_tag_ids,
+            "daily_limit": daily_limit,
+            "days": days,
+            "timezone": timezone,
+            "start_date": start_date,
+            "start_time": start_time,
+            "end_time": end_time,
+            "step_waits": (
+                step_waits if isinstance(step_waits, NotGiven) else list(step_waits)
+            ),
+        }
+    )
+
+
 def _step_body(
     *,
     name: NotGivenOr[str],
@@ -525,6 +851,7 @@ def _step_body(
     body_sync: NotGivenOr[bool],
     body_code: NotGivenOr[bool],
     wait_after: NotGivenOr[int],
+    thread_reply: NotGivenOr[bool],
     kind: NotGivenOr[str],
     action: NotGivenOr[Mapping[str, Any]],
     conditions: NotGivenOr[Mapping[str, Any]],
@@ -538,6 +865,7 @@ def _step_body(
             "body_sync": body_sync,
             "body_code": body_code,
             "wait_after": wait_after,
+            "thread_reply": thread_reply,
             "kind": kind,
             "action": action,
             "conditions": conditions,
@@ -578,7 +906,6 @@ class Campaigns(SyncAPIResource):
         self,
         *,
         name: str,
-        kind: NotGivenOr[str] = NOT_GIVEN,
         description: NotGivenOr[str] = NOT_GIVEN,
         stop_on_reply: NotGivenOr[bool] = NOT_GIVEN,
         open_tracking: NotGivenOr[bool] = NOT_GIVEN,
@@ -611,6 +938,7 @@ class Campaigns(SyncAPIResource):
         esp_match_mode: NotGivenOr[str] = NOT_GIVEN,
         max_new_leads_per_day: NotGivenOr[int] = NOT_GIVEN,
         prioritize_new_leads: NotGivenOr[bool] = NOT_GIVEN,
+        entry_delay_minutes: NotGivenOr[int] = NOT_GIVEN,
         continuous: NotGivenOr[bool] = NOT_GIVEN,
         tracking_domain: NotGivenOr[str] = NOT_GIVEN,
         utm_tracking: NotGivenOr[bool] = NOT_GIVEN,
@@ -636,8 +964,6 @@ class Campaigns(SyncAPIResource):
 
         Args:
             name: A human-readable name for the campaign.
-            kind: ``"sequence"`` (default) or ``"one_time"``, a single message with no
-                follow-ups. Fixed at creation.
             description: An optional longer description.
             stop_on_reply: Stop sequencing a contact once they reply.
             open_tracking: Enable open tracking.
@@ -673,6 +999,8 @@ class Campaigns(SyncAPIResource):
             esp_match_mode: ESP matching: ``off``, ``prefer`` or ``strict``.
             max_new_leads_per_day: New-lead throttle; ``0`` is unlimited.
             prioritize_new_leads: Send to new leads before continuing older ones.
+            entry_delay_minutes: Hold a contact's first email back this many minutes
+                after they enter the campaign (``0`` to ``129600``; ``0`` sends at once).
             continuous: Keep the campaign active when it runs out of leads: it waits,
                 idle, for more instead of finishing.
             tracking_domain: A campaign-scoped tracking domain, honored once verified.
@@ -703,7 +1031,6 @@ class Campaigns(SyncAPIResource):
             body=_campaign_body(
                 for_create=True,
                 name=name,
-                kind=kind,
                 description=description,
                 stop_on_reply=stop_on_reply,
                 open_tracking=open_tracking,
@@ -736,6 +1063,7 @@ class Campaigns(SyncAPIResource):
                 esp_match_mode=esp_match_mode,
                 max_new_leads_per_day=max_new_leads_per_day,
                 prioritize_new_leads=prioritize_new_leads,
+                entry_delay_minutes=entry_delay_minutes,
                 continuous=continuous,
                 tracking_domain=tracking_domain,
                 utm_tracking=utm_tracking,
@@ -795,39 +1123,52 @@ class Campaigns(SyncAPIResource):
     def estimate(
         self,
         *,
-        segment_ids: Sequence[str],
+        segment_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        campaign_id: NotGivenOr[str] = NOT_GIVEN,
         email_tag_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         daily_limit: NotGivenOr[int] = NOT_GIVEN,
         days: NotGivenOr[int] = NOT_GIVEN,
         timezone: NotGivenOr[str] = NOT_GIVEN,
         start_date: NotGivenOr[str] = NOT_GIVEN,
+        start_time: NotGivenOr[str] = NOT_GIVEN,
+        end_time: NotGivenOr[str] = NOT_GIVEN,
+        step_waits: NotGivenOr[Sequence[int]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> CampaignEstimate:
-        """Project an audience against a sender pool before a campaign exists.
+        """Project an audience against a sender pool. Nothing is written.
 
         Answers "how many people is this, and how long will reaching them
-        take" without writing anything.
+        take". Give *campaign_id* to project a saved campaign, which fills
+        anything not sent here from the campaign.
 
         Args:
-            segment_ids: The segments making up the audience.
+            segment_ids: The segments making up the audience (at most 20).
+            campaign_id: A saved campaign to project; its own audience and
+                settings fill whatever is not given.
             email_tag_ids: Mailbox tags the senders would be drawn from.
             daily_limit: The per-campaign daily cap to project under.
             days: Weekday bitmask for the sending window.
             timezone: IANA timezone the schedule is interpreted in.
             start_date: RFC 3339 date sending would start.
+            start_time: Daily sending window start (``"HH:MM"``).
+            end_time: Daily sending window end (``"HH:MM"``).
+            step_waits: Each follow-up's wait in days (0 to 365), in order, at
+                most 30. Empty projects a single email.
         """
         return self._post(
             "/campaigns-estimate",
             cast_to=CampaignEstimate,
-            body=drop_not_given(
-                {
-                    "segment_ids": list(segment_ids),
-                    "email_tag_ids": email_tag_ids,
-                    "daily_limit": daily_limit,
-                    "days": days,
-                    "timezone": timezone,
-                    "start_date": start_date,
-                }
+            body=_estimate_body(
+                segment_ids=segment_ids,
+                campaign_id=campaign_id,
+                email_tag_ids=email_tag_ids,
+                daily_limit=daily_limit,
+                days=days,
+                timezone=timezone,
+                start_date=start_date,
+                start_time=start_time,
+                end_time=end_time,
+                step_waits=step_waits,
             ),
             options=options,
         )
@@ -926,6 +1267,7 @@ class Campaigns(SyncAPIResource):
         esp_match_mode: NotGivenOr[str] = NOT_GIVEN,
         max_new_leads_per_day: NotGivenOr[int] = NOT_GIVEN,
         prioritize_new_leads: NotGivenOr[bool] = NOT_GIVEN,
+        entry_delay_minutes: NotGivenOr[int] = NOT_GIVEN,
         continuous: NotGivenOr[bool] = NOT_GIVEN,
         tracking_domain: NotGivenOr[str] = NOT_GIVEN,
         utm_tracking: NotGivenOr[bool] = NOT_GIVEN,
@@ -984,6 +1326,8 @@ class Campaigns(SyncAPIResource):
             esp_match_mode: ESP matching: ``off``, ``prefer`` or ``strict``.
             max_new_leads_per_day: New-lead throttle; ``0`` is unlimited.
             prioritize_new_leads: Send to new leads before continuing older ones.
+            entry_delay_minutes: Hold a contact's first email back this many minutes
+                after they enter the campaign (``0`` to ``129600``; ``0`` sends at once).
             continuous: Keep the campaign active when it runs out of leads: it waits,
                 idle, for more instead of finishing.
             tracking_domain: A campaign-scoped tracking domain, honored once verified.
@@ -1040,6 +1384,7 @@ class Campaigns(SyncAPIResource):
                 esp_match_mode=esp_match_mode,
                 max_new_leads_per_day=max_new_leads_per_day,
                 prioritize_new_leads=prioritize_new_leads,
+                entry_delay_minutes=entry_delay_minutes,
                 continuous=continuous,
                 tracking_domain=tracking_domain,
                 utm_tracking=utm_tracking,
@@ -1129,15 +1474,47 @@ class Campaigns(SyncAPIResource):
         )
 
     def create_step(
-        self, campaign_id: str, *, options: RequestOptions | None = None
+        self,
+        campaign_id: str,
+        *,
+        name: NotGivenOr[str] = NOT_GIVEN,
+        subject: NotGivenOr[str] = NOT_GIVEN,
+        body_html: NotGivenOr[str] = NOT_GIVEN,
+        body_plain: NotGivenOr[str] = NOT_GIVEN,
+        body_sync: NotGivenOr[bool] = NOT_GIVEN,
+        body_code: NotGivenOr[bool] = NOT_GIVEN,
+        wait_after: NotGivenOr[int] = NOT_GIVEN,
+        thread_reply: NotGivenOr[bool] = NOT_GIVEN,
+        kind: NotGivenOr[str] = NOT_GIVEN,
+        action: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        conditions: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        options: RequestOptions | None = None,
     ) -> CampaignStep:
-        """Append a blank step to a campaign's sequence.
+        """Append a step to a campaign's sequence.
 
-        Takes no body: the step is created empty and then filled in with
-        :meth:`update_step`.
+        With no arguments the step is created blank and then filled in with
+        :meth:`update_step`. Any field given here, the same ones
+        :meth:`update_step` takes, is applied to the new step in the same call;
+        if the server refuses them no blank step is left behind.
         """
         return self._post(
-            f"/campaigns/{campaign_id}/steps", cast_to=CampaignStep, options=options
+            f"/campaigns/{campaign_id}/steps",
+            cast_to=CampaignStep,
+            body=_step_body(
+                name=name,
+                subject=subject,
+                body_html=body_html,
+                body_plain=body_plain,
+                body_sync=body_sync,
+                body_code=body_code,
+                wait_after=wait_after,
+                thread_reply=thread_reply,
+                kind=kind,
+                action=action,
+                conditions=conditions,
+            )
+            or None,
+            options=options,
         )
 
     def update_step(
@@ -1152,6 +1529,7 @@ class Campaigns(SyncAPIResource):
         body_sync: NotGivenOr[bool] = NOT_GIVEN,
         body_code: NotGivenOr[bool] = NOT_GIVEN,
         wait_after: NotGivenOr[int] = NOT_GIVEN,
+        thread_reply: NotGivenOr[bool] = NOT_GIVEN,
         kind: NotGivenOr[str] = NOT_GIVEN,
         action: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
         conditions: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
@@ -1161,6 +1539,8 @@ class Campaigns(SyncAPIResource):
 
         Args:
             wait_after: Days to wait before the next step fires.
+            thread_reply: Send the step as a reply in the conversation the
+                contact's first email opened. The server defaults it to ``True``.
             kind: The step kind; non-email kinds carry their behaviour in
                 *action*.
             action: The action configuration for a non-email step.
@@ -1177,6 +1557,7 @@ class Campaigns(SyncAPIResource):
                 body_sync=body_sync,
                 body_code=body_code,
                 wait_after=wait_after,
+                thread_reply=thread_reply,
                 kind=kind,
                 action=action,
                 conditions=conditions,
@@ -1465,6 +1846,218 @@ class Campaigns(SyncAPIResource):
             options=options,
         )
 
+    # -- per-lead hold + copies ---------------------------------------------
+    def lead_hold(
+        self,
+        campaign_id: str,
+        contact_id: str,
+        *,
+        options: RequestOptions | None = None,
+    ) -> CampaignLeadHoldState:
+        """Read whether one lead's flow in a campaign is currently held.
+
+        Needs the ``read_campaigns`` permission.
+        """
+        return self._get(
+            f"/campaigns/{campaign_id}/leads/{contact_id}/hold",
+            cast_to=CampaignLeadHoldState,
+            options=options,
+        )
+
+    def pause_lead(
+        self,
+        campaign_id: str,
+        contact_id: str,
+        *,
+        until: NotGivenOr[str | None] = NOT_GIVEN,
+        reason: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> CampaignLeadHoldState:
+        """Park one contact's flow inside one campaign.
+
+        The contact stays subscribed and stays a lead of the campaign: this is
+        not an unsubscribe and not a suppression. Pausing an already held lead
+        replaces the hold and keeps its start, so a retry is safe. Needs the
+        ``write_campaigns`` permission.
+
+        Args:
+            campaign_id: The campaign id.
+            contact_id: The contact id.
+            until: RFC 3339 time the hold lifts. Omitted or ``None`` holds the
+                lead with no end, until :meth:`resume_lead`.
+            reason: A note on why the lead was paused.
+        """
+        return self._post(
+            f"/campaigns/{campaign_id}/leads/{contact_id}/pause",
+            cast_to=CampaignLeadHoldState,
+            body=drop_not_given({"until": until, "reason": reason}),
+            options=options,
+        )
+
+    def resume_lead(
+        self,
+        campaign_id: str,
+        contact_id: str,
+        *,
+        options: RequestOptions | None = None,
+    ) -> CampaignLeadHoldState:
+        """Lift a lead's hold now.
+
+        Resuming a lead that is not held succeeds; the returned ``hold`` is
+        ``None``. A contact that is not a lead of the campaign is a 404. Needs
+        the ``write_campaigns`` permission.
+        """
+        return self._post(
+            f"/campaigns/{campaign_id}/leads/{contact_id}/resume",
+            cast_to=CampaignLeadHoldState,
+            options=options,
+        )
+
+    def lead_cc(
+        self,
+        campaign_id: str,
+        contact_id: str,
+        *,
+        options: RequestOptions | None = None,
+    ) -> CampaignLeadCCList:
+        """List the contacts copied on every email to one lead in a campaign.
+
+        Needs the ``read_campaigns`` and ``read_contacts`` permissions.
+        """
+        return self._get(
+            f"/campaigns/{campaign_id}/leads/{contact_id}/cc",
+            cast_to=CampaignLeadCCList,
+            options=options,
+        )
+
+    def set_lead_cc(
+        self,
+        campaign_id: str,
+        contact_id: str,
+        *,
+        contact_ids: Sequence[str],
+        options: RequestOptions | None = None,
+    ) -> CampaignLeadCCList:
+        """Replace the contacts copied on every email to one lead.
+
+        This is the desired final set, so a retry is safe; pass ``[]`` to copy
+        nobody. Needs the ``write_campaigns`` and ``read_contacts`` permissions.
+
+        Args:
+            campaign_id: The campaign id.
+            contact_id: The lead's contact id.
+            contact_ids: The contacts to copy.
+        """
+        return self._put(
+            f"/campaigns/{campaign_id}/leads/{contact_id}/cc",
+            cast_to=CampaignLeadCCList,
+            body={"contact_ids": list(contact_ids)},
+            options=options,
+        )
+
+    def suggest_lead_cc(
+        self,
+        campaign_id: str,
+        contact_id: str,
+        *,
+        options: RequestOptions | None = None,
+    ) -> CampaignLeadCCSuggestions:
+        """Suggest the lead's likely colleagues to copy.
+
+        Needs the ``read_campaigns`` and ``read_contacts`` permissions.
+        """
+        return self._get(
+            f"/campaigns/{campaign_id}/leads/{contact_id}/cc/suggestions",
+            cast_to=CampaignLeadCCSuggestions,
+            options=options,
+        )
+
+    # -- placement monitor + send plan --------------------------------------
+    def placement_monitor(
+        self, campaign_id: str, *, options: RequestOptions | None = None
+    ) -> CampaignPlacementMonitorResult:
+        """Read a campaign's scheduled placement test.
+
+        ``data`` is ``None`` when the campaign has none. Needs the
+        ``read_campaigns`` permission.
+        """
+        return self._get(
+            f"/campaigns/{campaign_id}/placement-monitor",
+            cast_to=CampaignPlacementMonitorResult,
+            options=options,
+        )
+
+    def put_placement_monitor(
+        self,
+        campaign_id: str,
+        *,
+        enabled: NotGivenOr[bool] = NOT_GIVEN,
+        interval_days: NotGivenOr[int] = NOT_GIVEN,
+        panel: NotGivenOr[str] = NOT_GIVEN,
+        alert_below: NotGivenOr[int] = NOT_GIVEN,
+        pause_on_alert: NotGivenOr[bool] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> CampaignPlacementMonitorResult:
+        """Create or update a campaign's scheduled placement test.
+
+        Fields left out keep their stored value, or the default on a new
+        monitor. A new or re-enabled monitor runs its first test within
+        minutes. Repeating a call lands on the same state. Needs the
+        ``send_campaigns`` permission.
+
+        Args:
+            campaign_id: The campaign id.
+            enabled: Whether the schedule runs.
+            interval_days: Days between tests.
+            panel: ``instance``, ``workspace`` or ``cloud``.
+            alert_below: Alert when the inbox percentage (0 to 100) falls below
+                this.
+            pause_on_alert: Pause the campaign when an alert fires.
+        """
+        return self._put(
+            f"/campaigns/{campaign_id}/placement-monitor",
+            cast_to=CampaignPlacementMonitorResult,
+            body=drop_not_given(
+                {
+                    "enabled": enabled,
+                    "interval_days": interval_days,
+                    "panel": panel,
+                    "alert_below": alert_below,
+                    "pause_on_alert": pause_on_alert,
+                }
+            ),
+            options=options,
+        )
+
+    def delete_placement_monitor(
+        self, campaign_id: str, *, options: RequestOptions | None = None
+    ) -> CampaignPlacementMonitorDeleted:
+        """Remove a campaign's scheduled placement test.
+
+        A campaign with no monitor is a 404. Needs the ``send_campaigns``
+        permission.
+        """
+        return self._delete(
+            f"/campaigns/{campaign_id}/placement-monitor",
+            cast_to=CampaignPlacementMonitorDeleted,
+            options=options,
+        )
+
+    def send_plan(
+        self, campaign_id: str, *, options: RequestOptions | None = None
+    ) -> CampaignSendPlan:
+        """Read today's sending plan for a campaign.
+
+        Shows what will go out today and every limit that decided it, read
+        through the scheduler's own gates. Needs the ``read_campaigns``
+        permission.
+        """
+        return self._get(
+            f"/campaigns/{campaign_id}/send-plan",
+            cast_to=CampaignSendPlan,
+            options=options,
+        )
+
     # -- run lifecycle -------------------------------------------------------
     def preflight(
         self, campaign_id: str, *, options: RequestOptions | None = None
@@ -1507,12 +2100,24 @@ class Campaigns(SyncAPIResource):
         )
 
     def start(
-        self, campaign_id: str, *, options: RequestOptions | None = None
+        self,
+        campaign_id: str,
+        *,
+        acknowledge_list_risk: NotGivenOr[bool] = NOT_GIVEN,
+        options: RequestOptions | None = None,
     ) -> CampaignRunState:
-        """Start sending. This dispatches real mail."""
+        """Start sending. This dispatches real mail.
+
+        Args:
+            campaign_id: The campaign id.
+            acknowledge_list_risk: Launch past the bounce-risk gate after reading
+                the list projection, for a list verified elsewhere.
+        """
         return self._post(
             f"/campaigns/{campaign_id}/start",
             cast_to=CampaignRunState,
+            body=drop_not_given({"acknowledge_list_risk": acknowledge_list_risk})
+            or None,
             options=options,
         )
 
@@ -1555,7 +2160,6 @@ class AsyncCampaigns(AsyncAPIResource):
         self,
         *,
         name: str,
-        kind: NotGivenOr[str] = NOT_GIVEN,
         description: NotGivenOr[str] = NOT_GIVEN,
         stop_on_reply: NotGivenOr[bool] = NOT_GIVEN,
         open_tracking: NotGivenOr[bool] = NOT_GIVEN,
@@ -1588,6 +2192,7 @@ class AsyncCampaigns(AsyncAPIResource):
         esp_match_mode: NotGivenOr[str] = NOT_GIVEN,
         max_new_leads_per_day: NotGivenOr[int] = NOT_GIVEN,
         prioritize_new_leads: NotGivenOr[bool] = NOT_GIVEN,
+        entry_delay_minutes: NotGivenOr[int] = NOT_GIVEN,
         continuous: NotGivenOr[bool] = NOT_GIVEN,
         tracking_domain: NotGivenOr[str] = NOT_GIVEN,
         utm_tracking: NotGivenOr[bool] = NOT_GIVEN,
@@ -1613,8 +2218,6 @@ class AsyncCampaigns(AsyncAPIResource):
 
         Args:
             name: A human-readable name for the campaign.
-            kind: ``"sequence"`` (default) or ``"one_time"``, a single message with no
-                follow-ups. Fixed at creation.
             description: An optional longer description.
             stop_on_reply: Stop sequencing a contact once they reply.
             open_tracking: Enable open tracking.
@@ -1650,6 +2253,8 @@ class AsyncCampaigns(AsyncAPIResource):
             esp_match_mode: ESP matching: ``off``, ``prefer`` or ``strict``.
             max_new_leads_per_day: New-lead throttle; ``0`` is unlimited.
             prioritize_new_leads: Send to new leads before continuing older ones.
+            entry_delay_minutes: Hold a contact's first email back this many minutes
+                after they enter the campaign (``0`` to ``129600``; ``0`` sends at once).
             continuous: Keep the campaign active when it runs out of leads: it waits,
                 idle, for more instead of finishing.
             tracking_domain: A campaign-scoped tracking domain, honored once verified.
@@ -1680,7 +2285,6 @@ class AsyncCampaigns(AsyncAPIResource):
             body=_campaign_body(
                 for_create=True,
                 name=name,
-                kind=kind,
                 description=description,
                 stop_on_reply=stop_on_reply,
                 open_tracking=open_tracking,
@@ -1713,6 +2317,7 @@ class AsyncCampaigns(AsyncAPIResource):
                 esp_match_mode=esp_match_mode,
                 max_new_leads_per_day=max_new_leads_per_day,
                 prioritize_new_leads=prioritize_new_leads,
+                entry_delay_minutes=entry_delay_minutes,
                 continuous=continuous,
                 tracking_domain=tracking_domain,
                 utm_tracking=utm_tracking,
@@ -1774,39 +2379,52 @@ class AsyncCampaigns(AsyncAPIResource):
     async def estimate(
         self,
         *,
-        segment_ids: Sequence[str],
+        segment_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        campaign_id: NotGivenOr[str] = NOT_GIVEN,
         email_tag_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         daily_limit: NotGivenOr[int] = NOT_GIVEN,
         days: NotGivenOr[int] = NOT_GIVEN,
         timezone: NotGivenOr[str] = NOT_GIVEN,
         start_date: NotGivenOr[str] = NOT_GIVEN,
+        start_time: NotGivenOr[str] = NOT_GIVEN,
+        end_time: NotGivenOr[str] = NOT_GIVEN,
+        step_waits: NotGivenOr[Sequence[int]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> CampaignEstimate:
-        """Project an audience against a sender pool before a campaign exists.
+        """Project an audience against a sender pool. Nothing is written.
 
         Answers "how many people is this, and how long will reaching them
-        take" without writing anything.
+        take". Give *campaign_id* to project a saved campaign, which fills
+        anything not sent here from the campaign.
 
         Args:
-            segment_ids: The segments making up the audience.
+            segment_ids: The segments making up the audience (at most 20).
+            campaign_id: A saved campaign to project; its own audience and
+                settings fill whatever is not given.
             email_tag_ids: Mailbox tags the senders would be drawn from.
             daily_limit: The per-campaign daily cap to project under.
             days: Weekday bitmask for the sending window.
             timezone: IANA timezone the schedule is interpreted in.
             start_date: RFC 3339 date sending would start.
+            start_time: Daily sending window start (``"HH:MM"``).
+            end_time: Daily sending window end (``"HH:MM"``).
+            step_waits: Each follow-up's wait in days (0 to 365), in order, at
+                most 30. Empty projects a single email.
         """
         return await self._post(
             "/campaigns-estimate",
             cast_to=CampaignEstimate,
-            body=drop_not_given(
-                {
-                    "segment_ids": list(segment_ids),
-                    "email_tag_ids": email_tag_ids,
-                    "daily_limit": daily_limit,
-                    "days": days,
-                    "timezone": timezone,
-                    "start_date": start_date,
-                }
+            body=_estimate_body(
+                segment_ids=segment_ids,
+                campaign_id=campaign_id,
+                email_tag_ids=email_tag_ids,
+                daily_limit=daily_limit,
+                days=days,
+                timezone=timezone,
+                start_date=start_date,
+                start_time=start_time,
+                end_time=end_time,
+                step_waits=step_waits,
             ),
             options=options,
         )
@@ -1907,6 +2525,7 @@ class AsyncCampaigns(AsyncAPIResource):
         esp_match_mode: NotGivenOr[str] = NOT_GIVEN,
         max_new_leads_per_day: NotGivenOr[int] = NOT_GIVEN,
         prioritize_new_leads: NotGivenOr[bool] = NOT_GIVEN,
+        entry_delay_minutes: NotGivenOr[int] = NOT_GIVEN,
         continuous: NotGivenOr[bool] = NOT_GIVEN,
         tracking_domain: NotGivenOr[str] = NOT_GIVEN,
         utm_tracking: NotGivenOr[bool] = NOT_GIVEN,
@@ -1965,6 +2584,8 @@ class AsyncCampaigns(AsyncAPIResource):
             esp_match_mode: ESP matching: ``off``, ``prefer`` or ``strict``.
             max_new_leads_per_day: New-lead throttle; ``0`` is unlimited.
             prioritize_new_leads: Send to new leads before continuing older ones.
+            entry_delay_minutes: Hold a contact's first email back this many minutes
+                after they enter the campaign (``0`` to ``129600``; ``0`` sends at once).
             continuous: Keep the campaign active when it runs out of leads: it waits,
                 idle, for more instead of finishing.
             tracking_domain: A campaign-scoped tracking domain, honored once verified.
@@ -2021,6 +2642,7 @@ class AsyncCampaigns(AsyncAPIResource):
                 esp_match_mode=esp_match_mode,
                 max_new_leads_per_day=max_new_leads_per_day,
                 prioritize_new_leads=prioritize_new_leads,
+                entry_delay_minutes=entry_delay_minutes,
                 continuous=continuous,
                 tracking_domain=tracking_domain,
                 utm_tracking=utm_tracking,
@@ -2110,15 +2732,47 @@ class AsyncCampaigns(AsyncAPIResource):
         )
 
     async def create_step(
-        self, campaign_id: str, *, options: RequestOptions | None = None
+        self,
+        campaign_id: str,
+        *,
+        name: NotGivenOr[str] = NOT_GIVEN,
+        subject: NotGivenOr[str] = NOT_GIVEN,
+        body_html: NotGivenOr[str] = NOT_GIVEN,
+        body_plain: NotGivenOr[str] = NOT_GIVEN,
+        body_sync: NotGivenOr[bool] = NOT_GIVEN,
+        body_code: NotGivenOr[bool] = NOT_GIVEN,
+        wait_after: NotGivenOr[int] = NOT_GIVEN,
+        thread_reply: NotGivenOr[bool] = NOT_GIVEN,
+        kind: NotGivenOr[str] = NOT_GIVEN,
+        action: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        conditions: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        options: RequestOptions | None = None,
     ) -> CampaignStep:
-        """Append a blank step to a campaign's sequence.
+        """Append a step to a campaign's sequence.
 
-        Takes no body: the step is created empty and then filled in with
-        :meth:`update_step`.
+        With no arguments the step is created blank and then filled in with
+        :meth:`update_step`. Any field given here, the same ones
+        :meth:`update_step` takes, is applied to the new step in the same call;
+        if the server refuses them no blank step is left behind.
         """
         return await self._post(
-            f"/campaigns/{campaign_id}/steps", cast_to=CampaignStep, options=options
+            f"/campaigns/{campaign_id}/steps",
+            cast_to=CampaignStep,
+            body=_step_body(
+                name=name,
+                subject=subject,
+                body_html=body_html,
+                body_plain=body_plain,
+                body_sync=body_sync,
+                body_code=body_code,
+                wait_after=wait_after,
+                thread_reply=thread_reply,
+                kind=kind,
+                action=action,
+                conditions=conditions,
+            )
+            or None,
+            options=options,
         )
 
     async def update_step(
@@ -2133,6 +2787,7 @@ class AsyncCampaigns(AsyncAPIResource):
         body_sync: NotGivenOr[bool] = NOT_GIVEN,
         body_code: NotGivenOr[bool] = NOT_GIVEN,
         wait_after: NotGivenOr[int] = NOT_GIVEN,
+        thread_reply: NotGivenOr[bool] = NOT_GIVEN,
         kind: NotGivenOr[str] = NOT_GIVEN,
         action: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
         conditions: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
@@ -2142,6 +2797,8 @@ class AsyncCampaigns(AsyncAPIResource):
 
         Args:
             wait_after: Days to wait before the next step fires.
+            thread_reply: Send the step as a reply in the conversation the
+                contact's first email opened. The server defaults it to ``True``.
             kind: The step kind; non-email kinds carry their behaviour in
                 *action*.
             action: The action configuration for a non-email step.
@@ -2158,6 +2815,7 @@ class AsyncCampaigns(AsyncAPIResource):
                 body_sync=body_sync,
                 body_code=body_code,
                 wait_after=wait_after,
+                thread_reply=thread_reply,
                 kind=kind,
                 action=action,
                 conditions=conditions,
@@ -2446,6 +3104,218 @@ class AsyncCampaigns(AsyncAPIResource):
             options=options,
         )
 
+    # -- per-lead hold + copies ---------------------------------------------
+    async def lead_hold(
+        self,
+        campaign_id: str,
+        contact_id: str,
+        *,
+        options: RequestOptions | None = None,
+    ) -> CampaignLeadHoldState:
+        """Read whether one lead's flow in a campaign is currently held.
+
+        Needs the ``read_campaigns`` permission.
+        """
+        return await self._get(
+            f"/campaigns/{campaign_id}/leads/{contact_id}/hold",
+            cast_to=CampaignLeadHoldState,
+            options=options,
+        )
+
+    async def pause_lead(
+        self,
+        campaign_id: str,
+        contact_id: str,
+        *,
+        until: NotGivenOr[str | None] = NOT_GIVEN,
+        reason: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> CampaignLeadHoldState:
+        """Park one contact's flow inside one campaign.
+
+        The contact stays subscribed and stays a lead of the campaign: this is
+        not an unsubscribe and not a suppression. Pausing an already held lead
+        replaces the hold and keeps its start, so a retry is safe. Needs the
+        ``write_campaigns`` permission.
+
+        Args:
+            campaign_id: The campaign id.
+            contact_id: The contact id.
+            until: RFC 3339 time the hold lifts. Omitted or ``None`` holds the
+                lead with no end, until :meth:`resume_lead`.
+            reason: A note on why the lead was paused.
+        """
+        return await self._post(
+            f"/campaigns/{campaign_id}/leads/{contact_id}/pause",
+            cast_to=CampaignLeadHoldState,
+            body=drop_not_given({"until": until, "reason": reason}),
+            options=options,
+        )
+
+    async def resume_lead(
+        self,
+        campaign_id: str,
+        contact_id: str,
+        *,
+        options: RequestOptions | None = None,
+    ) -> CampaignLeadHoldState:
+        """Lift a lead's hold now.
+
+        Resuming a lead that is not held succeeds; the returned ``hold`` is
+        ``None``. A contact that is not a lead of the campaign is a 404. Needs
+        the ``write_campaigns`` permission.
+        """
+        return await self._post(
+            f"/campaigns/{campaign_id}/leads/{contact_id}/resume",
+            cast_to=CampaignLeadHoldState,
+            options=options,
+        )
+
+    async def lead_cc(
+        self,
+        campaign_id: str,
+        contact_id: str,
+        *,
+        options: RequestOptions | None = None,
+    ) -> CampaignLeadCCList:
+        """List the contacts copied on every email to one lead in a campaign.
+
+        Needs the ``read_campaigns`` and ``read_contacts`` permissions.
+        """
+        return await self._get(
+            f"/campaigns/{campaign_id}/leads/{contact_id}/cc",
+            cast_to=CampaignLeadCCList,
+            options=options,
+        )
+
+    async def set_lead_cc(
+        self,
+        campaign_id: str,
+        contact_id: str,
+        *,
+        contact_ids: Sequence[str],
+        options: RequestOptions | None = None,
+    ) -> CampaignLeadCCList:
+        """Replace the contacts copied on every email to one lead.
+
+        This is the desired final set, so a retry is safe; pass ``[]`` to copy
+        nobody. Needs the ``write_campaigns`` and ``read_contacts`` permissions.
+
+        Args:
+            campaign_id: The campaign id.
+            contact_id: The lead's contact id.
+            contact_ids: The contacts to copy.
+        """
+        return await self._put(
+            f"/campaigns/{campaign_id}/leads/{contact_id}/cc",
+            cast_to=CampaignLeadCCList,
+            body={"contact_ids": list(contact_ids)},
+            options=options,
+        )
+
+    async def suggest_lead_cc(
+        self,
+        campaign_id: str,
+        contact_id: str,
+        *,
+        options: RequestOptions | None = None,
+    ) -> CampaignLeadCCSuggestions:
+        """Suggest the lead's likely colleagues to copy.
+
+        Needs the ``read_campaigns`` and ``read_contacts`` permissions.
+        """
+        return await self._get(
+            f"/campaigns/{campaign_id}/leads/{contact_id}/cc/suggestions",
+            cast_to=CampaignLeadCCSuggestions,
+            options=options,
+        )
+
+    # -- placement monitor + send plan --------------------------------------
+    async def placement_monitor(
+        self, campaign_id: str, *, options: RequestOptions | None = None
+    ) -> CampaignPlacementMonitorResult:
+        """Read a campaign's scheduled placement test.
+
+        ``data`` is ``None`` when the campaign has none. Needs the
+        ``read_campaigns`` permission.
+        """
+        return await self._get(
+            f"/campaigns/{campaign_id}/placement-monitor",
+            cast_to=CampaignPlacementMonitorResult,
+            options=options,
+        )
+
+    async def put_placement_monitor(
+        self,
+        campaign_id: str,
+        *,
+        enabled: NotGivenOr[bool] = NOT_GIVEN,
+        interval_days: NotGivenOr[int] = NOT_GIVEN,
+        panel: NotGivenOr[str] = NOT_GIVEN,
+        alert_below: NotGivenOr[int] = NOT_GIVEN,
+        pause_on_alert: NotGivenOr[bool] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> CampaignPlacementMonitorResult:
+        """Create or update a campaign's scheduled placement test.
+
+        Fields left out keep their stored value, or the default on a new
+        monitor. A new or re-enabled monitor runs its first test within
+        minutes. Repeating a call lands on the same state. Needs the
+        ``send_campaigns`` permission.
+
+        Args:
+            campaign_id: The campaign id.
+            enabled: Whether the schedule runs.
+            interval_days: Days between tests.
+            panel: ``instance``, ``workspace`` or ``cloud``.
+            alert_below: Alert when the inbox percentage (0 to 100) falls below
+                this.
+            pause_on_alert: Pause the campaign when an alert fires.
+        """
+        return await self._put(
+            f"/campaigns/{campaign_id}/placement-monitor",
+            cast_to=CampaignPlacementMonitorResult,
+            body=drop_not_given(
+                {
+                    "enabled": enabled,
+                    "interval_days": interval_days,
+                    "panel": panel,
+                    "alert_below": alert_below,
+                    "pause_on_alert": pause_on_alert,
+                }
+            ),
+            options=options,
+        )
+
+    async def delete_placement_monitor(
+        self, campaign_id: str, *, options: RequestOptions | None = None
+    ) -> CampaignPlacementMonitorDeleted:
+        """Remove a campaign's scheduled placement test.
+
+        A campaign with no monitor is a 404. Needs the ``send_campaigns``
+        permission.
+        """
+        return await self._delete(
+            f"/campaigns/{campaign_id}/placement-monitor",
+            cast_to=CampaignPlacementMonitorDeleted,
+            options=options,
+        )
+
+    async def send_plan(
+        self, campaign_id: str, *, options: RequestOptions | None = None
+    ) -> CampaignSendPlan:
+        """Read today's sending plan for a campaign.
+
+        Shows what will go out today and every limit that decided it, read
+        through the scheduler's own gates. Needs the ``read_campaigns``
+        permission.
+        """
+        return await self._get(
+            f"/campaigns/{campaign_id}/send-plan",
+            cast_to=CampaignSendPlan,
+            options=options,
+        )
+
     # -- run lifecycle -------------------------------------------------------
     async def preflight(
         self, campaign_id: str, *, options: RequestOptions | None = None
@@ -2488,12 +3358,24 @@ class AsyncCampaigns(AsyncAPIResource):
         )
 
     async def start(
-        self, campaign_id: str, *, options: RequestOptions | None = None
+        self,
+        campaign_id: str,
+        *,
+        acknowledge_list_risk: NotGivenOr[bool] = NOT_GIVEN,
+        options: RequestOptions | None = None,
     ) -> CampaignRunState:
-        """Start sending. This dispatches real mail."""
+        """Start sending. This dispatches real mail.
+
+        Args:
+            campaign_id: The campaign id.
+            acknowledge_list_risk: Launch past the bounce-risk gate after reading
+                the list projection, for a list verified elsewhere.
+        """
         return await self._post(
             f"/campaigns/{campaign_id}/start",
             cast_to=CampaignRunState,
+            body=drop_not_given({"acknowledge_list_risk": acknowledge_list_risk})
+            or None,
             options=options,
         )
 
