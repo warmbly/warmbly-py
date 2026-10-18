@@ -111,8 +111,8 @@ class Suppressions(SyncAPIResource):
         """Add addresses or domains to the list.
 
         Args:
-            entries: Up to 5000 entries. Each is either a bare string — an
-                address, or a domain with or without a leading ``@`` — or a
+            entries: Up to 5000 entries. Each is either a bare string (an
+                address, or a domain with or without a leading ``@``) or a
                 mapping of ``{"value": ..., "reason": ...}``.
             reason: Applied to every entry that carries no reason of its own.
         """
@@ -169,8 +169,8 @@ class AsyncSuppressions(AsyncAPIResource):
         """Add addresses or domains to the list.
 
         Args:
-            entries: Up to 5000 entries. Each is either a bare string — an
-                address, or a domain with or without a leading ``@`` — or a
+            entries: Up to 5000 entries. Each is either a bare string (an
+                address, or a domain with or without a leading ``@``) or a
                 mapping of ``{"value": ..., "reason": ...}``.
             reason: Applied to every entry that carries no reason of its own.
         """

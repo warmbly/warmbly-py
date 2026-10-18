@@ -6,9 +6,13 @@ exists for calls booked outside those, so the timeline stays complete.
 
 A meeting is attributed to a contact by ``invitee_email``, or explicitly with
 ``contact_id``.
+
+Reads need the ``read_contacts`` scope and writes ``write_contacts``.
 """
 
 from __future__ import annotations
+
+from typing import Any
 
 from .._models import BaseModel
 from .._pagination import AsyncPaginator, SyncCursorPage
@@ -45,6 +49,7 @@ class Meeting(BaseModel):
     cancel_url: str | None = None
     reschedule_url: str | None = None
     canceled_reason: str | None = None
+    raw_payload: Any = None
     contact_id: str | None = None
     contact_name: str | None = None
     campaign_id: str | None = None

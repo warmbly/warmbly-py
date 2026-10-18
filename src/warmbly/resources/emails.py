@@ -14,7 +14,7 @@ reachable with an API key or OAuth token and is deliberately absent here.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from .._models import BaseModel
@@ -26,6 +26,7 @@ from .._utils import drop_not_given
 __all__ = [
     "AsyncEmails",
     "BulkTagResult",
+    "DirectTracking",
     "EmailAccount",
     "EmailAccountDeleted",
     "EmailAuthCheck",
@@ -34,8 +35,12 @@ __all__ = [
     "Emails",
     "MailboxAllowance",
     "MailboxSync",
+    "MailboxSyncFolder",
     "MailboxSyncPolicy",
+    "MailboxSyncSettings",
     "MailboxSyncState",
+    "SendAsIdentity",
+    "SendIdentity",
     "SendLifecycleState",
     "SendingBehavior",
     "SendingBehaviorPlan",
@@ -49,7 +54,11 @@ class EmailAccount(BaseModel):
     """A connected email account (mailbox).
 
     ``warmup`` is the timestamp warmup was started at, or ``None`` when warmup
-    is off — not a boolean.
+    is off, not a boolean. ``test_mode`` is ``legacy``, ``diagnostic`` or
+    ``off``; ``warmup_placement`` is ``folder``, ``inbox`` or ``archive``;
+    ``auth_method`` is ``password``, ``app_password``, ``oauth`` or
+    ``delegated``. ``track_direct_mail`` reports whether hand-written unibox
+    sends from this mailbox carry open and click tracking.
     """
 
     id: str
@@ -64,12 +73,26 @@ class EmailAccount(BaseModel):
     signature_html: str | None = None
     signature_sync: bool | None = None
     signature_code: bool | None = None
+    send_as_email: str | None = None
+    mail_host: str | None = None
+    auth_method: str | None = None
+    domain_grant_id: str | None = None
+    vendor_connection_id: str | None = None
+    vendor: str | None = None
+    avatar_url: str | None = None
+    last_id: int | None = None
     campaign_limit: int | None = None
+    test_mode: str | None = None
+    test_send_enabled: bool | None = None
+    test_receive_enabled: bool | None = None
+    shared_daily_limit: int | None = None
+    rolling_recipient_limit: int | None = None
     min_wait_time: int | None = None
     reply_to: str | None = None
     tracking_domain: str | None = None
     tracking_domain_verified: bool | None = None
     tracking_domain_verified_at: str | None = None
+    track_direct_mail: bool | None = None
     auth_state: str | None = None
     auth_spf: bool | None = None
     auth_dkim: bool | None = None
@@ -90,7 +113,11 @@ class EmailAccount(BaseModel):
     warmup_start_time: str | None = None
     warmup_end_time: str | None = None
     warmup_days: int | None = None
+    warmup_placement: str | None = None
+    warmup_folder: str | None = None
+    warmup_retention_days: int | None = None
     timezone: str | None = None
+    relay_folder_moves: bool | None = None
     tags: Sequence[str] = []
     last_synced_at: str | None = None
     created_at: str | None = None
@@ -108,9 +135,9 @@ class TrackingDomainStatus(BaseModel):
     """The tracking-domain configuration and verification state.
 
     ``cname_target`` is the host this install expects the CNAME to point at.
-    ``status`` is stable and machine-readable — ``verified``, ``unset``,
+    ``status`` is stable and machine-readable: ``verified``, ``unset``,
     ``no_target``, ``not_found``, ``wrong_target``, ``lookup_error``, or
-    ``pending`` when the value is stored state rather than a fresh lookup —
+    ``pending`` when the value is stored state rather than a fresh lookup,
     and ``observed`` is what DNS actually returned, so a customer can spot
     their own typo. ``tracking_host_unresolvable`` means the record is right
     but this install's own tracking host does not resolve, which is an
@@ -140,21 +167,29 @@ class EmailAuthCheck(BaseModel):
 
 
 class EmailVerification(BaseModel):
-    """The result of verifying an email address (syntax, MX, SMTP probe)."""
+    """The result of verifying an email address (syntax, MX, SMTP probe).
+
+    ``status`` is the verdict, ``sub_status`` refines it, ``provider`` names who
+    produced it (the built-in check or a connected verifier), and
+    ``confidence`` is the scored certainty once evidence is applied.
+    """
 
     email: str | None = None
-    valid: bool | None = None
-    deliverable: bool | None = None
-    catch_all: bool | None = None
-    reason: str | None = None
     status: str | None = None
+    sub_status: str | None = None
+    reason: str | None = None
+    is_catch_all: bool | None = None
+    has_mx: bool | None = None
+    provider: str | None = None
+    confidence: int | None = None
+    checked_at: str | None = None
 
 
 class WarmupBanStatus(BaseModel):
     """Whether the warmup pool has blocked an account, and why.
 
     ``blocked_until`` is when the block lapses on its own, and
-    ``pending_appeal`` is ``True`` while an appeal is awaiting review — in
+    ``pending_appeal`` is ``True`` while an appeal is awaiting review, in
     which case a second :meth:`Emails.warmup_appeal` is refused.
     """
 
@@ -230,9 +265,12 @@ class SendLifecycleState(BaseModel):
 class MailboxSyncState(BaseModel):
     """The worker's most recent report of a mailbox's sync.
 
+    ``backfill_status`` is ``pending``, ``running`` or ``complete``.
     ``throttle_reason`` names which budget is exhausted while
     ``throttled_until`` is set: ``burst``, ``hourly``, ``daily``,
-    ``org_daily`` or ``priority_daily``.
+    ``org_daily`` or ``priority_daily``. ``folders_skipped_cap`` and
+    ``folders_skipped_conflict`` count the folders the last listing could not
+    follow (more than the sync covers, and names the server listed twice).
     """
 
     backfill_status: str | None = None
@@ -243,6 +281,8 @@ class MailboxSyncState(BaseModel):
     throttled_until: str | None = None
     throttle_reason: str | None = None
     deferred: int | None = None
+    folders_skipped_cap: int | None = None
+    folders_skipped_conflict: int | None = None
     last_synced_at: str | None = None
 
 
@@ -251,22 +291,87 @@ class MailboxSyncPolicy(BaseModel):
 
     Resolved from the instance settings when the mailbox was loaded onto a
     worker, so a policy change reaches a mailbox on its next load.
+    ``skip_folders`` is the per-mailbox list of folders the sync leaves alone.
     """
 
     backfill_days: int | None = None
     backfill_messages: int | None = None
     daily_messages: int | None = None
     org_daily_messages: int | None = None
+    skip_folders: Sequence[str] = []
+
+
+class MailboxSyncFolder(BaseModel):
+    """A folder the sync has seen on the server.
+
+    ``name`` is the value to use in ``skip_folders`` and ``folder`` is the
+    canonical folder it files under, so special folders can be told apart.
+    """
+
+    name: str | None = None
+    folder: str | None = None
 
 
 class MailboxSync(BaseModel):
     """Where a mailbox's import stands, and the budget it runs under.
 
-    ``state`` is ``None`` until the worker has reported once.
+    ``state`` is ``None`` until the worker has reported once. ``skip_folders``
+    is the stored skip list (the value :meth:`Emails.update_sync` writes) and
+    ``folders`` is what the worker last listed on the server, INBOX first;
+    it is empty for Gmail and Outlook, which have no IMAP folder list.
     """
 
     state: MailboxSyncState | None = None
     policy: MailboxSyncPolicy | None = None
+    skip_folders: Sequence[str] = []
+    folders: Sequence[MailboxSyncFolder] = []
+
+
+class MailboxSyncSettings(BaseModel):
+    """The skip list stored by :meth:`Emails.update_sync`."""
+
+    skip_folders: Sequence[str] = []
+
+
+class DirectTracking(BaseModel):
+    """The switch stored by :meth:`Emails.update_direct_tracking`."""
+
+    track_direct_mail: bool | None = None
+
+
+class SendAsIdentity(BaseModel):
+    """One address the provider has verified this mailbox to send as.
+
+    ``is_primary`` marks the mailbox's own address and ``is_default`` the one
+    the provider composes from by default. Unverified aliases are listed but
+    cannot be selected.
+    """
+
+    email: str | None = None
+    name: str | None = None
+    is_primary: bool | None = None
+    is_default: bool | None = None
+    verified: bool | None = None
+
+
+class SendIdentity(BaseModel):
+    """A mailbox's sending identity: send-as addresses and signature origin.
+
+    ``supported`` is ``False`` for providers that cannot be asked (only Gmail
+    exposes send-as identities), in which case ``identities`` is empty.
+    ``send_as_email`` is the alias in use, and an empty string means the
+    mailbox's own address (``mailbox_email``). ``signature_source`` is
+    ``manual`` or ``provider``.
+    """
+
+    supported: bool | None = None
+    provider: str | None = None
+    mailbox_email: str | None = None
+    send_as_email: str | None = None
+    identities: Sequence[SendAsIdentity] = []
+    synced_at: str | None = None
+    signature_source: str | None = None
+    signature_imported_at: str | None = None
 
 
 class SendingBehavior(BaseModel):
@@ -397,6 +502,17 @@ def _update_body(
     warmup_start_time: NotGivenOr[str],
     warmup_end_time: NotGivenOr[str],
     warmup_days: NotGivenOr[int],
+    send_as_email: NotGivenOr[str],
+    test_mode: NotGivenOr[str],
+    test_send_enabled: NotGivenOr[bool],
+    test_receive_enabled: NotGivenOr[bool],
+    shared_daily_limit: NotGivenOr[int],
+    rolling_recipient_limit: NotGivenOr[int],
+    send_recovery_resolution: NotGivenOr[Mapping[str, Any]],
+    warmup_placement: NotGivenOr[str],
+    warmup_folder: NotGivenOr[str],
+    warmup_retention_days: NotGivenOr[int],
+    relay_folder_moves: NotGivenOr[bool],
 ) -> dict[str, Any]:
     return drop_not_given(
         {
@@ -421,6 +537,17 @@ def _update_body(
             "warmup_start_time": warmup_start_time,
             "warmup_end_time": warmup_end_time,
             "warmup_days": warmup_days,
+            "send_as_email": send_as_email,
+            "test_mode": test_mode,
+            "test_send_enabled": test_send_enabled,
+            "test_receive_enabled": test_receive_enabled,
+            "shared_daily_limit": shared_daily_limit,
+            "rolling_recipient_limit": rolling_recipient_limit,
+            "send_recovery_resolution": send_recovery_resolution,
+            "warmup_placement": warmup_placement,
+            "warmup_folder": warmup_folder,
+            "warmup_retention_days": warmup_retention_days,
+            "relay_folder_moves": relay_folder_moves,
         }
     )
 
@@ -513,6 +640,17 @@ class Emails(SyncAPIResource):
         warmup_start_time: NotGivenOr[str] = NOT_GIVEN,
         warmup_end_time: NotGivenOr[str] = NOT_GIVEN,
         warmup_days: NotGivenOr[int] = NOT_GIVEN,
+        send_as_email: NotGivenOr[str] = NOT_GIVEN,
+        test_mode: NotGivenOr[str] = NOT_GIVEN,
+        test_send_enabled: NotGivenOr[bool] = NOT_GIVEN,
+        test_receive_enabled: NotGivenOr[bool] = NOT_GIVEN,
+        shared_daily_limit: NotGivenOr[int] = NOT_GIVEN,
+        rolling_recipient_limit: NotGivenOr[int] = NOT_GIVEN,
+        send_recovery_resolution: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        warmup_placement: NotGivenOr[str] = NOT_GIVEN,
+        warmup_folder: NotGivenOr[str] = NOT_GIVEN,
+        warmup_retention_days: NotGivenOr[int] = NOT_GIVEN,
+        relay_folder_moves: NotGivenOr[bool] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> EmailAccount:
         """Update an account's settings.
@@ -540,6 +678,26 @@ class Emails(SyncAPIResource):
             warmup_start_time: Daily warmup window start (``"HH:MM"``).
             warmup_end_time: Daily warmup window end (``"HH:MM"``).
             warmup_days: Number of days in the warmup week.
+            send_as_email: The verified provider alias to send from. An empty
+                string goes back to the mailbox's own address.
+            test_mode: Placement-test participation: ``"legacy"``,
+                ``"diagnostic"`` or ``"off"``.
+            test_send_enabled: Whether the mailbox may send placement tests.
+            test_receive_enabled: Whether the mailbox may receive them.
+            shared_daily_limit: Daily cap shared across pool links.
+            rolling_recipient_limit: Rolling per-recipient send cap.
+            send_recovery_resolution: Resolves a held send of unknown outcome.
+                Keys: ``held_task_id``, ``held_reason``, ``evidence_type``,
+                and optionally ``message_id``, ``provider_msg_id``,
+                ``thread_id``, ``evidence_task_id`` and
+                ``confirmation_reference``.
+            warmup_placement: Where warmup mail lands: ``"folder"``,
+                ``"inbox"`` or ``"archive"``.
+            warmup_folder: The destination for ``"folder"`` placement. An
+                empty string goes back to the instance default.
+            warmup_retention_days: How long warmup mail is kept; ``0`` goes
+                back to the instance setting.
+            relay_folder_moves: Relay unibox filing moves to the mailbox.
             options: Per-request overrides.
         """
         return self._patch(
@@ -567,6 +725,17 @@ class Emails(SyncAPIResource):
                 warmup_start_time=warmup_start_time,
                 warmup_end_time=warmup_end_time,
                 warmup_days=warmup_days,
+                send_as_email=send_as_email,
+                test_mode=test_mode,
+                test_send_enabled=test_send_enabled,
+                test_receive_enabled=test_receive_enabled,
+                shared_daily_limit=shared_daily_limit,
+                rolling_recipient_limit=rolling_recipient_limit,
+                send_recovery_resolution=send_recovery_resolution,
+                warmup_placement=warmup_placement,
+                warmup_folder=warmup_folder,
+                warmup_retention_days=warmup_retention_days,
+                relay_folder_moves=relay_folder_moves,
             ),
             options=options,
         )
@@ -769,6 +938,89 @@ class Emails(SyncAPIResource):
         """Report where the mailbox's import stands and what is holding it."""
         return self._get(
             f"/emails/{email_id}/sync", cast_to=MailboxSync, options=options
+        )
+
+    def update_sync(
+        self,
+        email_id: str,
+        *,
+        skip_folders: Sequence[str],
+        options: RequestOptions | None = None,
+    ) -> MailboxSyncSettings:
+        """Replace the folders the mailbox's sync leaves alone.
+
+        The list is the desired state, so a retry converges. Each name also
+        covers its subfolders, and it only applies to IMAP mailboxes. Needs
+        the ``write_emails`` scope.
+
+        Args:
+            email_id: The mailbox id.
+            skip_folders: Folder names as listed by :meth:`sync`. An empty
+                list clears the skip list.
+        """
+        return self._put(
+            f"/emails/{email_id}/sync",
+            cast_to=MailboxSyncSettings,
+            body={"skip_folders": list(skip_folders)},
+            options=options,
+        )
+
+    def update_direct_tracking(
+        self,
+        email_id: str,
+        *,
+        enabled: bool,
+        options: RequestOptions | None = None,
+    ) -> DirectTracking:
+        """Switch open and click tracking on hand-written unibox sends.
+
+        Off by default and set per mailbox. Needs the ``write_emails`` scope.
+
+        Args:
+            email_id: The mailbox id.
+            enabled: Whether direct sends from this mailbox are tracked.
+        """
+        return self._patch(
+            f"/emails/{email_id}/direct-tracking",
+            cast_to=DirectTracking,
+            body={"enabled": enabled},
+            options=options,
+        )
+
+    def identity(
+        self, email_id: str, *, options: RequestOptions | None = None
+    ) -> SendIdentity:
+        """Read the addresses the mailbox may send as and its signature origin.
+
+        Stored state only: the provider is not called. Needs the
+        ``read_emails`` scope.
+        """
+        return self._get(
+            f"/emails/{email_id}/identity", cast_to=SendIdentity, options=options
+        )
+
+    def refresh_identity(
+        self,
+        email_id: str,
+        *,
+        import_signature: NotGivenOr[bool] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> SendIdentity:
+        """Re-read the mailbox's send-as addresses from the provider and store them.
+
+        Retry-safe, since it stores the provider's current state. Needs the
+        ``write_emails`` scope.
+
+        Args:
+            email_id: The mailbox id.
+            import_signature: Also import the provider's signature, which
+                overwrites the stored one. Off by default.
+        """
+        return self._post(
+            f"/emails/{email_id}/identity/refresh",
+            cast_to=SendIdentity,
+            body=drop_not_given({"import_signature": import_signature}),
+            options=options,
         )
 
     def allowance(self, *, options: RequestOptions | None = None) -> MailboxAllowance:
@@ -1000,6 +1252,17 @@ class AsyncEmails(AsyncAPIResource):
         warmup_start_time: NotGivenOr[str] = NOT_GIVEN,
         warmup_end_time: NotGivenOr[str] = NOT_GIVEN,
         warmup_days: NotGivenOr[int] = NOT_GIVEN,
+        send_as_email: NotGivenOr[str] = NOT_GIVEN,
+        test_mode: NotGivenOr[str] = NOT_GIVEN,
+        test_send_enabled: NotGivenOr[bool] = NOT_GIVEN,
+        test_receive_enabled: NotGivenOr[bool] = NOT_GIVEN,
+        shared_daily_limit: NotGivenOr[int] = NOT_GIVEN,
+        rolling_recipient_limit: NotGivenOr[int] = NOT_GIVEN,
+        send_recovery_resolution: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        warmup_placement: NotGivenOr[str] = NOT_GIVEN,
+        warmup_folder: NotGivenOr[str] = NOT_GIVEN,
+        warmup_retention_days: NotGivenOr[int] = NOT_GIVEN,
+        relay_folder_moves: NotGivenOr[bool] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> EmailAccount:
         """Update an account's settings.
@@ -1027,6 +1290,26 @@ class AsyncEmails(AsyncAPIResource):
             warmup_start_time: Daily warmup window start (``"HH:MM"``).
             warmup_end_time: Daily warmup window end (``"HH:MM"``).
             warmup_days: Number of days in the warmup week.
+            send_as_email: The verified provider alias to send from. An empty
+                string goes back to the mailbox's own address.
+            test_mode: Placement-test participation: ``"legacy"``,
+                ``"diagnostic"`` or ``"off"``.
+            test_send_enabled: Whether the mailbox may send placement tests.
+            test_receive_enabled: Whether the mailbox may receive them.
+            shared_daily_limit: Daily cap shared across pool links.
+            rolling_recipient_limit: Rolling per-recipient send cap.
+            send_recovery_resolution: Resolves a held send of unknown outcome.
+                Keys: ``held_task_id``, ``held_reason``, ``evidence_type``,
+                and optionally ``message_id``, ``provider_msg_id``,
+                ``thread_id``, ``evidence_task_id`` and
+                ``confirmation_reference``.
+            warmup_placement: Where warmup mail lands: ``"folder"``,
+                ``"inbox"`` or ``"archive"``.
+            warmup_folder: The destination for ``"folder"`` placement. An
+                empty string goes back to the instance default.
+            warmup_retention_days: How long warmup mail is kept; ``0`` goes
+                back to the instance setting.
+            relay_folder_moves: Relay unibox filing moves to the mailbox.
             options: Per-request overrides.
         """
         return await self._patch(
@@ -1054,6 +1337,17 @@ class AsyncEmails(AsyncAPIResource):
                 warmup_start_time=warmup_start_time,
                 warmup_end_time=warmup_end_time,
                 warmup_days=warmup_days,
+                send_as_email=send_as_email,
+                test_mode=test_mode,
+                test_send_enabled=test_send_enabled,
+                test_receive_enabled=test_receive_enabled,
+                shared_daily_limit=shared_daily_limit,
+                rolling_recipient_limit=rolling_recipient_limit,
+                send_recovery_resolution=send_recovery_resolution,
+                warmup_placement=warmup_placement,
+                warmup_folder=warmup_folder,
+                warmup_retention_days=warmup_retention_days,
+                relay_folder_moves=relay_folder_moves,
             ),
             options=options,
         )
@@ -1256,6 +1550,89 @@ class AsyncEmails(AsyncAPIResource):
         """Report where the mailbox's import stands and what is holding it."""
         return await self._get(
             f"/emails/{email_id}/sync", cast_to=MailboxSync, options=options
+        )
+
+    async def update_sync(
+        self,
+        email_id: str,
+        *,
+        skip_folders: Sequence[str],
+        options: RequestOptions | None = None,
+    ) -> MailboxSyncSettings:
+        """Replace the folders the mailbox's sync leaves alone.
+
+        The list is the desired state, so a retry converges. Each name also
+        covers its subfolders, and it only applies to IMAP mailboxes. Needs
+        the ``write_emails`` scope.
+
+        Args:
+            email_id: The mailbox id.
+            skip_folders: Folder names as listed by :meth:`sync`. An empty
+                list clears the skip list.
+        """
+        return await self._put(
+            f"/emails/{email_id}/sync",
+            cast_to=MailboxSyncSettings,
+            body={"skip_folders": list(skip_folders)},
+            options=options,
+        )
+
+    async def update_direct_tracking(
+        self,
+        email_id: str,
+        *,
+        enabled: bool,
+        options: RequestOptions | None = None,
+    ) -> DirectTracking:
+        """Switch open and click tracking on hand-written unibox sends.
+
+        Off by default and set per mailbox. Needs the ``write_emails`` scope.
+
+        Args:
+            email_id: The mailbox id.
+            enabled: Whether direct sends from this mailbox are tracked.
+        """
+        return await self._patch(
+            f"/emails/{email_id}/direct-tracking",
+            cast_to=DirectTracking,
+            body={"enabled": enabled},
+            options=options,
+        )
+
+    async def identity(
+        self, email_id: str, *, options: RequestOptions | None = None
+    ) -> SendIdentity:
+        """Read the addresses the mailbox may send as and its signature origin.
+
+        Stored state only: the provider is not called. Needs the
+        ``read_emails`` scope.
+        """
+        return await self._get(
+            f"/emails/{email_id}/identity", cast_to=SendIdentity, options=options
+        )
+
+    async def refresh_identity(
+        self,
+        email_id: str,
+        *,
+        import_signature: NotGivenOr[bool] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> SendIdentity:
+        """Re-read the mailbox's send-as addresses from the provider and store them.
+
+        Retry-safe, since it stores the provider's current state. Needs the
+        ``write_emails`` scope.
+
+        Args:
+            email_id: The mailbox id.
+            import_signature: Also import the provider's signature, which
+                overwrites the stored one. Off by default.
+        """
+        return await self._post(
+            f"/emails/{email_id}/identity/refresh",
+            cast_to=SendIdentity,
+            body=drop_not_given({"import_signature": import_signature}),
+            options=options,
         )
 
     async def allowance(

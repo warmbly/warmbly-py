@@ -21,7 +21,6 @@ import random
 import sys
 import time
 from typing import TYPE_CHECKING, Any
-from urllib.parse import quote
 
 from websockets.asyncio.client import ClientConnection, connect
 from websockets.exceptions import ConnectionClosed, InvalidStatus, WebSocketException
@@ -76,6 +75,10 @@ _MAX_FRAME_SIZE = 2**20
 # Reconnect backoff.
 _BACKOFF_INITIAL = 0.5
 _BACKOFF_MAX = 30.0
+
+#: Handshake header carrying the credential. The server refuses to log it and
+#: deprecates sending API keys or OAuth tokens in the query string.
+_CREDENTIAL_HEADER = "X-Warmbly-Token"
 
 # Close codes (from the gateway contract).
 _CLOSE_ZOMBIE = 4000  # client-initiated; keeps the server session for resume
@@ -160,7 +163,8 @@ class AsyncGatewayClient:
         Args:
             token: A bearer credential carrying the ``realtime_subscribe`` scope
                 (an API key, OAuth access token, or session JWT). It is sent in
-                the connect query string and is never logged.
+                the ``X-Warmbly-Token`` handshake header, never in the URL, and
+                is never logged.
             base_url: The gateway base URL. The ``/socket/websocket`` path and
                 version query are appended automatically.
             on_resume_failed: Optional callback invoked when the server reports a
@@ -311,7 +315,7 @@ class AsyncGatewayClient:
         try:
             ws = await connect(
                 url,
-                additional_headers={},
+                additional_headers={_CREDENTIAL_HEADER: self._token},
                 user_agent_header="warmbly-py",
                 open_timeout=_OPEN_TIMEOUT,
                 max_size=_MAX_FRAME_SIZE,
@@ -331,8 +335,7 @@ class AsyncGatewayClient:
         logger.debug("gateway connection opened")
 
     def _build_url(self) -> str:
-        token = quote(self._token, safe="")
-        return f"{self._base_url}/socket/websocket?token={token}&vsn=2.0.0"
+        return f"{self._base_url}/socket/websocket?vsn=2.0.0"
 
     async def close(self) -> None:
         """Close the connection and stop reconnecting.

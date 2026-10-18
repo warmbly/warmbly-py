@@ -44,6 +44,7 @@ from .resources import (
     AsyncContacts,
     AsyncCrm,
     AsyncDeliverability,
+    AsyncEmailImages,
     AsyncEmails,
     AsyncFolders,
     AsyncForms,
@@ -54,6 +55,7 @@ from .resources import (
     AsyncMeetings,
     AsyncOAuthApplications,
     AsyncOutreach,
+    AsyncPlacement,
     AsyncPlans,
     AsyncSegments,
     AsyncSuppressions,
@@ -72,6 +74,7 @@ from .resources import (
     Contacts,
     Crm,
     Deliverability,
+    EmailImages,
     Emails,
     Folders,
     Forms,
@@ -82,6 +85,7 @@ from .resources import (
     Meetings,
     OAuthApplications,
     Outreach,
+    Placement,
     Plans,
     Segments,
     Suppressions,
@@ -268,6 +272,14 @@ class Warmbly(SyncAPIClient):
         return Categories(self)
 
     @cached_property
+    def placement(self) -> Placement:
+        return Placement(self)
+
+    @cached_property
+    def email_images(self) -> EmailImages:
+        return EmailImages(self)
+
+    @cached_property
     def segments(self) -> Segments:
         return Segments(self)
 
@@ -429,6 +441,14 @@ class AsyncWarmbly(AsyncAPIClient):
     @cached_property
     def categories(self) -> AsyncCategories:
         return AsyncCategories(self)
+
+    @cached_property
+    def placement(self) -> AsyncPlacement:
+        return AsyncPlacement(self)
+
+    @cached_property
+    def email_images(self) -> AsyncEmailImages:
+        return AsyncEmailImages(self)
 
     @cached_property
     def segments(self) -> AsyncSegments:

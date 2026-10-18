@@ -21,8 +21,11 @@ from .._utils import drop_not_given
 
 __all__ = [
     "AsyncTemplates",
+    "CopyJudgment",
     "RenderedTemplate",
+    "SpamFinding",
     "Template",
+    "TemplateAnalysis",
     "TemplateDeleted",
     "TemplateList",
     "TemplateScore",
@@ -68,12 +71,74 @@ class TemplateList(BaseModel):
 
 
 class TemplateScore(BaseModel):
-    """A deliverability/quality score for template content (permissive)."""
+    """The rules-based content score for template copy.
+
+    ``score`` runs 0 to 100, higher is safer. Each entry of ``issues`` carries
+    ``severity`` (``warn`` or ``high``), ``code``, ``message``, an optional
+    ``field`` (``subject`` or ``body``), the quoted ``spans`` that triggered it
+    and a ``suggestion``.
+    """
 
     score: int | None = None
-    grade: str | None = None
     issues: Sequence[dict[str, object]] = []
-    suggestions: Sequence[str] = []
+
+
+class SpamFinding(BaseModel):
+    """One AI finding: a fragment of the copy and why it hurts deliverability.
+
+    ``severity`` is ``high``, ``warn`` or ``info``; ``field`` is ``subject`` or
+    ``body`` (empty when it could not be anchored); ``text`` is the exact
+    fragment quoted from the copy.
+    """
+
+    severity: str | None = None
+    field: str | None = None
+    text: str | None = None
+    line: int | None = None
+    excerpt: str | None = None
+    issue: str | None = None
+    suggestion: str | None = None
+    category: str | None = None
+
+
+class CopyJudgment(BaseModel):
+    """How the copy reads to its recipient.
+
+    ``reads_as`` and ``personalization`` are positions from 0 to 1 on their
+    rubric, where 0 is the personal end. ``ask`` is ``one_clear_ask``,
+    ``several_asks`` or ``no_ask``.
+    """
+
+    reads_as: float | None = None
+    personalization: float | None = None
+    ask: str | None = None
+    spam_claim: float | None = None
+    confidence: float | None = None
+    model: str | None = None
+    input_tokens: int | None = None
+
+
+class TemplateAnalysis(BaseModel):
+    """The AI spam analysis of template copy.
+
+    ``rules`` is the same result :meth:`Templates.score` returns, scored from
+    the same reading of the copy. ``judgment`` is present when a copy judge is
+    configured. When no language model is configured the server answers with
+    the rules score and the judgment, ``findings`` is empty and
+    ``credits_charged`` is 0.
+    """
+
+    score: int | None = None
+    verdict: str | None = None
+    findings: Sequence[SpamFinding] | None = None
+    suggested_subject: str | None = None
+    improvements: Sequence[str] | None = None
+    rules: TemplateScore | None = None
+    judgment: CopyJudgment | None = None
+    model: str | None = None
+    tokens_used: int | None = None
+    credits_remaining: int | None = None
+    credits_charged: int | None = None
 
 
 class Templates(SyncAPIResource):
@@ -231,6 +296,35 @@ class Templates(SyncAPIResource):
         )
         return self._post(
             "/templates/score", cast_to=TemplateScore, body=body, options=options
+        )
+
+    def analyze(
+        self,
+        *,
+        subject: NotGivenOr[str] = NOT_GIVEN,
+        body_html: NotGivenOr[str] = NOT_GIVEN,
+        body_plain: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> TemplateAnalysis:
+        """Run the AI spam analysis on template copy. Charges AI credits.
+
+        Names the offending words and sentences, says whether each sits in
+        the subject or the body, and suggests replacements. Unlike
+        :meth:`score` it spends credits, so it needs the ``WRITE_TEMPLATES``
+        permission (and ``use_ai`` for a signed-in member); a depleted balance
+        raises :class:`~warmbly.PaymentRequiredError`. At least one of the
+        three fields must hold text, and the total is capped at 60,000
+        characters.
+        """
+        body = drop_not_given(
+            {
+                "subject": subject,
+                "body_html": body_html,
+                "body_plain": body_plain,
+            }
+        )
+        return self._post(
+            "/templates/analyze", cast_to=TemplateAnalysis, body=body, options=options
         )
 
 
@@ -393,4 +487,33 @@ class AsyncTemplates(AsyncAPIResource):
         )
         return await self._post(
             "/templates/score", cast_to=TemplateScore, body=body, options=options
+        )
+
+    async def analyze(
+        self,
+        *,
+        subject: NotGivenOr[str] = NOT_GIVEN,
+        body_html: NotGivenOr[str] = NOT_GIVEN,
+        body_plain: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> TemplateAnalysis:
+        """Run the AI spam analysis on template copy. Charges AI credits.
+
+        Names the offending words and sentences, says whether each sits in
+        the subject or the body, and suggests replacements. Unlike
+        :meth:`score` it spends credits, so it needs the ``WRITE_TEMPLATES``
+        permission (and ``use_ai`` for a signed-in member); a depleted balance
+        raises :class:`~warmbly.PaymentRequiredError`. At least one of the
+        three fields must hold text, and the total is capped at 60,000
+        characters.
+        """
+        body = drop_not_given(
+            {
+                "subject": subject,
+                "body_html": body_html,
+                "body_plain": body_plain,
+            }
+        )
+        return await self._post(
+            "/templates/analyze", cast_to=TemplateAnalysis, body=body, options=options
         )

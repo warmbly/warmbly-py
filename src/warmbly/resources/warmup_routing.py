@@ -1,7 +1,7 @@
 """The ``warmup_routing`` resource: premium-pool partner selection rules.
 
 Maps to the ``/v1/warmup/routing`` route group. A rule biases which warmup
-partner a mailbox is paired with — for example, "send to Gmail recipients only
+partner a mailbox is paired with, for example "send to Gmail recipients only
 from Google-classified senders". Rules are evaluated in ``priority`` order and
 ``weight`` scales how strongly a match is preferred.
 """
@@ -121,7 +121,13 @@ class WarmupRouting(SyncAPIResource):
         enabled: NotGivenOr[bool] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> WarmupRoutingRule:
-        """Update a routing rule, or toggle it with *enabled*."""
+        """Replace a routing rule.
+
+        The server treats this as a full replacement, not a patch: *name* and
+        both match types must be sent (omitting them is a 400), the match values are required unless
+        the type is ``"any"``, and an omitted *priority*, *weight* or
+        *enabled* resets to ``0``, ``0`` and ``False``. Send the whole rule.
+        """
         return self._patch(
             f"/warmup/routing/{rule_id}",
             cast_to=WarmupRoutingRule,
@@ -222,7 +228,13 @@ class AsyncWarmupRouting(AsyncAPIResource):
         enabled: NotGivenOr[bool] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> WarmupRoutingRule:
-        """Update a routing rule, or toggle it with *enabled*."""
+        """Replace a routing rule.
+
+        The server treats this as a full replacement, not a patch: *name* and
+        both match types must be sent (omitting them is a 400), the match values are required unless
+        the type is ``"any"``, and an omitted *priority*, *weight* or
+        *enabled* resets to ``0``, ``0`` and ``False``. Send the whole rule.
+        """
         return await self._patch(
             f"/warmup/routing/{rule_id}",
             cast_to=WarmupRoutingRule,

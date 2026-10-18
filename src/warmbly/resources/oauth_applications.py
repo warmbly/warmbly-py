@@ -26,6 +26,9 @@ from .._types import NOT_GIVEN, NotGivenOr, RequestOptions
 from .._utils import drop_not_given
 
 __all__ = [
+    "AppListing",
+    "AppListingDeleted",
+    "AppListingEnvelope",
     "AsyncOAuthApplications",
     "OAuthApplication",
     "OAuthApplicationDeleted",
@@ -43,7 +46,9 @@ class OAuthApplication(BaseModel):
 
     ``is_public`` marks a PKCE-only client with no secret;
     ``dynamically_registered`` marks one created through RFC 7591 dynamic
-    client registration rather than the dashboard.
+    client registration rather than the dashboard. ``suspended_at`` and
+    ``suspended_reason`` are set when an operator suspends the app; the owner
+    cannot lift it and writes to a suspended app are refused.
     """
 
     id: str
@@ -63,8 +68,47 @@ class OAuthApplication(BaseModel):
     status: str | None = None
     is_public: bool | None = None
     dynamically_registered: bool | None = None
+    #: Set when an operator suspended the app; only an operator can lift it.
+    suspended_at: str | None = None
+    suspended_reason: str | None = None
     created_at: str | None = None
     updated_at: str | None = None
+
+
+class AppListing(BaseModel):
+    """An OAuth app's page in the community directory.
+
+    ``status`` is ``published`` (reachable by link), ``featured`` (always
+    listed) or ``hidden`` (taken down by an operator; see ``status_note``).
+    """
+
+    application_id: str | None = None
+    organization_id: str | None = None
+    slug: str | None = None
+    tagline: str | None = None
+    description: str | None = None
+    category: str | None = None
+    install_url: str | None = None
+    support_url: str | None = None
+    privacy_url: str | None = None
+    status: str | None = None
+    status_note: str | None = None
+    status_at: str | None = None
+    submitted_at: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+class AppListingEnvelope(BaseModel):
+    """The ``{"listing": ...}`` wrapper; ``listing`` is null when unpublished."""
+
+    listing: AppListing | None = None
+
+
+class AppListingDeleted(BaseModel):
+    """The result of unpublishing an application's listing."""
+
+    deleted: bool | None = None
 
 
 class OAuthApplicationDeleted(BaseModel):
@@ -361,6 +405,117 @@ class OAuthApplications(SyncAPIResource):
             options=options,
         )
 
+    def set_logo(
+        self,
+        application_id: str,
+        *,
+        file: bytes,
+        filename: str = "logo.png",
+        content_type: str = "image/png",
+        options: RequestOptions | None = None,
+    ) -> OAuthApplication:
+        """Upload an image and set it as the application's logo.
+
+        The server stores a re-encoded copy (PNG or JPG, at most 2 MB, 32 to
+        1,024 pixels per side) and deletes the previous logo. Requires the
+        ``api_keys`` scope. A suspended application refuses the change.
+
+        Args:
+            application_id: The application to update.
+            file: The raw image bytes.
+            filename: The filename to send in the multipart part.
+            content_type: The image's MIME type.
+        """
+        return self._client.request(
+            cast_to=OAuthApplication,
+            method="POST",
+            path=f"/oauth/applications/{application_id}/logo",
+            files={"file": (filename, file, content_type)},
+            options=options,
+        )
+
+    def delete_logo(
+        self, application_id: str, *, options: RequestOptions | None = None
+    ) -> OAuthApplication:
+        """Remove the application's logo. Requires the ``api_keys`` scope."""
+        return self._delete(
+            f"/oauth/applications/{application_id}/logo",
+            cast_to=OAuthApplication,
+            options=options,
+        )
+
+    def retrieve_listing(
+        self, application_id: str, *, options: RequestOptions | None = None
+    ) -> AppListing | None:
+        """Return the application's community-directory listing.
+
+        Returns ``None`` when the application is not published. Requires the
+        ``api_keys`` scope.
+        """
+        data = self._get(
+            f"/oauth/applications/{application_id}/listing",
+            cast_to=AppListingEnvelope,
+            options=options,
+        )
+        return data.listing
+
+    def put_listing(
+        self,
+        application_id: str,
+        *,
+        slug: str,
+        tagline: str,
+        category: str,
+        install_url: str,
+        description: NotGivenOr[str] = NOT_GIVEN,
+        support_url: NotGivenOr[str] = NOT_GIVEN,
+        privacy_url: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> AppListing:
+        """Publish or replace the application's community-directory listing.
+
+        Replaces the whole listing, so repeating the call is safe. Requires the
+        ``api_keys`` scope.
+
+        Args:
+            application_id: The application to publish.
+            slug: The link, 3 to 48 lowercase letters, numbers or dashes.
+            tagline: One line, at most 120 characters.
+            category: One of ``crm``, ``automation``, ``notifications``,
+                ``meetings``, ``data``, ``verification``, ``ai`` or ``other``.
+            install_url: Where Install sends people (HTTPS).
+            description: Optional text, at most 2,000 characters.
+            support_url: Optional HTTPS support link.
+            privacy_url: Optional HTTPS privacy policy link.
+        """
+        data = self._put(
+            f"/oauth/applications/{application_id}/listing",
+            cast_to=AppListingEnvelope,
+            body=drop_not_given(
+                {
+                    "slug": slug,
+                    "tagline": tagline,
+                    "description": description,
+                    "category": category,
+                    "install_url": install_url,
+                    "support_url": support_url,
+                    "privacy_url": privacy_url,
+                }
+            ),
+            options=options,
+        )
+        return data.listing or AppListing()
+
+    def delete_listing(
+        self, application_id: str, *, options: RequestOptions | None = None
+    ) -> AppListingDeleted:
+        """Unpublish the application. Succeeds when nothing is published."""
+        return self._delete(
+            f"/oauth/applications/{application_id}/listing",
+            cast_to=AppListingDeleted,
+            options=options,
+        )
+
 
 class AsyncOAuthApplications(AsyncAPIResource):
     """Asynchronous ``oauth_applications`` resource."""
@@ -569,5 +724,116 @@ class AsyncOAuthApplications(AsyncAPIResource):
             method="POST",
             path="/oauth/application-logo",
             files={"file": (filename, file, content_type)},
+            options=options,
+        )
+
+    async def set_logo(
+        self,
+        application_id: str,
+        *,
+        file: bytes,
+        filename: str = "logo.png",
+        content_type: str = "image/png",
+        options: RequestOptions | None = None,
+    ) -> OAuthApplication:
+        """Upload an image and set it as the application's logo.
+
+        The server stores a re-encoded copy (PNG or JPG, at most 2 MB, 32 to
+        1,024 pixels per side) and deletes the previous logo. Requires the
+        ``api_keys`` scope. A suspended application refuses the change.
+
+        Args:
+            application_id: The application to update.
+            file: The raw image bytes.
+            filename: The filename to send in the multipart part.
+            content_type: The image's MIME type.
+        """
+        return await self._client.request(
+            cast_to=OAuthApplication,
+            method="POST",
+            path=f"/oauth/applications/{application_id}/logo",
+            files={"file": (filename, file, content_type)},
+            options=options,
+        )
+
+    async def delete_logo(
+        self, application_id: str, *, options: RequestOptions | None = None
+    ) -> OAuthApplication:
+        """Remove the application's logo. Requires the ``api_keys`` scope."""
+        return await self._delete(
+            f"/oauth/applications/{application_id}/logo",
+            cast_to=OAuthApplication,
+            options=options,
+        )
+
+    async def retrieve_listing(
+        self, application_id: str, *, options: RequestOptions | None = None
+    ) -> AppListing | None:
+        """Return the application's community-directory listing.
+
+        Returns ``None`` when the application is not published. Requires the
+        ``api_keys`` scope.
+        """
+        data = await self._get(
+            f"/oauth/applications/{application_id}/listing",
+            cast_to=AppListingEnvelope,
+            options=options,
+        )
+        return data.listing
+
+    async def put_listing(
+        self,
+        application_id: str,
+        *,
+        slug: str,
+        tagline: str,
+        category: str,
+        install_url: str,
+        description: NotGivenOr[str] = NOT_GIVEN,
+        support_url: NotGivenOr[str] = NOT_GIVEN,
+        privacy_url: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> AppListing:
+        """Publish or replace the application's community-directory listing.
+
+        Replaces the whole listing, so repeating the call is safe. Requires the
+        ``api_keys`` scope.
+
+        Args:
+            application_id: The application to publish.
+            slug: The link, 3 to 48 lowercase letters, numbers or dashes.
+            tagline: One line, at most 120 characters.
+            category: One of ``crm``, ``automation``, ``notifications``,
+                ``meetings``, ``data``, ``verification``, ``ai`` or ``other``.
+            install_url: Where Install sends people (HTTPS).
+            description: Optional text, at most 2,000 characters.
+            support_url: Optional HTTPS support link.
+            privacy_url: Optional HTTPS privacy policy link.
+        """
+        data = await self._put(
+            f"/oauth/applications/{application_id}/listing",
+            cast_to=AppListingEnvelope,
+            body=drop_not_given(
+                {
+                    "slug": slug,
+                    "tagline": tagline,
+                    "description": description,
+                    "category": category,
+                    "install_url": install_url,
+                    "support_url": support_url,
+                    "privacy_url": privacy_url,
+                }
+            ),
+            options=options,
+        )
+        return data.listing or AppListing()
+
+    async def delete_listing(
+        self, application_id: str, *, options: RequestOptions | None = None
+    ) -> AppListingDeleted:
+        """Unpublish the application. Succeeds when nothing is published."""
+        return await self._delete(
+            f"/oauth/applications/{application_id}/listing",
+            cast_to=AppListingDeleted,
             options=options,
         )

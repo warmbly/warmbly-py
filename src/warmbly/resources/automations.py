@@ -15,10 +15,12 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from pydantic import model_validator
+
 from .._models import BaseModel
 from .._pagination import AsyncPaginator, SyncCursorPage
 from .._resource import AsyncAPIResource, SyncAPIResource
-from .._types import NOT_GIVEN, NotGivenOr, RequestOptions
+from .._types import NOT_GIVEN, NotGiven, NotGivenOr, RequestOptions
 from .._utils import drop_not_given
 
 __all__ = [
@@ -37,6 +39,11 @@ class Automation(BaseModel):
 
     ``inbound_url`` is present for automations triggered by an inbound webhook;
     the token in it is the capability, so treat it as a secret.
+
+    The server wraps a single automation as ``{"automation": {...}}`` on
+    create, retrieve and update; the wrapper's fields are lifted onto the model
+    so ``automation.id`` works, and ``automation.automation`` still holds the
+    raw inner object.
     """
 
     id: str
@@ -49,6 +56,14 @@ class Automation(BaseModel):
     inbound_url: str | None = None
     created_at: str | None = None
     updated_at: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _lift_wrapper(cls, value: Any) -> Any:
+        """Lift the fields of a ``{"automation": {...}}`` wrapper to the top."""
+        if isinstance(value, dict) and isinstance(value.get("automation"), dict):
+            return {**value["automation"], **value}
+        return value
 
 
 class AutomationDeleted(BaseModel):
@@ -86,6 +101,43 @@ class AutomationDryRun(BaseModel):
 
     trace: Sequence[dict[str, Any]] = []
     data: dict[str, Any] | None = None
+
+
+def _write_body(
+    current: Automation,
+    *,
+    name: NotGivenOr[str],
+    trigger_event: NotGivenOr[str],
+    graph: NotGivenOr[Mapping[str, Any]],
+    enabled: NotGivenOr[bool],
+    filter: NotGivenOr[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Merge the given fields over *current* into a complete write body.
+
+    ``PATCH /automations/{id}`` replaces the whole definition (an omitted
+    ``graph`` empties the flow, an omitted ``enabled`` disables it), so a
+    partial update has to be sent as the stored automation with the changes
+    applied.
+    """
+    body: dict[str, Any] = drop_not_given(
+        {
+            "name": current.name if isinstance(name, NotGiven) else name,
+            "trigger_event": (
+                current.trigger_event
+                if isinstance(trigger_event, NotGiven)
+                else trigger_event
+            ),
+            "graph": current.graph if isinstance(graph, NotGiven) else graph,
+            "enabled": current.enabled if isinstance(enabled, NotGiven) else enabled,
+            "filter": current.filter if isinstance(filter, NotGiven) else filter,
+        }
+    )
+    return {key: value for key, value in body.items() if value is not None}
+
+
+def _needs_current(*fields: object) -> bool:
+    """Whether any of the update fields was left out."""
+    return any(isinstance(field, NotGiven) for field in fields)
 
 
 class Automations(SyncAPIResource):
@@ -155,18 +207,26 @@ class Automations(SyncAPIResource):
         filter: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> Automation:
-        """Update an automation, or toggle it with *enabled*."""
+        """Update an automation, or toggle it with *enabled*.
+
+        The server replaces the whole definition on every write, so any of
+        *name*, *trigger_event*, *graph*, *enabled* and *filter* you leave out
+        is first read from the stored automation (one extra ``GET``) and sent
+        back unchanged. Pass all five to skip that read.
+        """
+        current = Automation(id=automation_id)
+        if _needs_current(name, trigger_event, graph, enabled, filter):
+            current = self.retrieve(automation_id, options=options)
         return self._patch(
             f"/automations/{automation_id}",
             cast_to=Automation,
-            body=drop_not_given(
-                {
-                    "name": name,
-                    "trigger_event": trigger_event,
-                    "graph": graph,
-                    "enabled": enabled,
-                    "filter": filter,
-                }
+            body=_write_body(
+                current,
+                name=name,
+                trigger_event=trigger_event,
+                graph=graph,
+                enabled=enabled,
+                filter=filter,
             ),
             options=options,
         )
@@ -305,18 +365,26 @@ class AsyncAutomations(AsyncAPIResource):
         filter: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> Automation:
-        """Update an automation, or toggle it with *enabled*."""
+        """Update an automation, or toggle it with *enabled*.
+
+        The server replaces the whole definition on every write, so any of
+        *name*, *trigger_event*, *graph*, *enabled* and *filter* you leave out
+        is first read from the stored automation (one extra ``GET``) and sent
+        back unchanged. Pass all five to skip that read.
+        """
+        current = Automation(id=automation_id)
+        if _needs_current(name, trigger_event, graph, enabled, filter):
+            current = await self.retrieve(automation_id, options=options)
         return await self._patch(
             f"/automations/{automation_id}",
             cast_to=Automation,
-            body=drop_not_given(
-                {
-                    "name": name,
-                    "trigger_event": trigger_event,
-                    "graph": graph,
-                    "enabled": enabled,
-                    "filter": filter,
-                }
+            body=_write_body(
+                current,
+                name=name,
+                trigger_event=trigger_event,
+                graph=graph,
+                enabled=enabled,
+                filter=filter,
             ),
             options=options,
         )

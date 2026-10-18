@@ -52,7 +52,7 @@ class ApiKey(BaseModel):
 
 
 class ApiKeyDeleted(BaseModel):
-    """The result of revoking an API key."""
+    """The result of revoking (``revoked``) or permanently deleting (``deleted``) a key."""
 
     status: str | None = None
 
@@ -65,10 +65,17 @@ class PermissionInfo(BaseModel):
 
 
 class ApiKeyPermissions(BaseModel):
-    """The catalog of available permissions and convenience presets."""
+    """The catalog of available permissions and convenience presets.
+
+    ``grantable`` is the permission bitmask the caller may put on a key (a
+    key cannot hold more than its creator does) and ``app_scopes`` is the
+    bitmask an OAuth application may request.
+    """
 
     permissions: Sequence[PermissionInfo] = []
     presets: dict[str, int] = {}
+    grantable: int | None = None
+    app_scopes: int | None = None
 
 
 class ApiKeyUsageSummary(BaseModel):
@@ -205,6 +212,21 @@ class ApiKeys(SyncAPIResource):
             f"/api-keys/{api_key_id}",
             cast_to=ApiKeyDeleted,
             query=query,
+            options=options,
+        )
+
+    def delete_permanently(
+        self, api_key_id: str, *, options: RequestOptions | None = None
+    ) -> ApiKeyDeleted:
+        """Permanently delete a revoked or expired API key and its usage logs.
+
+        Revoking (:meth:`delete`) ends a key but keeps its row; this removes
+        the row. Requires the ``API_KEYS`` permission and is refused for OAuth
+        app tokens.
+        """
+        return self._delete(
+            f"/api-keys/{api_key_id}/permanent",
+            cast_to=ApiKeyDeleted,
             options=options,
         )
 
@@ -382,6 +404,21 @@ class AsyncApiKeys(AsyncAPIResource):
             f"/api-keys/{api_key_id}",
             cast_to=ApiKeyDeleted,
             query=query,
+            options=options,
+        )
+
+    async def delete_permanently(
+        self, api_key_id: str, *, options: RequestOptions | None = None
+    ) -> ApiKeyDeleted:
+        """Permanently delete a revoked or expired API key and its usage logs.
+
+        Revoking (:meth:`delete`) ends a key but keeps its row; this removes
+        the row. Requires the ``API_KEYS`` permission and is refused for OAuth
+        app tokens.
+        """
+        return await self._delete(
+            f"/api-keys/{api_key_id}/permanent",
+            cast_to=ApiKeyDeleted,
             options=options,
         )
 

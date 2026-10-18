@@ -152,3 +152,11 @@ bound to three route prefixes.
 ## Timezones
 
 ::: warmbly.resources.timezones.Timezones
+
+## Placement
+
+::: warmbly.resources.placement.Placement
+
+## Email images
+
+::: warmbly.resources.email_images.EmailImages

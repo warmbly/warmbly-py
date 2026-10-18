@@ -219,17 +219,14 @@ def test_transient_disconnect_default_message() -> None:
     assert str(exc) == "Gateway connection lost."
 
 
-def test_build_url_quotes_token_and_appends_vsn() -> None:
+def test_build_url_keeps_token_out_of_the_url() -> None:
     client = AsyncGatewayClient(
         token="wmbly/with spaces&x", base_url="wss://rt.example.com/"
     )
     url = client._build_url()
     # The base_url trailing slash is stripped in __init__.
-    assert url.startswith("wss://rt.example.com/socket/websocket?token=")
-    assert "wmbly%2Fwith%20spaces%26x" in url
-    assert url.endswith("&vsn=2.0.0")
-    # No raw special characters leaked from the token.
-    assert "with spaces" not in url
+    assert url == "wss://rt.example.com/socket/websocket?vsn=2.0.0"
+    assert "wmbly" not in url
 
 
 def test_require_ws_when_never_connected_raises() -> None:

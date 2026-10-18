@@ -2,8 +2,10 @@
 
 Maps to the ``/v1/folders``, ``/v1/tags``, and ``/v1/categories`` route groups,
 which share one shape: a titled, coloured, ordered label. They differ only in
-what they organize — folders group campaigns, tags group mailboxes, and
-categories group contacts and unibox conversations.
+what they organize: folders group campaigns, tags group mailboxes, and
+categories group contacts and unibox conversations. Writes need the
+``write_campaigns`` scope for folders, ``write_emails`` for tags and
+``write_contacts`` for categories.
 
 There is no list endpoint: groups arrive embedded in the resources they
 organize (a campaign's ``folders``, a mailbox's ``tags``, a contact's

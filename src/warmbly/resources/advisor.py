@@ -1,7 +1,7 @@
 """The ``advisor`` resource: continuous deliverability and setup checks.
 
 Maps to the ``/v1/advisor`` route group. The Advisor runs detectors across the
-organization and surfaces findings on the row they are about — a mailbox
+organization and surfaces findings on the row they are about: a mailbox
 missing DMARC, a campaign with no unsubscribe header, and so on. Each finding
 carries a severity, an explanation, and often an ``action`` the server can
 apply for you.
@@ -9,6 +9,9 @@ apply for you.
 Findings are stateful: apply, undo, snooze, or dismiss one and the state sticks
 until the underlying condition clears and recurs, so telling the Advisor "this
 is fine" does not have to be repeated weekly.
+
+Every route needs the ``read_analytics`` scope; applying or undoing a fix
+then also needs whatever permission the underlying change requires.
 
 The autopilot toggle and the agent-fix path are session-only and therefore
 absent here.
@@ -123,16 +126,19 @@ class Advisor(SyncAPIResource):
         category: NotGivenOr[str] = NOT_GIVEN,
         entity_type: NotGivenOr[str] = NOT_GIVEN,
         entity_id: NotGivenOr[str] = NOT_GIVEN,
+        status: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         limit: NotGivenOr[int] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> SyncCursorPage[AdvisorFinding]:
-        """List open findings.
+        """List findings (open ones unless *status* says otherwise).
 
         Args:
             surface: Restrict to one surface (where the finding is shown).
             category: Restrict to one detector category.
             entity_type: Restrict to findings about one kind of entity.
             entity_id: Restrict to findings about one specific entity.
+            status: Restrict to findings in these states (``open``,
+                ``snoozed``, ``dismissed``, ``applied``, ``resolved``).
             limit: Maximum findings to return.
         """
         return self._get_api_list(
@@ -143,6 +149,7 @@ class Advisor(SyncAPIResource):
                 "category": category,
                 "entity_type": entity_type,
                 "entity_id": entity_id,
+                "status": status,
                 "limit": limit,
             },
             options=options,
@@ -242,16 +249,19 @@ class AsyncAdvisor(AsyncAPIResource):
         category: NotGivenOr[str] = NOT_GIVEN,
         entity_type: NotGivenOr[str] = NOT_GIVEN,
         entity_id: NotGivenOr[str] = NOT_GIVEN,
+        status: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         limit: NotGivenOr[int] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> AsyncPaginator[AdvisorFinding]:
-        """List open findings.
+        """List findings (open ones unless *status* says otherwise).
 
         Args:
             surface: Restrict to one surface (where the finding is shown).
             category: Restrict to one detector category.
             entity_type: Restrict to findings about one kind of entity.
             entity_id: Restrict to findings about one specific entity.
+            status: Restrict to findings in these states (``open``,
+                ``snoozed``, ``dismissed``, ``applied``, ``resolved``).
             limit: Maximum findings to return.
         """
         return self._get_api_list(
@@ -262,6 +272,7 @@ class AsyncAdvisor(AsyncAPIResource):
                 "category": category,
                 "entity_type": entity_type,
                 "entity_id": entity_id,
+                "status": status,
                 "limit": limit,
             },
             options=options,

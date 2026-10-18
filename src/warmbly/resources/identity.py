@@ -1,7 +1,7 @@
 """The ``me`` resource: who this credential is.
 
 Maps to ``GET /v1/me``. No scope gates it, so any valid credential can resolve
-its own identity — which makes it the natural way to validate a key at setup
+its own identity, which makes it the natural way to validate a key at setup
 time and to label the connection in a UI.
 
 ``scopes`` is populated for API keys and OAuth tokens, and empty for browser

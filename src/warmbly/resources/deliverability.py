@@ -5,7 +5,7 @@ deliverability pipeline: a downstream processor (an SES bounce handler, a
 provider webhook relay) posts what it saw, and Warmbly applies the
 organization's suppression and auto-pause rules to it.
 
-Ingestion is fire-and-forget — the endpoint answers ``202 Accepted`` and does
+Ingestion is fire-and-forget: the endpoint answers ``202 Accepted`` and does
 the work behind it. Pass ``idempotency_key`` so a retried delivery from your
 own queue is not counted twice.
 """
@@ -77,18 +77,20 @@ class Deliverability(SyncAPIResource):
         metadata: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> DeliverabilityEventAccepted:
-        """Record a bounce, complaint, or unsubscribe.
+        """Record a deliverability event.
 
         Depending on the organization's outreach settings this can suppress
-        the recipient and pause the campaign, so treat it as a write.
+        the recipient and pause the campaign, so treat it as a write. Any
+        campaign, task or contact id must belong to your workspace.
 
         Args:
-            event_type: The kind of event (bounce, complaint, unsubscribe).
+            event_type: ``"bounce"``, ``"complaint"``, ``"unsubscribe"``,
+                ``"open"``, ``"click"`` or ``"reply"``.
             recipient_email: The address the event is about.
             campaign_id: The campaign the send belonged to.
             task_id: The send task the event is about.
             contact_id: The contact the address maps to.
-            provider: Where the signal came from.
+            provider: Where the signal came from (``"manual"`` when omitted).
             reason: The provider's stated reason.
             idempotency_key: A stable key so a replayed event is deduped
                 server-side.
@@ -129,18 +131,20 @@ class AsyncDeliverability(AsyncAPIResource):
         metadata: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> DeliverabilityEventAccepted:
-        """Record a bounce, complaint, or unsubscribe.
+        """Record a deliverability event.
 
         Depending on the organization's outreach settings this can suppress
-        the recipient and pause the campaign, so treat it as a write.
+        the recipient and pause the campaign, so treat it as a write. Any
+        campaign, task or contact id must belong to your workspace.
 
         Args:
-            event_type: The kind of event (bounce, complaint, unsubscribe).
+            event_type: ``"bounce"``, ``"complaint"``, ``"unsubscribe"``,
+                ``"open"``, ``"click"`` or ``"reply"``.
             recipient_email: The address the event is about.
             campaign_id: The campaign the send belonged to.
             task_id: The send task the event is about.
             contact_id: The contact the address maps to.
-            provider: Where the signal came from.
+            provider: Where the signal came from (``"manual"`` when omitted).
             reason: The provider's stated reason.
             idempotency_key: A stable key so a replayed event is deduped
                 server-side.

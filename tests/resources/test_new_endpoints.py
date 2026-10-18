@@ -57,7 +57,6 @@ def test_campaign_create_names_the_id_lists(client: Warmbly) -> None:
     )
     client.campaigns.create(
         name="Q4",
-        kind="one_time",
         email_tags=["tag_1"],
         folders=["fol_1"],
         continuous=True,
@@ -70,7 +69,6 @@ def test_campaign_create_names_the_id_lists(client: Warmbly) -> None:
     )
     assert json.loads(_last(create).content) == {
         "name": "Q4",
-        "kind": "one_time",
         "email_tag_ids": ["tag_1"],
         "folder_ids": ["fol_1"],
         "continuous": True,

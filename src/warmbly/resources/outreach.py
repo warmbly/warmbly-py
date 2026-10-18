@@ -30,15 +30,17 @@ class OutreachSettings(BaseModel):
     """The organization's outreach settings.
 
     Each attribute is one branch of the settings tree: bounce handling, task
-    reliability, A/B defaults, reply-intent keywords, send-time optimization,
-    preflight checks, the workspace opt-out footer, and which dashboard panels
-    are shown.
+    reliability, A/B defaults, reply-intent keywords, inbox tagging (what a
+    classified reply may do, plus the workspace's own tagging questions),
+    send-time optimization, preflight checks, the workspace opt-out footer, and
+    which dashboard panels are shown.
     """
 
     bounce_pipeline: dict[str, Any] | None = None
     task_reliability: dict[str, Any] | None = None
     ab_testing: dict[str, Any] | None = None
     reply_intent: dict[str, Any] | None = None
+    inbox_tagging: dict[str, Any] | None = None
     send_time_optimization: dict[str, Any] | None = None
     preflight: dict[str, Any] | None = None
     unsubscribe: dict[str, Any] | None = None
@@ -65,7 +67,8 @@ class Outreach(SyncAPIResource):
 
         This is a whole-document write, not a merge: read
         :meth:`settings` first, change the branch you care about, and send the
-        result back.
+        result back. A branch or field left out of the document takes its
+        server default, so it is reset rather than kept.
 
         Args:
             settings: The full settings tree. The ``unsubscribe`` branch is the
@@ -103,7 +106,8 @@ class AsyncOutreach(AsyncAPIResource):
 
         This is a whole-document write, not a merge: read
         :meth:`settings` first, change the branch you care about, and send the
-        result back.
+        result back. A branch or field left out of the document takes its
+        server default, so it is reset rather than kept.
 
         Args:
             settings: The full settings tree. The ``unsubscribe`` branch is the
