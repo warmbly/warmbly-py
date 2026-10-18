@@ -1,0 +1,1 @@
+Rate limit errors now read the server's `retry_after_ms`, so `RateLimitError.retry_after` is exact for waits under a second, and `code` is set to `rate_limit_exceeded`. Error responses without an `X-Request-Id` header fall back to the `request_id` in the error body.

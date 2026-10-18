@@ -1,0 +1,1 @@
+`segments.set_members()` now takes `select_all`, `filters` and `exclude` to override every contact matching a search instead of listing ids, and `contacts` is optional. `SegmentField` gains `option_labels`.

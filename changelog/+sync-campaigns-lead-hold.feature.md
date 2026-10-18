@@ -1,0 +1,1 @@
+Added `campaigns.lead_hold()`, `pause_lead()` and `resume_lead()` (`GET /campaigns/:id/leads/:contactId/hold`, `POST .../pause`, `POST .../resume`) to park one contact inside one campaign, optionally until a date, without unsubscribing them. Each returns a `CampaignLeadHoldState` whose `hold` is `None` when the lead is not held.

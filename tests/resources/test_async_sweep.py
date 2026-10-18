@@ -789,9 +789,9 @@ async def test_emails_async_sweep(aclient: AsyncWarmbly) -> None:
 @respx.mock
 def test_contacts_sync_sweep(client: Warmbly) -> None:
     create = respx.post(f"{BASE_URL}/contacts").mock(
-        return_value=httpx.Response(200, json={"created": 1})
+        return_value=httpx.Response(200, json=[{"id": "ct_1"}])
     )
-    assert client.contacts.create([{"email": "a@e.com"}]).created == 1
+    assert client.contacts.create([{"email": "a@e.com"}])[0].id == "ct_1"
     # The endpoint takes a bare array, not an object.
     assert json.loads(_last(create).content) == [{"email": "a@e.com"}]
 
@@ -955,9 +955,9 @@ def test_contacts_sync_research_and_io(client: Warmbly) -> None:
 @respx.mock
 async def test_contacts_async_sweep(aclient: AsyncWarmbly) -> None:
     respx.post(f"{BASE_URL}/contacts").mock(
-        return_value=httpx.Response(200, json={"created": 1})
+        return_value=httpx.Response(200, json=[{"id": "ct_1"}])
     )
-    assert (await aclient.contacts.create([{"email": "a@e.com"}])).created == 1
+    assert (await aclient.contacts.create([{"email": "a@e.com"}]))[0].id == "ct_1"
 
     respx.post(f"{BASE_URL}/contacts/search").mock(
         return_value=httpx.Response(200, json={"data": []})
@@ -988,9 +988,9 @@ async def test_contacts_async_sweep(aclient: AsyncWarmbly) -> None:
     assert (await aclient.contacts.delete("ct_1")).id is None
 
     respx.patch(f"{BASE_URL}/contacts").mock(
-        return_value=httpx.Response(200, json={"updated": 1})
+        return_value=httpx.Response(200, json=[{"id": "ct_1"}])
     )
-    assert (await aclient.contacts.bulk_update(contacts=["a"])).updated == 1
+    assert (await aclient.contacts.bulk_update(contacts=["a"]))[0].id == "ct_1"
 
     respx.delete(f"{BASE_URL}/contacts").mock(return_value=httpx.Response(204))
     assert (await aclient.contacts.bulk_delete(["a"])).id is None

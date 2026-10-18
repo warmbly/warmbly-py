@@ -1,0 +1,1 @@
+`campaigns.estimate()` accepts `campaign_id`, `start_time`, `end_time` and `step_waits`, and `segment_ids` is now optional. `CampaignEstimate` also returns `steps`, `total_sends`, `first_touch_finish_at`, `steady_capacity`, `full_capacity_at`, `ramping`, `held`, `warmup`, `other_campaigns_per_day`, `bottleneck`, a day by day `timeline` and per mailbox `senders`.

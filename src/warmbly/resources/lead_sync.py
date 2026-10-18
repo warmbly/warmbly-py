@@ -40,20 +40,35 @@ class LeadSyncConnection(BaseModel):
 
 
 class LeadSyncSpreadsheet(BaseModel):
-    """A spreadsheet's metadata, including its tabs (permissive)."""
+    """A spreadsheet's metadata, including its tabs (each ``{"title",
+    "index"}``)."""
 
-    spreadsheet_id: str | None = None
+    sheet_id: str | None = None
     title: str | None = None
     tabs: Sequence[dict[str, Any]] = []
 
 
 class LeadSyncPreview(BaseModel):
-    """A parsed preview of a sheet tab, before any contacts are written."""
+    """A parsed preview of a sheet tab, before any contacts are written.
 
-    headers: Sequence[str] = []
-    rows: Sequence[dict[str, Any]] = []
+    It has the same shape as a contact import preview: ``columns`` are the
+    headers found, ``sample_rows`` the top rows verbatim, and
+    ``suggested_mapping`` a default column mapping to start from.
+    ``inferred_columns`` lists column indexes whose suggestion was inferred
+    rather than read from the header, and ``mapping_source`` is ``"saved"``
+    when the workspace confirmed a mapping for these exact headers before.
+    """
+
+    filename: str | None = None
+    format: str | None = None
     total_rows: int | None = None
+    columns: Sequence[str] = []
+    has_header: bool | None = None
+    sample_rows: Sequence[Sequence[str]] = []
     suggested_mapping: Sequence[dict[str, Any]] = []
+    inferred_columns: Sequence[int] = []
+    column_stats: Sequence[dict[str, Any]] = []
+    mapping_source: str | None = None
 
 
 class LeadSyncSource(BaseModel):
@@ -73,6 +88,7 @@ class LeadSyncSource(BaseModel):
     dedup: str | None = None
     target_campaign_id: str | None = None
     category_ids: Sequence[str] = []
+    segment_ids: Sequence[str] = []
     subscribed_default: bool | None = None
     label: str | None = None
     status: str | None = None
@@ -108,6 +124,7 @@ def _source_body(
     dedup: NotGivenOr[str],
     target_campaign_id: NotGivenOr[str],
     category_ids: NotGivenOr[Sequence[str]],
+    segment_ids: NotGivenOr[Sequence[str]],
     subscribed_default: NotGivenOr[bool],
     label: NotGivenOr[str],
     clear_campaign: NotGivenOr[bool] = NOT_GIVEN,
@@ -123,6 +140,7 @@ def _source_body(
             "dedup": dedup,
             "target_campaign_id": target_campaign_id,
             "category_ids": category_ids,
+            "segment_ids": segment_ids,
             "subscribed_default": subscribed_default,
             "label": label,
             "clear_campaign": clear_campaign,
@@ -187,17 +205,19 @@ class LeadSync(SyncAPIResource):
         self,
         *,
         campaign_id: NotGivenOr[str] = NOT_GIVEN,
+        segment_id: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> SyncCursorPage[LeadSyncSource]:
         """List saved sync sources.
 
         Args:
             campaign_id: Restrict to sources targeting one campaign.
+            segment_id: Restrict to sources that pin rows into one segment.
         """
         return self._get_api_list(
             "/lead-sync/sources",
             model=LeadSyncSource,
-            query={"campaign_id": campaign_id},
+            query={"campaign_id": campaign_id, "segment_id": segment_id},
             options=options,
         )
 
@@ -213,6 +233,7 @@ class LeadSync(SyncAPIResource):
         dedup: NotGivenOr[str] = NOT_GIVEN,
         target_campaign_id: NotGivenOr[str] = NOT_GIVEN,
         category_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        segment_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         subscribed_default: NotGivenOr[bool] = NOT_GIVEN,
         label: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
@@ -229,6 +250,9 @@ class LeadSync(SyncAPIResource):
             dedup: How to resolve an existing contact with the same email.
             target_campaign_id: A campaign to enrol synced contacts into.
             category_ids: Categories to apply to synced contacts.
+            segment_ids: Segments to pin every synced row into as an include
+                override. A segment deleted later is dropped from the run
+                rather than failing it.
             subscribed_default: The subscription state for new contacts.
             label: A human-readable name for the source.
         """
@@ -245,6 +269,7 @@ class LeadSync(SyncAPIResource):
                 dedup=dedup,
                 target_campaign_id=target_campaign_id,
                 category_ids=category_ids,
+                segment_ids=segment_ids,
                 subscribed_default=subscribed_default,
                 label=label,
             ),
@@ -274,6 +299,7 @@ class LeadSync(SyncAPIResource):
         target_campaign_id: NotGivenOr[str] = NOT_GIVEN,
         clear_campaign: NotGivenOr[bool] = NOT_GIVEN,
         category_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        segment_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         subscribed_default: NotGivenOr[bool] = NOT_GIVEN,
         label: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
@@ -297,6 +323,7 @@ class LeadSync(SyncAPIResource):
                 dedup=dedup,
                 target_campaign_id=target_campaign_id,
                 category_ids=category_ids,
+                segment_ids=segment_ids,
                 subscribed_default=subscribed_default,
                 label=label,
                 clear_campaign=clear_campaign,
@@ -385,17 +412,19 @@ class AsyncLeadSync(AsyncAPIResource):
         self,
         *,
         campaign_id: NotGivenOr[str] = NOT_GIVEN,
+        segment_id: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> AsyncPaginator[LeadSyncSource]:
         """List saved sync sources.
 
         Args:
             campaign_id: Restrict to sources targeting one campaign.
+            segment_id: Restrict to sources that pin rows into one segment.
         """
         return self._get_api_list(
             "/lead-sync/sources",
             model=LeadSyncSource,
-            query={"campaign_id": campaign_id},
+            query={"campaign_id": campaign_id, "segment_id": segment_id},
             options=options,
         )
 
@@ -411,6 +440,7 @@ class AsyncLeadSync(AsyncAPIResource):
         dedup: NotGivenOr[str] = NOT_GIVEN,
         target_campaign_id: NotGivenOr[str] = NOT_GIVEN,
         category_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        segment_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         subscribed_default: NotGivenOr[bool] = NOT_GIVEN,
         label: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
@@ -427,6 +457,9 @@ class AsyncLeadSync(AsyncAPIResource):
             dedup: How to resolve an existing contact with the same email.
             target_campaign_id: A campaign to enrol synced contacts into.
             category_ids: Categories to apply to synced contacts.
+            segment_ids: Segments to pin every synced row into as an include
+                override. A segment deleted later is dropped from the run
+                rather than failing it.
             subscribed_default: The subscription state for new contacts.
             label: A human-readable name for the source.
         """
@@ -443,6 +476,7 @@ class AsyncLeadSync(AsyncAPIResource):
                 dedup=dedup,
                 target_campaign_id=target_campaign_id,
                 category_ids=category_ids,
+                segment_ids=segment_ids,
                 subscribed_default=subscribed_default,
                 label=label,
             ),
@@ -472,6 +506,7 @@ class AsyncLeadSync(AsyncAPIResource):
         target_campaign_id: NotGivenOr[str] = NOT_GIVEN,
         clear_campaign: NotGivenOr[bool] = NOT_GIVEN,
         category_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        segment_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         subscribed_default: NotGivenOr[bool] = NOT_GIVEN,
         label: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
@@ -495,6 +530,7 @@ class AsyncLeadSync(AsyncAPIResource):
                 dedup=dedup,
                 target_campaign_id=target_campaign_id,
                 category_ids=category_ids,
+                segment_ids=segment_ids,
                 subscribed_default=subscribed_default,
                 label=label,
                 clear_campaign=clear_campaign,

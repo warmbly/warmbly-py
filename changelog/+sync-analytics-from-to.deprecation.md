@@ -1,0 +1,1 @@
+The `from_` and `to` arguments of `analytics.dashboard()`, `usage()`, `campaign_hourly()`, `accounts()` and `account()` are deprecated: the server never read them for those reports, so use `period`, `date` or `email_ids` instead.

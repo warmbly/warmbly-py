@@ -1,0 +1,1 @@
+Added `campaigns.placement_monitor()`, `put_placement_monitor()` and `delete_placement_monitor()` (`GET`/`PUT`/`DELETE /campaigns/:id/placement-monitor`) to manage a campaign's scheduled inbox placement test. `placement_monitor()` returns a result whose `data` is `None` when the campaign has no monitor.

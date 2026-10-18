@@ -61,10 +61,8 @@ class Automation(BaseModel):
     @classmethod
     def _lift_wrapper(cls, value: Any) -> Any:
         """Lift the fields of a ``{"automation": {...}}`` wrapper to the top."""
-        if isinstance(value, dict):
-            inner = value.get("automation")
-            if isinstance(inner, dict):
-                return {**inner, **value}
+        if isinstance(value, dict) and isinstance(value.get("automation"), dict):
+            return {**value["automation"], **value}
         return value
 
 

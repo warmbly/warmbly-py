@@ -1,0 +1,1 @@
+`automations.update()` now works for partial changes. The server replaces the whole definition on every write, so omitted fields are read from the stored automation first and sent back unchanged. Single automations are also decoded correctly: the server's `{"automation": {...}}` wrapper is lifted so `automation.id` and the other fields are populated.

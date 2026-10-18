@@ -1,0 +1,1 @@
+Added `campaigns.send_plan()` (`GET /campaigns/:id/send-plan`), returning a typed `CampaignSendPlan` with today's projected volume, the limits that decided it, the sending window, lead supply and each mailbox's day.
