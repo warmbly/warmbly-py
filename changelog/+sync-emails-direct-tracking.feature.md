@@ -1,1 +1,0 @@
-Added `emails.update_direct_tracking()` (`PATCH /emails/:id/direct-tracking`) to switch open and click tracking on a mailbox's hand-written unibox sends, returning the stored `track_direct_mail` value.

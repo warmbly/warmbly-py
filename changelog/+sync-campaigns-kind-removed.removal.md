@@ -1,1 +1,0 @@
-Removed the campaign `kind` field: `campaigns.create()` no longer takes `kind`, `Campaign` no longer has `kind`, and `CampaignsOverview` no longer has `one_time`, because the server no longer has one-time campaigns.

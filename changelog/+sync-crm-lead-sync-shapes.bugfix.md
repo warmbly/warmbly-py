@@ -1,1 +1,0 @@
-`LeadSyncPreview` and `LeadSyncSpreadsheet` now match what the server returns. The preview carries `columns`, `sample_rows`, `has_header`, `suggested_mapping` and the other import preview fields instead of the never-populated `headers` and `rows`, and the spreadsheet id is `sheet_id` instead of `spreadsheet_id`.

@@ -1,1 +1,0 @@
-Removed the `description` argument of `teams.create()` and `teams.update()` and the `description` and `member_count` fields of `Team`. The server never stored or returned them, so the argument was silently ignored.

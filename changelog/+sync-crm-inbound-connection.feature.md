@@ -1,1 +1,0 @@
-`integrations.set_connection_signing_key()` and `integrations.rotate_inbound_url()` manage the signing key and the inbound webhook URL of Calendly and Cal.com connections. `IntegrationCatalogEntry` gains `rank`.

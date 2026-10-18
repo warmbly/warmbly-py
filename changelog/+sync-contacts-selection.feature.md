@@ -1,1 +1,0 @@
-`Contacts.bulk_update`, `bulk_delete`, `request_verification` and `research_batch` accept a "select all matching" selection through `select_all`, `filters` and `exclude`, and id lists may now hold up to 10,000 contacts.

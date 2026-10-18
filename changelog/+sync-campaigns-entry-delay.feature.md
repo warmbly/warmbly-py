@@ -1,1 +1,0 @@
-`campaigns.create()` and `campaigns.update()` accept `entry_delay_minutes` to hold a contact's first email back, and `Campaign` exposes it together with `effective_timezone`, the zone in use when the campaign follows the workspace timezone.

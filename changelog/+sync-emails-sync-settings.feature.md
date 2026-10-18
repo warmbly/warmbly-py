@@ -1,1 +1,0 @@
-Added `emails.update_sync()` (`PUT /emails/:id/sync`) to replace the folders a mailbox's sync skips. `emails.sync()` now also returns `skip_folders`, the listed `folders`, `policy.skip_folders` and the `folders_skipped_cap` and `folders_skipped_conflict` counts.

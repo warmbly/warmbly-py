@@ -1,1 +1,0 @@
-`CampaignStep` exposes `thread_reply`, and `campaigns.create_step()` and `update_step()` accept it. `create_step()` now also takes the same optional fields as `update_step()` and applies them to the new step in one call; with no arguments it still creates a blank step.

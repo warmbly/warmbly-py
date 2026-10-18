@@ -1,1 +1,0 @@
-Added `campaigns.lead_cc()`, `set_lead_cc()` and `suggest_lead_cc()` (`GET`/`PUT /campaigns/:id/leads/:contactId/cc` and `GET .../cc/suggestions`) to read, replace and get suggestions for the contacts copied on every email a campaign sends one lead.

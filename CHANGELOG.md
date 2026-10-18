@@ -9,6 +9,81 @@ assembled from news fragments in `changelog/` by
 
 <!-- towncrier release notes start -->
 
+## [v0.4.0] - 2026-10-18
+
+### Added
+
+- API keys gain `delete_permanently` to remove a revoked or expired key and its usage logs, and the permissions catalog reports `grantable` and `app_scopes`.
+- Added `analytics.direct()` (`GET /analytics/direct`) for hand-written mail volume, replies and tracking, `analytics.inbox_tagging()` (`GET /analytics/inbox-tagging`) for reviewing automatic inbox tagging, and `analytics.warmup_placement()` (`GET /analytics/warmup/placement`) for where warmup mail landed, each returning typed models.
+- Added `campaigns.lead_cc()`, `set_lead_cc()` and `suggest_lead_cc()` (`GET`/`PUT /campaigns/:id/leads/:contactId/cc` and `GET .../cc/suggestions`) to read, replace and get suggestions for the contacts copied on every email a campaign sends one lead.
+- Added `campaigns.lead_hold()`, `pause_lead()` and `resume_lead()` (`GET /campaigns/:id/leads/:contactId/hold`, `POST .../pause`, `POST .../resume`) to park one contact inside one campaign, optionally until a date, without unsubscribing them. Each returns a `CampaignLeadHoldState` whose `hold` is `None` when the lead is not held.
+- Added `campaigns.placement_monitor()`, `put_placement_monitor()` and `delete_placement_monitor()` (`GET`/`PUT`/`DELETE /campaigns/:id/placement-monitor`) to manage a campaign's scheduled inbox placement test. `placement_monitor()` returns a result whose `data` is `None` when the campaign has no monitor.
+- Added `campaigns.send_plan()` (`GET /campaigns/:id/send-plan`), returning a typed `CampaignSendPlan` with today's projected volume, the limits that decided it, the sending window, lead supply and each mailbox's day.
+- Added `emails.identity()` (`GET /emails/:id/identity`) and `emails.refresh_identity()` (`POST /emails/:id/identity/refresh`, with an optional `import_signature`) to read and refresh the addresses a mailbox may send as and where its signature came from.
+- Added `emails.update_direct_tracking()` (`PATCH /emails/:id/direct-tracking`) to switch open and click tracking on a mailbox's hand-written unibox sends, returning the stored `track_direct_mail` value.
+- Added `emails.update_sync()` (`PUT /emails/:id/sync`) to replace the folders a mailbox's sync skips. `emails.sync()` now also returns `skip_folders`, the listed `folders`, `policy.skip_folders` and the `folders_skipped_cap` and `folders_skipped_conflict` counts.
+- Added the `placement` resource (`client.placement`, sync and async) for inbox placement tests: `overview`, `coverage`, `list_tests`, `retrieve_test`, `create_tests`, `cancel_test`, `list_seeds`, `set_seed`, and batches that run one test from many mailboxes with `preview_batch`, `create_batch`, `list_batches`, `retrieve_batch`, `list_batch_senders` and `cancel_batch`. The routes wrap results in a `data` envelope, which the methods unwrap into typed models.
+- Contacts gains `salesforce`, `sync_salesforce` and `unlink_salesforce` for a contact's Salesforce panel, with typed panel, record, opportunity and task models.
+- Contacts gains background imports: `list_imports`, `create_import` (multipart upload), `retrieve_import`, `save_import_draft`, `analyze_import`, `start_import`, `cancel_import` and `download_import_failures`, with `ContactImport` and `ContactImportAnalysis` models. The preview now reports `mapping_source`, `inferred_columns` and `column_stats`, and the synchronous commit result reports `segments_pinned`.
+- Forms gain submission triage: `forms.update(triage_enabled=...)`, `Form.triage_enabled`, `FormsConfig.triage_available`, and `FormSubmission.triage` and `triage_confidence`.
+- Lead sync sources can pin synced rows into segments: `lead_sync.create_source()` and `update_source()` take `segment_ids`, `list_sources()` takes `segment_id`, and `LeadSyncSource` exposes `segment_ids`.
+- Templates gains `analyze`, the AI spam analysis, which returns findings with the quoted fragment and a suggested fix, a suggested subject, the rules score and a copy judgment, and charges AI credits. `TemplateScore` no longer declares the `grade` and `suggestions` fields the server never sent.
+- The `crm` resource covers connected CRM mode (HubSpot and Pipedrive): `settings()` and `update_settings()`, `metadata()`, `owners()` and `map_owner()`, `sync_health()`, `sync_now()`, `retry_sync_failures()` and `discard_sync_failures()`, `backfill_preview()` and `start_backfill()`, the contact record calls `retrieve_contact()`, `refresh_contact()`, `link_contact()` and `update_contact()`, and list imports with `lists()`, `preview_list_import()` and `import_list()`, each returning typed models.
+- The new `email_images` resource lists, uploads (multipart) and deletes the workspace images hosted for email bodies.
+- Unibox gains `move_folder` to archive, trash or restore messages and whole conversations. `mark_seen` accepts `thread_ids`, `snooze` and `unsnooze` accept several threads, `reply` can forward a stored message with `forward_message_id`, `list` accepts `automated` and `include_archived`, and compose drafts carry `body_html`.
+- `CampaignStep` exposes `thread_reply`, and `campaigns.create_step()` and `update_step()` accept it. `create_step()` now also takes the same optional fields as `update_step()` and applies them to the new step in one call; with no arguments it still creates a blank step.
+- `Contacts.bulk_update`, `bulk_delete`, `request_verification` and `research_batch` accept a "select all matching" selection through `select_all`, `filters` and `exclude`, and id lists may now hold up to 10,000 contacts.
+- `Contacts.update` can change a contact's `email`, `search` filters by `mail_hosts`, `lookup` accepts `thread_id` and `account_id` and reports `match`, and the contact models carry `mail_host`, `verification_requested_at`, `outreach`, `machine_opened_at`, the lead `sender_*`, `hold` and `cc` fields and the verification `verifier_*` fields.
+- `GatewayEvent` gains the new realtime event names: `DIRECT_EMAIL_OPENED`, `DIRECT_EMAIL_CLICKED`, `WARMUP_PLACEMENT`, `MAILBOX_IMPORT_PROGRESS`, `CONTACT_IMPORT_PROGRESS`, `PLACEMENT_TEST_UPDATED` and `CRM_SYNCED`, each documented with the permission the server requires to receive it.
+- `Meeting` gains `raw_payload`, the provider's original booking payload.
+- `OAuthApplication` exposes `suspended_at` and `suspended_reason` for apps an operator has suspended.
+- `OutreachSettings` exposes the `inbox_tagging` branch (hold on not now, stop on declined, call-request tasks, workspace tagging questions and languages).
+- `Pipeline`, `Deal` and `CrmTask` gain `external`, the reference to the provider record when the workspace runs on a connected CRM, and `PipelineStage` gains `closed`, `won` and `probability`.
+- `Plan` gains `price_yearly`, the yearly term price, and `None` marks a monthly-only plan.
+- `advisor.list()` accepts `status` (one or more of open, snoozed, dismissed, applied, resolved) to list findings beyond the open ones.
+- `campaigns.create()` and `campaigns.update()` accept `entry_delay_minutes` to hold a contact's first email back, and `Campaign` exposes it together with `effective_timezone`, the zone in use when the campaign follows the workspace timezone.
+- `campaigns.estimate()` accepts `campaign_id`, `start_time`, `end_time` and `step_waits`, and `segment_ids` is now optional. `CampaignEstimate` also returns `steps`, `total_sends`, `first_touch_finish_at`, `steady_capacity`, `full_capacity_at`, `ramping`, `held`, `warmup`, `other_campaigns_per_day`, `bottleneck`, a day by day `timeline` and per mailbox `senders`.
+- `campaigns.start()` accepts `acknowledge_list_risk` to launch past the bounce-risk gate, and `CampaignSegments` returns `withdrawn` and `contacted` after `set_segments()` detaches a segment.
+- `crm.bulk_update_tasks()` and `crm.bulk_delete_tasks()` change or delete a selection of tasks, given as ids or as `select_all` with `filters` and `exclude`, and return the number affected.
+- `emails.update()` now accepts `send_as_email`, `test_mode`, `test_send_enabled`, `test_receive_enabled`, `shared_daily_limit`, `rolling_recipient_limit`, `send_recovery_resolution`, `warmup_placement`, `warmup_folder`, `warmup_retention_days` and `relay_folder_moves`, and `EmailAccount` exposes the matching fields plus `auth_method`, `mail_host`, `vendor`, `avatar_url` and `track_direct_mail`.
+- `integrations.clay_settings()` and `integrations.clay_update_settings()` read and edit a Clay connection's inbound defaults, outbound table and events.
+- `integrations.community_apps()` and `integrations.community_app()` browse the community app directory, returning `CommunityApp` models.
+- `integrations.push()` accepts `select_all`, `filters` and `exclude` to push every contact a search matches (up to 500) instead of listing ids, and `contact_ids` is now optional.
+- `integrations.set_connection_signing_key()` and `integrations.rotate_inbound_url()` manage the signing key and the inbound webhook URL of Calendly and Cal.com connections. `IntegrationCatalogEntry` gains `rank`.
+- `integrations` gains the Apollo calls: `apollo_overview()`, `apollo_replace_key()`, `apollo_lists()`, `apollo_preview_import()`, the `apollo_*_import_source` calls to list, create, update, run and delete saved list imports, and `apollo_enrichments()`, `apollo_start_enrichment()` and `apollo_enrichment()` for contact enrichment.
+- `integrations` gains the Salesforce calls: `salesforce_overview()`, `get_salesforce_settings()` and `set_salesforce_settings()`, `salesforce_metadata()`, `salesforce_users()`, `salesforce_list_views()`, `salesforce_campaigns()`, `salesforce_preview_import()`, the `salesforce_*_import_source` calls, `salesforce_activity()`, `salesforce_retry_activity()` and `salesforce_sync_now()`.
+- `oauth_applications` gains `set_logo` and `delete_logo` for an application's logo, and `retrieve_listing`, `put_listing` and `delete_listing` to manage its community directory listing. `OAuthApplication` now exposes `suspended_at` and `suspended_reason`.
+- `segments.set_members()` now takes `select_all`, `filters` and `exclude` to override every contact matching a search instead of listing ids, and `contacts` is optional. `SegmentField` gains `option_labels`.
+
+### Changed
+
+- The `analytics` methods now send the query parameters the server actually reads: `dashboard()` takes `period`, `campaign_ids` and `folder_ids`, `usage()` takes `period`, `campaign_hourly()` takes `date`, `warmup()` takes `email_id`, `compare_campaigns()` takes `campaign_ids`, and `accounts()` takes `email_ids`, `limit` and `cursor` and returns a `pagination` block. Report dates are `YYYY-MM-DD` where the server reads days.
+- The realtime gateway client now sends its API key, OAuth token or session token in the `X-Warmbly-Token` handshake header instead of the `token` query parameter, which the server deprecates for long-lived credentials because URLs are logged by proxies.
+- The unibox models carry the newer server fields: `email_id` and `folder` on `Message`, `answers_mailbox_id` on `MessagePreview`, and `automated` and `automated_unread` on `UniboxOverview`. The `snoozed` filter documents the values the server reads (`true` and `any`) and `since` and `until` document the `YYYY-MM-DD` format.
+- `EmailVerification` now matches what `emails.verify()` returns: `status`, `sub_status`, `reason`, `is_catch_all`, `has_mx`, `provider`, `confidence` and `checked_at`. The `valid`, `deliverable` and `catch_all` fields were never sent by the server and are gone.
+
+### Deprecated
+
+- The `from_` and `to` arguments of `analytics.dashboard()`, `usage()`, `campaign_hourly()`, `accounts()` and `account()` are deprecated: the server never read them for those reports, so use `period`, `date` or `email_ids` instead.
+
+### Removed
+
+- Removed the `description` argument of `teams.create()` and `teams.update()` and the `description` and `member_count` fields of `Team`. The server never stored or returned them, so the argument was silently ignored.
+- Removed the campaign `kind` field: `campaigns.create()` no longer takes `kind`, `Campaign` no longer has `kind`, and `CampaignsOverview` no longer has `one_time`, because the server no longer has one-time campaigns.
+
+### Fixed
+
+- Rate limit errors now read the server's `retry_after_ms`, so `RateLimitError.retry_after` is exact for waits under a second, and `code` is set to `rate_limit_exceeded`. Error responses without an `X-Request-Id` header fall back to the `request_id` in the error body.
+- `Contacts.create` and `Contacts.bulk_update` now return the bare list of `Contact` objects the server sends, instead of an empty `ContactsAdded`. A select-all edit, which the server answers with no rows, returns an empty list.
+- `LeadSyncPreview` and `LeadSyncSpreadsheet` now match what the server returns. The preview carries `columns`, `sample_rows`, `has_header`, `suggested_mapping` and the other import preview fields instead of the never-populated `headers` and `rows`, and the spreadsheet id is `sheet_id` instead of `spreadsheet_id`.
+- `automations.update()` now works for partial changes. The server replaces the whole definition on every write, so omitted fields are read from the stored automation first and sent back unchanged. Single automations are also decoded correctly: the server's `{"automation": {...}}` wrapper is lifted so `automation.id` and the other fields are populated.
+
+### Documentation
+
+- Documented that `warmup_routing.update()` replaces the whole rule on the server, and that `deliverability.ingest_event()` also accepts `open`, `click` and `reply` events.
+- Resource docstrings for groups, teams, meetings, advisor, AI skills, AI tools and timezones now name the required scopes and the real response shapes (timezones carry `name` and `display_name`).
+
+
 ## [v0.3.0] - 2026-09-07
 
 ### Added

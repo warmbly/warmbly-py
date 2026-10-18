@@ -1,1 +1,0 @@
-The unibox models carry the newer server fields: `email_id` and `folder` on `Message`, `answers_mailbox_id` on `MessagePreview`, and `automated` and `automated_unread` on `UniboxOverview`. The `snoozed` filter documents the values the server reads (`true` and `any`) and `since` and `until` document the `YYYY-MM-DD` format.

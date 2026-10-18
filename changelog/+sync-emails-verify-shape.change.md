@@ -1,1 +1,0 @@
-`EmailVerification` now matches what `emails.verify()` returns: `status`, `sub_status`, `reason`, `is_catch_all`, `has_mx`, `provider`, `confidence` and `checked_at`. The `valid`, `deliverable` and `catch_all` fields were never sent by the server and are gone.

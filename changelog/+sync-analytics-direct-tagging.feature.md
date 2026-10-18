@@ -1,1 +1,0 @@
-Added `analytics.direct()` (`GET /analytics/direct`) for hand-written mail volume, replies and tracking, `analytics.inbox_tagging()` (`GET /analytics/inbox-tagging`) for reviewing automatic inbox tagging, and `analytics.warmup_placement()` (`GET /analytics/warmup/placement`) for where warmup mail landed, each returning typed models.

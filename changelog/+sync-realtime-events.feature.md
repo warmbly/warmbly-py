@@ -1,1 +1,0 @@
-`GatewayEvent` gains the new realtime event names: `DIRECT_EMAIL_OPENED`, `DIRECT_EMAIL_CLICKED`, `WARMUP_PLACEMENT`, `MAILBOX_IMPORT_PROGRESS`, `CONTACT_IMPORT_PROGRESS`, `PLACEMENT_TEST_UPDATED` and `CRM_SYNCED`, each documented with the permission the server requires to receive it.
