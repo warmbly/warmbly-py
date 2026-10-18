@@ -1,0 +1,1 @@
+Unibox gains `move_folder` to archive, trash or restore messages and whole conversations. `mark_seen` accepts `thread_ids`, `snooze` and `unsnooze` accept several threads, `reply` can forward a stored message with `forward_message_id`, `list` accepts `automated` and `include_archived`, and compose drafts carry `body_html`.

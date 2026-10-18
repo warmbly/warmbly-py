@@ -23,7 +23,7 @@ from warmbly import AsyncGatewayClient, GatewayClient, GatewayEvent
 
 The gateway authenticates with a bearer credential passed as `token`: an API
 key, an OAuth2 access token, or a session JWT. **The credential must carry the
-`realtime_subscribe` scope.** The token is sent in the connection query string
+`realtime_subscribe` scope.** The token is sent in the `X-Warmbly-Token` handshake header, not in the URL,
 and is never logged.
 
 ```python

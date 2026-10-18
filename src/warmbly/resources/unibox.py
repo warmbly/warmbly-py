@@ -83,7 +83,7 @@ class Message(BaseModel):
     message belongs to and ``folder`` the canonical folder it sits in.
     ``body_truncated`` marks a message whose stored
     body could not be read, in which case ``body_plain`` holds only the preview
-    snippet — show a notice rather than presenting it as the whole message.
+    snippet, so show a notice rather than presenting it as the whole message.
     ``body_html`` is sanitized for display before it leaves the API.
     """
 

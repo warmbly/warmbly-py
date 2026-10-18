@@ -205,7 +205,7 @@ Each API group hangs off the client as an attribute:
 
 | | |
 | --- | --- |
-| **Sending** | `campaigns`, `emails`, `templates`, `generation`, `outreach`, `deliverability`, `warmup_routing`, `suppressions` |
+| **Sending** | `campaigns`, `emails`, `templates`, `generation`, `outreach`, `deliverability`, `warmup_routing`, `suppressions`, `placement`, `email_images` |
 | **Audience** | `contacts`, `segments`, `forms`, `folders`, `tags`, `categories` |
 | **Inbox & CRM** | `unibox`, `crm`, `meetings`, `automations`, `lead_sync` |
 | **Insight** | `analytics`, `advisor`, `audit_logs`, `tasks` |

@@ -1,0 +1,1 @@
+Templates gains `analyze`, the AI spam analysis, which returns findings with the quoted fragment and a suggested fix, a suggested subject, the rules score and a copy judgment, and charges AI credits. `TemplateScore` no longer declares the `grade` and `suggestions` fields the server never sent.

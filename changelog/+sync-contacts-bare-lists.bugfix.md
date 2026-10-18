@@ -1,0 +1,1 @@
+`Contacts.create` and `Contacts.bulk_update` now return the bare list of `Contact` objects the server sends, instead of an empty `ContactsAdded`. A select-all edit, which the server answers with no rows, returns an empty list.

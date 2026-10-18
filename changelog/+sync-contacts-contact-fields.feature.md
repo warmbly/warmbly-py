@@ -1,0 +1,1 @@
+`Contacts.update` can change a contact's `email`, `search` filters by `mail_hosts`, `lookup` accepts `thread_id` and `account_id` and reports `match`, and the contact models carry `mail_host`, `verification_requested_at`, `outreach`, `machine_opened_at`, the lead `sender_*`, `hold` and `cc` fields and the verification `verifier_*` fields.

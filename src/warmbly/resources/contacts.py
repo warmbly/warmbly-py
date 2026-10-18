@@ -248,8 +248,8 @@ class ContactTimelineEntry(BaseModel):
     rest of the fields are whichever ones that kind carries.
 
     On an open or a click, ``machine`` is ``True`` when the hit came from an
-    automated fetcher — a mail privacy proxy, a security gateway walking the
-    links — rather than a person, with ``machine_reason`` naming the rule that
+    automated fetcher (a mail privacy proxy, a security gateway walking the
+    links) rather than a person, with ``machine_reason`` naming the rule that
     caught it, and ``origin`` describing the client and location it came from.
     ``link`` is the exact link behind a click, and ``page_hit`` the page view
     behind a ``page_hit`` event.
