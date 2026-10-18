@@ -1,0 +1,1 @@
+Added `emails.identity()` (`GET /emails/:id/identity`) and `emails.refresh_identity()` (`POST /emails/:id/identity/refresh`, with an optional `import_signature`) to read and refresh the addresses a mailbox may send as and where its signature came from.
