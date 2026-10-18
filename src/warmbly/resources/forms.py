@@ -334,7 +334,9 @@ class Forms(SyncAPIResource):
         """List a form's submissions, newest first.
 
         Paged with a ``before`` timestamp (RFC 3339 nano); ``limit`` caps at
-        100.
+        100. The server reports ``has_more`` beside ``data`` rather than in a
+        ``pagination`` object, so the returned page does not auto-advance: to
+        read further back, pass the last item's ``created_at`` as ``before``.
         """
         return self._get_api_list(
             f"/forms/{form_id}/submissions",
@@ -560,7 +562,9 @@ class AsyncForms(AsyncAPIResource):
         """List a form's submissions, newest first.
 
         Paged with a ``before`` timestamp (RFC 3339 nano); ``limit`` caps at
-        100.
+        100. The server reports ``has_more`` beside ``data`` rather than in a
+        ``pagination`` object, so the returned page does not auto-advance: to
+        read further back, pass the last item's ``created_at`` as ``before``.
         """
         return self._get_api_list(
             f"/forms/{form_id}/submissions",
