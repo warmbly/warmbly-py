@@ -1,0 +1,1 @@
+The realtime gateway client now sends its API key, OAuth token or session token in the `X-Warmbly-Token` handshake header instead of the `token` query parameter, which the server deprecates for long-lived credentials because URLs are logged by proxies.

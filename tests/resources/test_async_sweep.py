@@ -2012,8 +2012,8 @@ def test_teams_sync_sweep(client: Warmbly) -> None:
     update = respx.patch(f"{BASE_URL}/teams/tm_1").mock(
         return_value=httpx.Response(200, json={"id": "tm_1"})
     )
-    client.teams.update("tm_1", description="d")
-    assert json.loads(_last(update).content) == {"description": "d"}
+    client.teams.update("tm_1", color="#111")
+    assert json.loads(_last(update).content) == {"color": "#111"}
 
     add = respx.post(f"{BASE_URL}/teams/tm_1/members").mock(
         return_value=httpx.Response(200, json={"id": "tm_1"})
@@ -2043,7 +2043,7 @@ async def test_teams_async_sweep(aclient: AsyncWarmbly) -> None:
     respx.post(f"{BASE_URL}/teams").mock(
         return_value=httpx.Response(201, json={"id": "tm_1"})
     )
-    assert (await aclient.teams.create(name="S", description="d")).id == "tm_1"
+    assert (await aclient.teams.create(name="S", color="#111")).id == "tm_1"
 
     respx.get(f"{BASE_URL}/teams/tm_1").mock(
         return_value=httpx.Response(200, json={"id": "tm_1"})

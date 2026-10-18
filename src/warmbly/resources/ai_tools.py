@@ -3,8 +3,10 @@
 Maps to the ``/v1/ai/tools`` route group, which exposes the same shared tool
 registry as the MCP endpoint to agents that speak plain HTTP (OpenAI-style
 function calling, Hermes, or anything else). The list reflects only the tools
-the calling credential may actually use, and send-class tools — anything that
-puts real mail on the wire — are never exposed here.
+the calling credential may actually use, and send-class tools (anything that
+puts real mail on the wire) are never exposed here. The routes need the
+``ai_agent`` scope; a key limited to some mailboxes is refused with a
+``PermissionDeniedError``, because tools act across the whole workspace.
 
 Ask for ``format="openai"`` to get objects usable verbatim in an
 OpenAI-compatible ``tools`` array::
@@ -105,7 +107,9 @@ class AITools(SyncAPIResource):
         Raises:
             NotFoundError: The tool does not exist, or is send-class and so is
                 never callable over this surface.
-            PermissionDeniedError: The credential lacks the tool's permission.
+            PermissionDeniedError: The credential lacks the tool's permission,
+                is limited to some mailboxes, or the tool needs a recent
+                sign-in confirmation (``code`` of ``reauth_required``).
             UnprocessableEntityError: The tool itself failed; the message is
                 the tool's own, for the agent to read and react to.
         """
@@ -157,7 +161,9 @@ class AsyncAITools(AsyncAPIResource):
         Raises:
             NotFoundError: The tool does not exist, or is send-class and so is
                 never callable over this surface.
-            PermissionDeniedError: The credential lacks the tool's permission.
+            PermissionDeniedError: The credential lacks the tool's permission,
+                is limited to some mailboxes, or the tool needs a recent
+                sign-in confirmation (``code`` of ``reauth_required``).
             UnprocessableEntityError: The tool itself failed; the message is
                 the tool's own, for the agent to read and react to.
         """

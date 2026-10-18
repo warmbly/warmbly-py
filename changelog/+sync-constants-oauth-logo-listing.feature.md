@@ -1,0 +1,1 @@
+`oauth_applications` gains `set_logo` and `delete_logo` for an application's logo, and `retrieve_listing`, `put_listing` and `delete_listing` to manage its community directory listing. `OAuthApplication` now exposes `suspended_at` and `suspended_reason`.

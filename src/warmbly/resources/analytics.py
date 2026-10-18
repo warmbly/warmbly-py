@@ -1,10 +1,12 @@
 """The ``analytics`` resource: read-only reporting endpoints.
 
-Maps to the ``/v1/analytics`` route group. Every method is a ``GET`` and most
-accept an optional date range (``from_`` / ``to``, RFC3339). Results are
-permissive :class:`~warmbly._models.BaseModel` subclasses (``extra="allow"``),
-so additional or future fields the backend returns are preserved without a
-client upgrade.
+Maps to the ``/v1/analytics`` route group. Every method is a ``GET``. Each
+report takes the query parameters the server reads for it: a ``period`` for the
+dashboard, direct-mail and usage reports, ``from_`` / ``to`` day ranges for
+the campaign, warmup and comparison reports, and a cursor for paged ones. The
+older reports return a permissive :class:`AnalyticsResult` (``extra="allow"``),
+so additional fields the backend returns are preserved without a client
+upgrade; the direct-mail, inbox-tagging and warmup-placement reports are typed.
 """
 
 from __future__ import annotations

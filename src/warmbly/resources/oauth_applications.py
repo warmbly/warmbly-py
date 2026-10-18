@@ -46,7 +46,9 @@ class OAuthApplication(BaseModel):
 
     ``is_public`` marks a PKCE-only client with no secret;
     ``dynamically_registered`` marks one created through RFC 7591 dynamic
-    client registration rather than the dashboard.
+    client registration rather than the dashboard. ``suspended_at`` and
+    ``suspended_reason`` are set when an operator suspends the app; the owner
+    cannot lift it and writes to a suspended app are refused.
     """
 
     id: str

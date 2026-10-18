@@ -249,11 +249,22 @@ def make_status_error(
     is a dict, falling back to a generic message otherwise.
     """
     message = _extract_message(body) or f"HTTP {status_code}"
+    if request_id is None and isinstance(body, dict):
+        in_body = body.get("request_id")
+        if isinstance(in_body, str) and in_body:
+            request_id = in_body
     cls = _STATUS_MAP.get(status_code)
     if cls is None:
         cls = InternalServerError if status_code >= 500 else APIStatusError
     if cls is RateLimitError:
-        return RateLimitError(
+        # The rate limiter answers ``{"error": "rate_limit_exceeded",
+        # "message": ..., "retry_after_ms": ...}``: no ``code`` key, and a
+        # ``Retry-After`` header rounded down to whole seconds (0 for a wait
+        # under a second), so the millisecond value is the precise one.
+        wait_ms = body.get("retry_after_ms") if isinstance(body, dict) else None
+        if isinstance(wait_ms, (int, float)) and not isinstance(wait_ms, bool):
+            retry_after = max(float(wait_ms), 0.0) / 1000.0
+        error = RateLimitError(
             message,
             status_code=status_code,
             request_id=request_id,
@@ -261,6 +272,11 @@ def make_status_error(
             body=body,
             retry_after=retry_after,
         )
+        if error.code is None and isinstance(body, dict):
+            kind = body.get("error")
+            if isinstance(kind, str):
+                error.code = kind
+        return error
     return cls(
         message,
         status_code=status_code,

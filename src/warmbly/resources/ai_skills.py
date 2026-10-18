@@ -2,8 +2,11 @@
 
 Maps to the ``/v1/ai/skills`` route group. A skill is a named block of
 instructions that is prepended to every AI generation for the organization when
-``enabled`` — house style, banned phrases, product facts. Disabling a skill
+``enabled`` (house style, banned phrases, product facts). Disabling a skill
 keeps it around without applying it.
+
+The routes need the ``ai_agent`` scope, and a key's writes also need its
+creator to hold the ``manage_settings`` permission.
 """
 
 from __future__ import annotations

@@ -29,7 +29,7 @@ class TimezoneList(BaseModel):
 
     The backend returns a bare JSON list; it is exposed here under
     :attr:`data`. Each entry is left as a raw mapping (e.g.
-    ``{"name": "America/New_York", "offset": "-05:00"}``) because the exact
+    ``{"name": "America/New_York", "display_name": "(UTC-05:00) New York"}``) because the exact
     per-entry shape may evolve.
 
     Attributes:

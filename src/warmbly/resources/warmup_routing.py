@@ -111,10 +111,10 @@ class WarmupRouting(SyncAPIResource):
         self,
         rule_id: str,
         *,
-        name: str,
-        sender_match_type: str,
-        recipient_match_type: str,
+        name: NotGivenOr[str] = NOT_GIVEN,
+        sender_match_type: NotGivenOr[str] = NOT_GIVEN,
         sender_match_value: NotGivenOr[str] = NOT_GIVEN,
+        recipient_match_type: NotGivenOr[str] = NOT_GIVEN,
         recipient_match_value: NotGivenOr[str] = NOT_GIVEN,
         priority: NotGivenOr[int] = NOT_GIVEN,
         weight: NotGivenOr[float] = NOT_GIVEN,
@@ -124,7 +124,7 @@ class WarmupRouting(SyncAPIResource):
         """Replace a routing rule.
 
         The server treats this as a full replacement, not a patch: *name* and
-        both match types are required, the match values are required unless
+        both match types must be sent (omitting them is a 400), the match values are required unless
         the type is ``"any"``, and an omitted *priority*, *weight* or
         *enabled* resets to ``0``, ``0`` and ``False``. Send the whole rule.
         """
@@ -218,10 +218,10 @@ class AsyncWarmupRouting(AsyncAPIResource):
         self,
         rule_id: str,
         *,
-        name: str,
-        sender_match_type: str,
-        recipient_match_type: str,
+        name: NotGivenOr[str] = NOT_GIVEN,
+        sender_match_type: NotGivenOr[str] = NOT_GIVEN,
         sender_match_value: NotGivenOr[str] = NOT_GIVEN,
+        recipient_match_type: NotGivenOr[str] = NOT_GIVEN,
         recipient_match_value: NotGivenOr[str] = NOT_GIVEN,
         priority: NotGivenOr[int] = NOT_GIVEN,
         weight: NotGivenOr[float] = NOT_GIVEN,
@@ -231,7 +231,7 @@ class AsyncWarmupRouting(AsyncAPIResource):
         """Replace a routing rule.
 
         The server treats this as a full replacement, not a patch: *name* and
-        both match types are required, the match values are required unless
+        both match types must be sent (omitting them is a 400), the match values are required unless
         the type is ``"any"``, and an omitted *priority*, *weight* or
         *enabled* resets to ``0``, ``0`` and ``False``. Send the whole rule.
         """
