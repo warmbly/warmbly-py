@@ -1,1 +1,0 @@
-`OAuthApplication` now reports `suspended_at` and `suspended_reason`, and `oauth_applications.developer_access` reports whether the workspace may register and publish apps. The `oauth_applications.update` documentation now says the server replaces the whole registration, so send `name`, `redirect_uris` and `scopes` every time.

@@ -1,1 +1,0 @@
-Bulk contact actions now accept a "select all matching" selection through `select_all`, `filters` and `exclude`: `contacts.bulk_update`, `contacts.bulk_delete`, `contacts.request_verification`, `contacts.research_batch`, `integrations.push` and the Apollo enrichment. Explicit id lists may now hold up to 10000 contacts, and the id argument of each is optional.

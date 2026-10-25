@@ -1,1 +1,0 @@
-Lead sync sources can pin every synced row into segments: `segment_ids` on `lead_sync.create_source`, `update_source` and `LeadSyncSource`, and `lead_sync.list_sources(segment_id=...)` filters by segment.

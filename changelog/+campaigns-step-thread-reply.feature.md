@@ -1,1 +1,0 @@
-Added `thread_reply` to `CampaignStep` and to `campaigns.update_step`, which sends a follow-up as a reply in the first email's conversation. `campaigns.create_step` now accepts the same fields as `update_step` and applies them to the new step in one call. Campaigns gain `entry_delay_minutes` on create and update and an `effective_timezone` on read.

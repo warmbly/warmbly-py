@@ -1,1 +1,0 @@
-Added `oauth_applications.upload_application_logo` and `delete_application_logo` for an app's own logo, and `get_listing`, `put_listing` and `delete_listing` to publish an app to the community directory.

@@ -1,1 +1,0 @@
-The realtime gateway client now sends API keys and OAuth tokens in the `X-Warmbly-Token` handshake header instead of the URL, as the gateway requires, and reads the gateway's `{code, reason}` refusal body: `FatalDisconnect` carries `code` and `reason`, and rate-limit and connection-cap refusals are retried after the hinted delay.

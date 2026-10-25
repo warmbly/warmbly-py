@@ -1,1 +1,0 @@
-Documented the permissions behind `advisor.apply` and `advisor.undo`, the mailbox-limit and confirmation errors of `ai_tools`, the key-holder rule for `ai_skills` writes and the `action_provider_mismatch` error of `automations`.
