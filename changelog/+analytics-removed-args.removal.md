@@ -1,0 +1,1 @@
+Removed the `from_` and `to` arguments of `analytics.dashboard`, `analytics.usage`, `analytics.campaign_hourly` and `analytics.account`, which the API ignores. `analytics.warmup` and `analytics.campaign_daily` now require `from_` and `to`, and `analytics.compare_campaigns` requires `ids`, `from_` and `to`, because the API rejects a request without them.

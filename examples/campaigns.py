@@ -21,23 +21,21 @@ def main() -> None:
     )
     print("campaign:", campaign.id)
 
-    # Steps are created blank and then filled in: POST takes no body, so the
-    # server owns ordering and you never have to renumber anything.
-    first = client.campaigns.create_step(campaign.id)
-    client.campaigns.update_step(
+    # A step can be created blank and filled in later, or written in one call.
+    # Follow-ups reply in the first email's conversation by default
+    # (thread_reply); pass thread_reply=False to open a new conversation.
+    client.campaigns.create_step(
         campaign.id,
-        first.id,
         subject="Quick question about {{.Company}}",
         body_html="<p>Hi {{.FirstName}}, ...</p>",
         wait_after=3,  # days to wait before the next step fires
     )
-
     second = client.campaigns.create_step(campaign.id)
     client.campaigns.update_step(
         campaign.id,
         second.id,
-        subject="Re: Quick question",
         body_html="<p>Just following up ...</p>",
+        thread_reply=True,
     )
     print("steps:", [s.id for s in client.campaigns.list_steps(campaign.id)])
 
@@ -61,11 +59,18 @@ def main() -> None:
     report = client.campaigns.preflight(campaign.id)
     print("preflight ready:", report.ready, "errors:", report.errors)
 
-    # Launch it, then read the activity log.
+    # Launch it, then see what today's plan allows and read the activity log.
     client.campaigns.start(campaign.id)
     print("started")
+    plan = client.campaigns.send_plan(campaign.id)
+    print("projected today:", plan.projected_today, "bottleneck:", plan.bottleneck)
     for entry in client.campaigns.logs(campaign.id, limit=20):
-        print("  log:", entry.event, entry.message)
+        print("  log:", entry.event_type, entry.message)
+
+    # Re-test inbox placement of the first email every week.
+    client.campaigns.set_placement_monitor(
+        campaign.id, enabled=True, interval_days=7, alert_below=60
+    )
 
     # Pause it again.
     client.campaigns.stop(campaign.id)

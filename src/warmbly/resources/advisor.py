@@ -167,7 +167,15 @@ class Advisor(SyncAPIResource):
     def apply(
         self, finding_id: str, *, options: RequestOptions | None = None
     ) -> AdvisorFinding:
-        """Apply a finding's suggested fix. This changes real configuration."""
+        """Apply a finding's suggested fix. This changes real configuration.
+
+        Needs the ``read_analytics`` permission like every Advisor route, and
+        the fix itself then runs with the credential's own permissions, so it is
+        refused (``PermissionDeniedError``) when the credential could not make
+        that change directly. A key limited to some mailboxes may only apply a
+        fix that touches mailboxes on its list. Applying twice returns the
+        first outcome.
+        """
         return self._post(
             f"/advisor/recommendations/{finding_id}/apply",
             cast_to=AdvisorFinding,
@@ -177,7 +185,10 @@ class Advisor(SyncAPIResource):
     def undo(
         self, finding_id: str, *, options: RequestOptions | None = None
     ) -> AdvisorFinding:
-        """Revert a previously applied fix."""
+        """Revert a previously applied fix.
+
+        Held to the same permission and mailbox limits as :meth:`apply`.
+        """
         return self._post(
             f"/advisor/recommendations/{finding_id}/undo",
             cast_to=AdvisorFinding,
@@ -294,7 +305,15 @@ class AsyncAdvisor(AsyncAPIResource):
     async def apply(
         self, finding_id: str, *, options: RequestOptions | None = None
     ) -> AdvisorFinding:
-        """Apply a finding's suggested fix. This changes real configuration."""
+        """Apply a finding's suggested fix. This changes real configuration.
+
+        Needs the ``read_analytics`` permission like every Advisor route, and
+        the fix itself then runs with the credential's own permissions, so it is
+        refused (``PermissionDeniedError``) when the credential could not make
+        that change directly. A key limited to some mailboxes may only apply a
+        fix that touches mailboxes on its list. Applying twice returns the
+        first outcome.
+        """
         return await self._post(
             f"/advisor/recommendations/{finding_id}/apply",
             cast_to=AdvisorFinding,
@@ -304,7 +323,10 @@ class AsyncAdvisor(AsyncAPIResource):
     async def undo(
         self, finding_id: str, *, options: RequestOptions | None = None
     ) -> AdvisorFinding:
-        """Revert a previously applied fix."""
+        """Revert a previously applied fix.
+
+        Held to the same permission and mailbox limits as :meth:`apply`.
+        """
         return await self._post(
             f"/advisor/recommendations/{finding_id}/undo",
             cast_to=AdvisorFinding,

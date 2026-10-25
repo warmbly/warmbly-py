@@ -93,6 +93,12 @@ except warmbly.WarmblyError as exc:
 
 ::: warmbly.ServiceUnavailableError
 
+## Error codes
+
+### ErrorCode
+
+::: warmbly.ErrorCode
+
 ## OAuth and gateway errors
 
 ### OAuthError

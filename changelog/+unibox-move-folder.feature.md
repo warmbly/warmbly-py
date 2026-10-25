@@ -1,0 +1,1 @@
+Added `unibox.move_folder` to archive, delete or restore messages and whole conversations, `unibox.reply(forward_message_id=...)` to forward a stored message, `thread_ids` on `unibox.mark_seen`, `unibox.snooze_many` and `unibox.unsnooze_many`, the `automated` and `include_archived` list filters, and the `automated` counts on `UniboxOverview`.

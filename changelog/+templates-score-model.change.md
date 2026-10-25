@@ -1,0 +1,1 @@
+`TemplateScore.issues` is now a list of typed `TemplateIssue` objects with `severity`, `code`, `message`, `field`, `spans` and `suggestion`, matching what the server sends. The `grade` and `suggestions` attributes are removed because the server never returned them.

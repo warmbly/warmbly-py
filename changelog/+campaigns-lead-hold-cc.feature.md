@@ -1,0 +1,1 @@
+Added per-lead controls on a campaign: `campaigns.lead_hold`, `pause_lead` and `resume_lead` park one contact's flow without unsubscribing them, and `lead_cc`, `set_lead_cc` and `lead_cc_suggestions` manage the colleagues copied on every email to a lead.

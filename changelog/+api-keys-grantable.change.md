@@ -1,0 +1,1 @@
+`api_keys.permissions` now reports `grantable`, the permission mask the caller may put on a key, and `app_scopes`, the mask an OAuth app may request. Key and app management routes are documented as unavailable to OAuth app tokens.

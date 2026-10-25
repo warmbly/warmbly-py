@@ -23,7 +23,12 @@ __all__ = [
     "AsyncTemplates",
     "RenderedTemplate",
     "Template",
+    "TemplateAnalysis",
     "TemplateDeleted",
+    "TemplateFinding",
+    "TemplateIssue",
+    "TemplateIssueSpan",
+    "TemplateJudgment",
     "TemplateList",
     "TemplateScore",
     "Templates",
@@ -67,13 +72,108 @@ class TemplateList(BaseModel):
     data: Sequence[Template] = []
 
 
+class TemplateIssueSpan(BaseModel):
+    """The exact fragment of the copy that triggered an issue.
+
+    ``field`` is ``subject`` or ``body``, ``line`` the 1-based line of that
+    field the fragment sits on (absent when unknown) and ``excerpt`` the whole
+    line, for context.
+    """
+
+    field: str | None = None
+    text: str | None = None
+    line: int | None = None
+    excerpt: str | None = None
+
+
+class TemplateIssue(BaseModel):
+    """One advisory content problem found by the rules score.
+
+    ``severity`` is ``warn`` or ``high``. ``field`` is ``subject`` or ``body``
+    when the issue lives in exactly one of them and absent when it spans both
+    or describes the send as a whole.
+    """
+
+    severity: str | None = None
+    code: str | None = None
+    message: str | None = None
+    field: str | None = None
+    spans: Sequence[TemplateIssueSpan] = []
+    suggestion: str | None = None
+
+
 class TemplateScore(BaseModel):
-    """A deliverability/quality score for template content (permissive)."""
+    """An advisory 0-100 content-safety score for template content.
+
+    Higher is safer. The score never blocks sending; ``issues`` say what
+    lowered it and where.
+    """
 
     score: int | None = None
-    grade: str | None = None
-    issues: Sequence[dict[str, object]] = []
-    suggestions: Sequence[str] = []
+    issues: Sequence[TemplateIssue] = []
+
+
+class TemplateFinding(BaseModel):
+    """One located problem the AI spam analysis found in the copy.
+
+    ``severity`` is ``high``, ``warn`` or ``info``; ``field`` is ``subject`` or
+    ``body`` (absent when it could not be anchored); ``text`` quotes the
+    offending fragment and ``suggestion`` says what to write instead.
+    ``category`` is a coarse grouping such as ``trigger_word``, ``tone``,
+    ``formatting``, ``links``, ``structure`` or ``authenticity``.
+    """
+
+    severity: str | None = None
+    field: str | None = None
+    text: str | None = None
+    line: int | None = None
+    excerpt: str | None = None
+    issue: str | None = None
+    suggestion: str | None = None
+    category: str | None = None
+
+
+class TemplateJudgment(BaseModel):
+    """How the copy reads to its recipient, as judged by a language model.
+
+    ``reads_as`` and ``personalization`` are 0-1 positions where ``0`` is the
+    personal end; ``spam_claim`` is 0-1; ``ask`` names whether the copy makes a
+    clear request; ``confidence`` is the lowest confidence across the answers.
+    """
+
+    reads_as: float | None = None
+    personalization: float | None = None
+    ask: str | None = None
+    spam_claim: float | None = None
+    confidence: float | None = None
+    model: str | None = None
+    input_tokens: int | None = None
+
+
+class TemplateAnalysis(BaseModel):
+    """The result of an AI spam analysis of template content.
+
+    ``score`` and ``verdict`` summarise the copy, ``findings`` locate each
+    problem, ``suggested_subject`` is a rewritten subject (absent when the
+    current one is fine) and ``improvements`` are copy-level suggestions with
+    nothing specific to quote. ``rules`` is the rules-based
+    :class:`TemplateScore` of the same copy, and ``judgment`` how it reads to a
+    recipient (absent when that judge is unavailable). When no language model
+    is configured on the deployment only the judgment answers, ``findings`` is
+    empty and ``credits_charged`` is ``0``.
+    """
+
+    score: int | None = None
+    verdict: str | None = None
+    findings: Sequence[TemplateFinding] = []
+    suggested_subject: str | None = None
+    improvements: Sequence[str] = []
+    rules: TemplateScore | None = None
+    judgment: TemplateJudgment | None = None
+    model: str | None = None
+    tokens_used: int | None = None
+    credits_remaining: int | None = None
+    credits_charged: int | None = None
 
 
 class Templates(SyncAPIResource):
@@ -231,6 +331,41 @@ class Templates(SyncAPIResource):
         )
         return self._post(
             "/templates/score", cast_to=TemplateScore, body=body, options=options
+        )
+
+    def analyze(
+        self,
+        *,
+        subject: NotGivenOr[str] = NOT_GIVEN,
+        body_html: NotGivenOr[str] = NOT_GIVEN,
+        body_plain: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> TemplateAnalysis:
+        """Analyze template content for spam signals with AI.
+
+        Where :meth:`score` says how safe the copy is, this says which word or
+        sentence is the problem, whether it is in the subject or the body, and
+        what to write instead. It spends AI credits (the result reports
+        ``credits_charged`` and ``credits_remaining``) and sends an idempotency
+        key, so a retry does not charge twice. Needs the ``write_templates``
+        permission, plus the AI assistant for a member session. At least one of
+        the three fields must have content, and together they may not exceed
+        60,000 characters.
+
+        Args:
+            subject: The subject line.
+            body_html: The HTML body.
+            body_plain: The plain-text body.
+        """
+        body = drop_not_given(
+            {
+                "subject": subject,
+                "body_html": body_html,
+                "body_plain": body_plain,
+            }
+        )
+        return self._post(
+            "/templates/analyze", cast_to=TemplateAnalysis, body=body, options=options
         )
 
 
@@ -393,4 +528,39 @@ class AsyncTemplates(AsyncAPIResource):
         )
         return await self._post(
             "/templates/score", cast_to=TemplateScore, body=body, options=options
+        )
+
+    async def analyze(
+        self,
+        *,
+        subject: NotGivenOr[str] = NOT_GIVEN,
+        body_html: NotGivenOr[str] = NOT_GIVEN,
+        body_plain: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> TemplateAnalysis:
+        """Analyze template content for spam signals with AI.
+
+        Where :meth:`score` says how safe the copy is, this says which word or
+        sentence is the problem, whether it is in the subject or the body, and
+        what to write instead. It spends AI credits (the result reports
+        ``credits_charged`` and ``credits_remaining``) and sends an idempotency
+        key, so a retry does not charge twice. Needs the ``write_templates``
+        permission, plus the AI assistant for a member session. At least one of
+        the three fields must have content, and together they may not exceed
+        60,000 characters.
+
+        Args:
+            subject: The subject line.
+            body_html: The HTML body.
+            body_plain: The plain-text body.
+        """
+        body = drop_not_given(
+            {
+                "subject": subject,
+                "body_html": body_html,
+                "body_plain": body_plain,
+            }
+        )
+        return await self._post(
+            "/templates/analyze", cast_to=TemplateAnalysis, body=body, options=options
         )

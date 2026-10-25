@@ -76,6 +76,19 @@ def main() -> None:
     overdue = client.crm.tasks_summary(overdue=True)
     print("overdue tasks:", overdue.overdue_count)
 
+    # Close a whole selection of tasks in one call.
+    done = client.crm.bulk_update_tasks(
+        select_all=True, filters={"overdue": True}, status="cancelled"
+    )
+    print("cancelled:", done.affected)
+
+    # A workspace can run its CRM on HubSpot or Pipedrive instead; the mode,
+    # sync health and a contact's CRM record are all readable.
+    mode = client.crm.get_settings()
+    print("crm provider:", mode.provider)
+    if mode.provider != "native":
+        print("sync:", client.crm.sync_health().pending, "pending")
+
     client.close()
 
 

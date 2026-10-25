@@ -1,0 +1,1 @@
+Added `client.integrations.apollo` (overview, key replacement, lists, list import sources and enrichment runs through `start_enrichment`) and `client.integrations.clay` (`get_settings` and `update_settings` for inbound defaults and the outbound table).

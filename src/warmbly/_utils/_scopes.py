@@ -14,6 +14,7 @@ from typing import Literal
 
 __all__ = [
     "ALL_SCOPES",
+    "APP_GRANTABLE_SCOPES",
     "FULL_ACCESS_SCOPES",
     "READ_ONLY_SCOPES",
     "SCOPES",
@@ -84,6 +85,10 @@ READ_ONLY_SCOPES: int = sum(
     bit for name, bit in SCOPES.items() if name.startswith("read_")
 )
 """The backend's ``read_only`` preset: every read scope and nothing else."""
+
+APP_GRANTABLE_SCOPES: int = ALL_SCOPES & ~SCOPES["api_keys"]
+"""Every scope a third-party OAuth app may request. Key management (``api_keys``)
+stays with people, so an app is never granted it."""
 
 FULL_ACCESS_SCOPES: int = ALL_SCOPES
 """The backend's ``full_access`` preset: every scope."""

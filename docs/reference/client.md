@@ -44,6 +44,17 @@ Top-level helpers re-exported from the `warmbly` package.
 
 ::: warmbly.mask_to_scopes
 
+### APP_GRANTABLE_SCOPES
+
+The mask of every scope a third-party OAuth app may request: all scopes except
+`api_keys`.
+
+```python
+from warmbly import APP_GRANTABLE_SCOPES, mask_to_scopes
+
+mask_to_scopes(APP_GRANTABLE_SCOPES)
+```
+
 ### verify_webhook_signature
 
 ::: warmbly.verify_webhook_signature

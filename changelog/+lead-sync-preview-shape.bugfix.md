@@ -1,0 +1,1 @@
+`LeadSyncPreview` now reads the fields the server sends (`columns`, `sample_rows`, `has_header`, `total_rows`, `suggested_mapping`, `inferred_columns`, `mapping_source`) and `LeadSyncSpreadsheet` reads `sheet_id`. The `headers` and `rows` attributes of the preview and `spreadsheet_id` are removed because the server never returned them.

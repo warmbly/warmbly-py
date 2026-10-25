@@ -1,0 +1,1 @@
+Added `analytics.direct` (hand-written mail volume, replies and opt-in tracking), `analytics.inbox_tagging` and `analytics.inbox_tagging_overview` (how replies were classified), and `analytics.warmup_placement` (where warmup mail landed per day and recipient provider), all returning typed models.

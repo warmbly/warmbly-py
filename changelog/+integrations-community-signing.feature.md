@@ -1,0 +1,1 @@
+Added `integrations.list_community_apps` and `get_community_app` for the community directory, `integrations.set_signing_key` and `rotate_inbound_url` for Calendly and Cal.com connections, and `rank` on `IntegrationCatalogEntry`. `integrations.bookings` needs the `read_contacts` permission, as the server now requires.

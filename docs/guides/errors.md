@@ -77,7 +77,7 @@ no dedicated class become `InternalServerError` (5xx) or the generic
 | 422 | `UnprocessableEntityError` | Semantically invalid request. |
 | 429 | `RateLimitError` | Rate limit exceeded; see `.retry_after`. |
 | 501 | `NotImplementedAPIError` | The endpoint is not enabled on this deployment. |
-| 503 | `ServiceUnavailableError` | A dependency (AI provider, mail server) is down. |
+| 503 | `ServiceUnavailableError` | A dependency (AI provider, mail server) is down; see `.retry_after`. |
 | other 5xx | `InternalServerError` | Server-side failure. |
 | other non-2xx | `APIStatusError` | Anything without a dedicated subclass. |
 
@@ -90,6 +90,34 @@ them.
     `client.unibox.draft_reply()` — answer 402 when the organization's credit
     balance is exhausted, and 429 when it trips the daily usage cap. The first
     needs a top-up; the second just needs waiting.
+
+## Error codes and `reason`
+
+Every error envelope carries a machine-readable `code`; branch on it and the
+status, not on the message. It is available as `exc.code`, and the named
+constants live on [`ErrorCode`][warmbly.ErrorCode]:
+
+```python
+from warmbly import ErrorCode, PermissionDeniedError
+
+try:
+    client.api_keys.create(name="ci", permissions=1 << 30)
+except PermissionDeniedError as exc:
+    if exc.code == ErrorCode.API_KEY_PERMISSIONS_EXCEED_CALLER:
+        ...
+```
+
+A few codes also carry a finer `reason`, available as `exc.reason`. Treat a
+missing or unknown `reason` as the plain code. The server answers a repeated
+query parameter or credential header with `400` `duplicate_query_parameter` or
+`duplicate_header`; the SDK never sends either twice.
+
+## Retries and 503
+
+`503` responses are retried, using the `Retry-After` header when the server
+sends one (`exc.retry_after` after the retries run out). The exception is a
+`503` with code `ai_not_configured`, which means the deployment has no AI
+provider: it is raised at once without retrying.
 
 ## Catching specific errors
 

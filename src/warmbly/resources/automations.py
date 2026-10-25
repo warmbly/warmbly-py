@@ -8,6 +8,10 @@ never rewrites the flow.
 
 :meth:`Automations.test` dry-runs the graph and returns a per-node trace of
 what *would* happen, without performing any action.
+
+An action node must name an action its connection's provider supports; a
+create or update that does not is a ``BadRequestError`` whose error identifier
+is ``action_provider_mismatch``.
 """
 
 from __future__ import annotations

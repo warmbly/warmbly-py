@@ -46,7 +46,7 @@ def main() -> None:
     # Bulk-import from a CSV: preview the parse, then commit with a mapping.
     csv_bytes = pathlib.Path("leads.csv").read_bytes()
     preview = client.contacts.import_preview(file=csv_bytes, filename="leads.csv")
-    print("import preview:", preview.headers, preview.total_rows)
+    print("import preview:", preview.columns, preview.total_rows)
 
     result = client.contacts.import_commit(
         file=csv_bytes,
@@ -57,6 +57,25 @@ def main() -> None:
         },
     )
     print("imported:", result.imported, "updated:", result.updated)
+
+    # Large files run in the background as a staged import: upload once, check
+    # what the mapping would do, then start it and follow its progress.
+    draft = client.contacts.create_import(file=csv_bytes, filename="leads.csv")
+    mapping = draft.preview.suggested_mapping if draft.preview else []
+    analysis = client.contacts.analyze_import(draft.id, mapping=mapping)
+    print("would add:", analysis.new, "update:", analysis.existing)
+    if not analysis.problem:
+        running = client.contacts.start_import(
+            draft.id, import_options={"column_mapping": mapping, "dedup": "update"}
+        )
+        print(
+            "import", running.id, running.status, f"{running.processed}/{running.total}"
+        )
+
+    # Act on every contact matching a search instead of listing ids.
+    client.contacts.bulk_update(
+        select_all=True, filters={"query": "acme.com"}, subscribe=True
+    )
 
     # Export the matching set back out. `xlsx` is binary; write it verbatim.
     blob = client.contacts.export(format="csv", scope="all")

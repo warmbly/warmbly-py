@@ -80,6 +80,11 @@ def main() -> None:
     client.unibox.mark_seen(email_ids=[m.id for m in inbox])
     client.unibox.snooze(thread_id=first.thread_id or "", snoozed_until=tomorrow)
 
+    # File a finished conversation away. Work from the thread id so the whole
+    # conversation moves, not half of it.
+    if first.thread_id:
+        client.unibox.move_folder(folder="archive", thread_ids=[first.thread_id])
+
     client.close()
 
 

@@ -4,6 +4,10 @@ Maps to the ``/v1/ai/skills`` route group. A skill is a named block of
 instructions that is prepended to every AI generation for the organization when
 ``enabled`` — house style, banned phrases, product facts. Disabling a skill
 keeps it around without applying it.
+
+Reading skills needs the AI-agent permission. Creating, updating or deleting
+one over an API key also requires the member who created the key to still hold
+the manage-settings permission; otherwise the call is a ``PermissionDeniedError``.
 """
 
 from __future__ import annotations

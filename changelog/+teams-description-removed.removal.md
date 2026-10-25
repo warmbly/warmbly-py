@@ -1,0 +1,1 @@
+Removed the `description` argument of `teams.create` and `teams.update` and the `description` and `member_count` attributes of `Team`, which the server does not support: a description was accepted and silently dropped.

@@ -1,0 +1,1 @@
+Added the `inbox_tagging` branch to `OutreachSettings`, which controls what a classified reply may do, and documented that `outreach.update_settings` fills fields left out of the document with the server defaults.

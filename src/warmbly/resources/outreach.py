@@ -30,7 +30,11 @@ class OutreachSettings(BaseModel):
     """The organization's outreach settings.
 
     Each attribute is one branch of the settings tree: bounce handling, task
-    reliability, A/B defaults, reply-intent keywords, send-time optimization,
+    reliability, A/B defaults, reply-intent keywords (including the reply
+    intents that open a CRM task and the out-of-office hold), what a classified
+    reply may do through ``inbox_tagging`` (hold on "not now", stop on a
+    decline, a task on a call request, suppression on a removal request,
+    workspace-defined tagging questions and languages), send-time optimization,
     preflight checks, the workspace opt-out footer, and which dashboard panels
     are shown.
     """
@@ -39,6 +43,7 @@ class OutreachSettings(BaseModel):
     task_reliability: dict[str, Any] | None = None
     ab_testing: dict[str, Any] | None = None
     reply_intent: dict[str, Any] | None = None
+    inbox_tagging: dict[str, Any] | None = None
     send_time_optimization: dict[str, Any] | None = None
     preflight: dict[str, Any] | None = None
     unsubscribe: dict[str, Any] | None = None
@@ -65,7 +70,11 @@ class Outreach(SyncAPIResource):
 
         This is a whole-document write, not a merge: read
         :meth:`settings` first, change the branch you care about, and send the
-        result back.
+        result back. A field left out of *settings* takes the server's default
+        rather than its stored value, which is what lets a client written
+        before a setting existed leave its default alone. Out-of-range values
+        are clamped, and an unsupported reply intent, tagging language or
+        tagging question is refused with a ``BadRequestError``.
 
         Args:
             settings: The full settings tree. The ``unsubscribe`` branch is the
@@ -103,7 +112,11 @@ class AsyncOutreach(AsyncAPIResource):
 
         This is a whole-document write, not a merge: read
         :meth:`settings` first, change the branch you care about, and send the
-        result back.
+        result back. A field left out of *settings* takes the server's default
+        rather than its stored value, which is what lets a client written
+        before a setting existed leave its default alone. Out-of-range values
+        are clamped, and an unsupported reply intent, tagging language or
+        tagging question is refused with a ``BadRequestError``.
 
         Args:
             settings: The full settings tree. The ``unsubscribe`` branch is the

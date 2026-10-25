@@ -108,13 +108,12 @@ def test_analytics_dashboard(client: Warmbly) -> None:
         return_value=httpx.Response(200, json={"sent": 100, "opened": 42})
     )
 
-    result = client.analytics.dashboard(from_="2026-01-01", to="2026-02-01")
+    result = client.analytics.dashboard(period="30d")
 
     request = route.calls.last.request
     assert request.method == "GET"
     assert request.url.path == "/v1/analytics/dashboard"
-    assert request.url.params.get("from") == "2026-01-01"
-    assert request.url.params.get("to") == "2026-02-01"
+    assert request.url.params.get("period") == "30d"
     assert result.sent == 100
 
 

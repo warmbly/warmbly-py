@@ -52,6 +52,8 @@ MAX_SERVER_RETRY_AFTER = 60.0
 # carries an Idempotency-Key.
 _IDEMPOTENT_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "PUT", "DELETE"})
 _RETRY_STATUS = frozenset({408, 409, 429})
+# 503 codes that mean "not available here at all", not "try again shortly".
+_PERMANENT_503_CODES = frozenset({"ai_not_configured"})
 
 
 def _user_agent() -> str:
@@ -228,11 +230,24 @@ class BaseClient:
 
     # -- retry policy -------------------------------------------------------
     def _should_retry(
-        self, method: str, status_code: int, *, has_idempotency_key: bool
+        self,
+        method: str,
+        status_code: int,
+        *,
+        has_idempotency_key: bool,
+        response: httpx.Response | None = None,
     ) -> bool:
         if method not in _IDEMPOTENT_METHODS and not has_idempotency_key:
             return False
-        return status_code in _RETRY_STATUS or status_code >= 500
+        if not (status_code in _RETRY_STATUS or status_code >= 500):
+            return False
+        # A 503 whose code says the deployment has no such capability will not
+        # clear on a retry, unlike an ordinary 503.
+        if status_code == 503 and response is not None:
+            body = _safe_json(response)
+            if isinstance(body, dict) and body.get("code") in _PERMANENT_503_CODES:
+                return False
+        return True
 
     def _retry_delay(self, attempt: int, headers: Mapping[str, str] | None) -> float:
         if headers is not None:
@@ -398,6 +413,7 @@ class SyncAPIClient(BaseClient):
                 prepared.method,
                 response.status_code,
                 has_idempotency_key=prepared.has_idempotency_key,
+                response=response,
             ):
                 remaining, attempt = remaining - 1, attempt + 1
                 time.sleep(self._retry_delay(attempt, response.headers))
@@ -550,6 +566,7 @@ class AsyncAPIClient(BaseClient):
                 prepared.method,
                 response.status_code,
                 has_idempotency_key=prepared.has_idempotency_key,
+                response=response,
             ):
                 remaining, attempt = remaining - 1, attempt + 1
                 await asyncio.sleep(self._retry_delay(attempt, response.headers))

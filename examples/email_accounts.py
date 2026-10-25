@@ -34,6 +34,15 @@ def main() -> None:
     status = client.emails.track(account.id, domain="track.example.com")
     print("tracking domain verified:", status.tracking_domain_verified)
 
+    # Opt hand-written unibox sends into open and click tracking, and keep the
+    # sync away from a folder (IMAP only).
+    client.emails.direct_tracking(account.id, enabled=True)
+    client.emails.update_sync(account.id, skip_folders=["Junk"])
+
+    # Which addresses may this mailbox send as?
+    identity = client.emails.identity(account.id)
+    print("send-as:", [i.email for i in identity.identities])
+
     # Tag several mailboxes at once. Set semantics, so this is idempotent.
     client.emails.bulk_tag(email_ids=[account.id], add_tags=["outbound"])
 

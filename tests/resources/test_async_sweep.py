@@ -2012,8 +2012,8 @@ def test_teams_sync_sweep(client: Warmbly) -> None:
     update = respx.patch(f"{BASE_URL}/teams/tm_1").mock(
         return_value=httpx.Response(200, json={"id": "tm_1"})
     )
-    client.teams.update("tm_1", description="d")
-    assert json.loads(_last(update).content) == {"description": "d"}
+    client.teams.update("tm_1", color="#0f0")
+    assert json.loads(_last(update).content) == {"color": "#0f0"}
 
     add = respx.post(f"{BASE_URL}/teams/tm_1/members").mock(
         return_value=httpx.Response(200, json={"id": "tm_1"})
@@ -2043,7 +2043,7 @@ async def test_teams_async_sweep(aclient: AsyncWarmbly) -> None:
     respx.post(f"{BASE_URL}/teams").mock(
         return_value=httpx.Response(201, json={"id": "tm_1"})
     )
-    assert (await aclient.teams.create(name="S", description="d")).id == "tm_1"
+    assert (await aclient.teams.create(name="S", color="#0f0")).id == "tm_1"
 
     respx.get(f"{BASE_URL}/teams/tm_1").mock(
         return_value=httpx.Response(200, json={"id": "tm_1"})
@@ -2108,7 +2108,7 @@ def test_unibox_sync_reads(client: Warmbly) -> None:
             agent_drafts=True,
             uncategorized=True,
             direction="received",
-            snoozed="exclude",
+            snoozed="any",
         )
     )
     assert [m.id for m in got] == ["m_1"]
@@ -2119,7 +2119,7 @@ def test_unibox_sync_reads(client: Warmbly) -> None:
     assert params.get("awaiting_reply") == "true"
     assert params.get("agent_drafts") == "true"
     assert params.get("uncategorized") == "true"
-    assert params.get("snoozed") == "exclude"
+    assert params.get("snoozed") == "any"
 
     # Falsy booleans are omitted rather than sent as "false".
     plain = respx.get(f"{BASE_URL}/unibox").mock(
@@ -3234,17 +3234,21 @@ async def test_timezones_async(aclient: AsyncWarmbly) -> None:
 # ===========================================================================
 @respx.mock
 def test_analytics_sync_sweep(client: Warmbly) -> None:
-    for name, path in (
-        ("deliverability", "deliverability"),
-        ("warmup", "warmup"),
-        ("compare_campaigns", "campaigns/compare"),
-        ("accounts", "accounts"),
-        ("usage", "usage"),
+    for name, path, kwargs in (
+        ("deliverability", "deliverability", {"from_": "a", "to": "b"}),
+        ("warmup", "warmup", {"from_": "a", "to": "b"}),
+        (
+            "compare_campaigns",
+            "campaigns/compare",
+            {"ids": ["c1"], "from_": "a", "to": "b"},
+        ),
+        ("accounts", "accounts", {}),
+        ("usage", "usage", {}),
     ):
         r = respx.get(f"{BASE_URL}/analytics/{path}").mock(
             return_value=httpx.Response(200, json={"sent": 1})
         )
-        getattr(client.analytics, name)(from_="a", to="b")
+        getattr(client.analytics, name)(**kwargs)
         assert _last(r).url.path == f"/v1/analytics/{path}"
 
     r = respx.get(f"{BASE_URL}/analytics/campaigns/camp_1").mock(
@@ -3254,7 +3258,7 @@ def test_analytics_sync_sweep(client: Warmbly) -> None:
     r = respx.get(f"{BASE_URL}/analytics/campaigns/camp_1/daily").mock(
         return_value=httpx.Response(200, json={"sent": 1})
     )
-    client.analytics.campaign_daily("camp_1")
+    client.analytics.campaign_daily("camp_1", from_="a", to="b")
     r = respx.get(f"{BASE_URL}/analytics/campaigns/camp_1/hourly").mock(
         return_value=httpx.Response(200, json={"sent": 1})
     )
@@ -3272,20 +3276,24 @@ async def test_analytics_async_sweep(aclient: AsyncWarmbly) -> None:
     r = respx.get(f"{BASE_URL}/analytics/dashboard").mock(
         return_value=httpx.Response(200, json={"sent": 1})
     )
-    await aclient.analytics.dashboard(from_="a")
-    assert _last(r).url.params.get("from") == "a"
+    await aclient.analytics.dashboard(period="30d")
+    assert _last(r).url.params.get("period") == "30d"
 
-    for name, path in (
-        ("deliverability", "deliverability"),
-        ("warmup", "warmup"),
-        ("compare_campaigns", "campaigns/compare"),
-        ("accounts", "accounts"),
-        ("usage", "usage"),
+    for name, path, kwargs in (
+        ("deliverability", "deliverability", {}),
+        ("warmup", "warmup", {"from_": "a", "to": "b"}),
+        (
+            "compare_campaigns",
+            "campaigns/compare",
+            {"ids": ["c1"], "from_": "a", "to": "b"},
+        ),
+        ("accounts", "accounts", {}),
+        ("usage", "usage", {}),
     ):
         r = respx.get(f"{BASE_URL}/analytics/{path}").mock(
             return_value=httpx.Response(200, json={"sent": 1})
         )
-        await getattr(aclient.analytics, name)()
+        await getattr(aclient.analytics, name)(**kwargs)
         assert _last(r).url.path == f"/v1/analytics/{path}"
 
     r = respx.get(f"{BASE_URL}/analytics/campaigns/camp_1").mock(
@@ -3295,7 +3303,7 @@ async def test_analytics_async_sweep(aclient: AsyncWarmbly) -> None:
     r = respx.get(f"{BASE_URL}/analytics/campaigns/camp_1/daily").mock(
         return_value=httpx.Response(200, json={"sent": 1})
     )
-    await aclient.analytics.campaign_daily("camp_1")
+    await aclient.analytics.campaign_daily("camp_1", from_="a", to="b")
     r = respx.get(f"{BASE_URL}/analytics/campaigns/camp_1/hourly").mock(
         return_value=httpx.Response(200, json={"sent": 1})
     )

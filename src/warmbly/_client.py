@@ -54,6 +54,7 @@ from .resources import (
     AsyncMeetings,
     AsyncOAuthApplications,
     AsyncOutreach,
+    AsyncPlacement,
     AsyncPlans,
     AsyncSegments,
     AsyncSuppressions,
@@ -82,6 +83,7 @@ from .resources import (
     Meetings,
     OAuthApplications,
     Outreach,
+    Placement,
     Plans,
     Segments,
     Suppressions,
@@ -256,6 +258,10 @@ class Warmbly(SyncAPIClient):
         return WarmupRouting(self)
 
     @cached_property
+    def placement(self) -> Placement:
+        return Placement(self)
+
+    @cached_property
     def folders(self) -> Folders:
         return Folders(self)
 
@@ -417,6 +423,10 @@ class AsyncWarmbly(AsyncAPIClient):
     @cached_property
     def warmup_routing(self) -> AsyncWarmupRouting:
         return AsyncWarmupRouting(self)
+
+    @cached_property
+    def placement(self) -> AsyncPlacement:
+        return AsyncPlacement(self)
 
     @cached_property
     def folders(self) -> AsyncFolders:

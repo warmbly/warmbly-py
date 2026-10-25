@@ -62,6 +62,10 @@ class GatewayEvent:
     EMAIL_FAILED = "EMAIL_FAILED"
     EMAIL_OPENED = "EMAIL_OPENED"
     EMAIL_CLICKED = "EMAIL_CLICKED"
+    #: A direct (non-campaign) email was opened. Needs ``view_analytics``.
+    DIRECT_EMAIL_OPENED = "DIRECT_EMAIL_OPENED"
+    #: A link in a direct (non-campaign) email was clicked. Needs ``view_analytics``.
+    DIRECT_EMAIL_CLICKED = "DIRECT_EMAIL_CLICKED"
     EMAIL_REPLIED = "EMAIL_REPLIED"
     EMAIL_RECEIVED = "EMAIL_RECEIVED"
     EMAIL_UPDATED = "EMAIL_UPDATED"
@@ -72,6 +76,12 @@ class GatewayEvent:
     CONTACT_UPDATED = "CONTACT_UPDATED"
     CONTACT_DELETED = "CONTACT_DELETED"
     CONTACTS_RELOAD = "CONTACTS_RELOAD"
+    #: A background contact import moved. Carries ``org_id``, ``import_id`` and
+    #: ``status``; refetch the import. Needs ``view_contacts``.
+    CONTACT_IMPORT_PROGRESS = "CONTACT_IMPORT_PROGRESS"
+    #: Mirrored CRM records changed. Carries ``org_id``, ``objects`` and an
+    #: optional ``contact_id``; refetch the affected lists.
+    CRM_SYNCED = "CRM_SYNCED"
 
     # Hosted forms and website tracking.
     FORM_SUBMISSION_CREATED = "FORM_SUBMISSION_CREATED"
@@ -85,6 +95,15 @@ class GatewayEvent:
     ACCOUNT_HEALTH_CHANGED = "ACCOUNT_HEALTH_CHANGED"
     #: A mailbox's import progress or fair-use hold changed.
     ACCOUNT_SYNC_STATE = "ACCOUNT_SYNC_STATE"
+    #: A partner saw one of the workspace's warmup emails land. ``status`` is
+    #: ``inbox``, ``tabs`` or ``spam``, or a ``rescue_*`` outcome.
+    WARMUP_PLACEMENT = "WARMUP_PLACEMENT"
+    #: A mailbox import moved. Carries ``org_id``, ``import_id`` and ``status``;
+    #: refetch the import. Needs ``manage_emails``.
+    MAILBOX_IMPORT_PROGRESS = "MAILBOX_IMPORT_PROGRESS"
+
+    # Inbox placement tests. Needs ``view_analytics``.
+    PLACEMENT_TEST_UPDATED = "PLACEMENT_TEST_UPDATED"
 
     # Bulk-operation events.
     BULK_STARTED = "BULK_STARTED"

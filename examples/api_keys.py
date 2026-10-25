@@ -46,6 +46,9 @@ def main() -> None:
     client.api_keys.delete(created.id, reason="example cleanup")
     print("revoked", created.id)
 
+    # A revoked key can be removed for good.
+    client.api_keys.delete_permanently(created.id)
+
     client.close()
 
 
