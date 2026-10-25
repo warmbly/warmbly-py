@@ -1533,6 +1533,7 @@ class Campaigns(SyncAPIResource):
     def create_step(
         self,
         campaign_id: str,
+        *,
         name: NotGivenOr[str] = NOT_GIVEN,
         subject: NotGivenOr[str] = NOT_GIVEN,
         body_html: NotGivenOr[str] = NOT_GIVEN,
@@ -2857,6 +2858,7 @@ class AsyncCampaigns(AsyncAPIResource):
     async def create_step(
         self,
         campaign_id: str,
+        *,
         name: NotGivenOr[str] = NOT_GIVEN,
         subject: NotGivenOr[str] = NOT_GIVEN,
         body_html: NotGivenOr[str] = NOT_GIVEN,

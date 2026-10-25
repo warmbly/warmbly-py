@@ -5,6 +5,8 @@ Note: ``create_test()`` sends real mail from the mailbox you name.
 
 from __future__ import annotations
 
+import time
+
 from warmbly import Warmbly
 
 
@@ -29,8 +31,12 @@ def main() -> None:
 
     # Poll for the verdicts (they arrive over a few minutes).
     detail = client.placement.retrieve_test(test.id)
+    while detail.status == "running":
+        time.sleep(30)
+        detail = client.placement.retrieve_test(test.id)
     counts = detail.summary
-    print("inbox rate:", counts.inbox_rate, "spam rate:", counts.spam_rate)
+    if counts is not None:
+        print("inbox rate:", counts.inbox_rate, "spam rate:", counts.spam_rate)
     for result in detail.results:
         print(result.seed, result.folder)
 

@@ -56,7 +56,7 @@ assembled from news fragments in `changelog/` by
 ### Removed
 
 - Removed the `description` argument of `teams.create` and `teams.update` and the `description` and `member_count` attributes of `Team`, which the server does not support: a description was accepted and silently dropped.
-- Removed the `from_` and `to` arguments of `analytics.dashboard`, `analytics.usage`, `analytics.campaign_hourly` and `analytics.account`, which the API ignores. `analytics.warmup` and `analytics.campaign_daily` now require `from_` and `to`, and `analytics.compare_campaigns` requires `ids`, `from_` and `to`, because the API rejects a request without them.
+- Removed the `from_` and `to` arguments of `analytics.dashboard`, `analytics.usage`, `analytics.campaign_hourly`, `analytics.account` and `analytics.accounts`, which the API ignores. `analytics.warmup` and `analytics.campaign_daily` now require `from_` and `to`, and `analytics.compare_campaigns` requires `ids`, `from_` and `to`, because the API rejects a request without them.
 - Removed the one-time campaign kind, which the server retired: `kind` is gone from `campaigns.create`, from `Campaign` and the `one_time` count is gone from `CampaignsOverview`.
 
 ### Fixed

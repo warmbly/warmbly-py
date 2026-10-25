@@ -76,9 +76,11 @@ def main() -> None:
     overdue = client.crm.tasks_summary(overdue=True)
     print("overdue tasks:", overdue.overdue_count)
 
-    # Close a whole selection of tasks in one call.
+    # Close a whole selection of tasks in one call (scoped to this deal).
     done = client.crm.bulk_update_tasks(
-        select_all=True, filters={"overdue": True}, status="cancelled"
+        select_all=True,
+        filters={"overdue": True, "deal_id": deal.id},
+        status="cancelled",
     )
     print("cancelled:", done.affected)
 

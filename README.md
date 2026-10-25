@@ -84,14 +84,21 @@ The SDK supports all three Warmbly auth modes; each is sent as a bearer token.
 ```python
 from warmbly.oauth import OAuth2Client
 
-oauth = OAuth2Client(client_id="wmcid_...", client_secret="wmcs_...",
-                     redirect_uri="https://app.example.com/callback")
+oauth = OAuth2Client(
+    client_id="wmcid_...",
+    client_secret="wmcs_...",
+    redirect_uri="https://app.example.com/callback",
+)
 
 # 1. Send the user to authorize (PKCE handled for you):
-url, state, verifier = oauth.authorization_url(scopes=["read_campaigns", "send_campaigns"])
+url, state, verifier = oauth.authorization_url(
+    scopes=["read_campaigns", "send_campaigns"]
+)
 
 # 2. Exchange the code returned to your redirect URI:
-token = oauth.exchange_code(code, state=state, expected_state=state, code_verifier=verifier)
+token = oauth.exchange_code(
+    code, state=state, expected_state=state, code_verifier=verifier
+)
 
 # 3. Use the access token:
 client = Warmbly(api_key=token.access_token)
@@ -111,7 +118,9 @@ from warmbly import AsyncGatewayClient
 
 
 async def main() -> None:
-    gateway = AsyncGatewayClient(token="wmbly_...")  # needs the realtime_subscribe scope
+    gateway = AsyncGatewayClient(
+        token="wmbly_..."
+    )  # needs the realtime_subscribe scope
 
     @gateway.on_event("CAMPAIGN_STARTED")
     async def handle(topic: str, payload: dict) -> None:
@@ -133,7 +142,7 @@ List endpoints return an iterator that transparently fetches every page:
 for campaign in client.campaigns.list():  # walks all pages
     print(campaign.name)
 
-page = client.api_keys.list()             # or work a page at a time
+page = client.api_keys.list()  # or work a page at a time
 print(page.data, page.has_more, page.next_cursor)
 ```
 
@@ -174,8 +183,8 @@ except RateLimitError as err:
 client = Warmbly(
     api_key="wmbly_...",
     base_url="https://api.warmbly.com/v1",  # or WARMBLY_BASE_URL
-    timeout=30.0,                            # seconds, or an httpx.Timeout
-    max_retries=2,                           # 408/409/429/5xx with backoff + jitter
+    timeout=30.0,  # seconds, or an httpx.Timeout
+    max_retries=2,  # 408/409/429/5xx with backoff + jitter
 )
 ```
 

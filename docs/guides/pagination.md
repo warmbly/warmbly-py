@@ -82,8 +82,8 @@ page = client.api_keys.list(limit=50)
 for key in page.data:
     print(key.id)
 
-print(page.total)        # e.g. 1234 (may be None)
-print(page.has_more)     # True if another page exists
+print(page.total)  # e.g. 1234 (may be None)
+print(page.has_more)  # True if another page exists
 print(page.next_cursor)  # cursor string, or None
 
 # Advance manually.
@@ -120,10 +120,12 @@ The asynchronous client mirrors the sync one: swap `Warmbly` for
 import asyncio
 from warmbly import AsyncWarmbly
 
+
 async def main():
     async with AsyncWarmbly(api_key="wmbly_...") as client:
         async for key in client.api_keys.list():
             print(key.id, key.name)
+
 
 asyncio.run(main())
 ```

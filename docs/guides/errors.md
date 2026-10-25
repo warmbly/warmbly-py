@@ -170,12 +170,12 @@ try:
     client.campaigns.create(name="")
 except APIStatusError as exc:
     print(exc.status_code)  # int, e.g. 422
-    print(exc.message)      # human-readable message from the error envelope
-    print(exc.request_id)   # X-Request-Id header, quote this to support
-    print(exc.code)         # machine-readable "code" from the body, if any
-    print(exc.body)         # parsed response body (dict, or raw text)
-    print(exc.headers)      # response headers as a plain mapping
-    print(str(exc))         # "[422] <message> (request_id: <id>)"
+    print(exc.message)  # human-readable message from the error envelope
+    print(exc.request_id)  # X-Request-Id header, quote this to support
+    print(exc.code)  # machine-readable "code" from the body, if any
+    print(exc.body)  # parsed response body (dict, or raw text)
+    print(exc.headers)  # response headers as a plain mapping
+    print(str(exc))  # "[422] <message> (request_id: <id>)"
 ```
 
 | Attribute | Available on | Description |
@@ -252,6 +252,6 @@ oauth = OAuth2Client(client_id="...", client_secret="...")
 try:
     token = oauth.exchange_code(code, code_verifier=verifier)
 except OAuthError as exc:
-    print(exc.error)              # e.g. "invalid_grant", "invalid_client"
+    print(exc.error)  # e.g. "invalid_grant", "invalid_client"
     print(exc.error_description)  # human-readable detail, if provided
 ```

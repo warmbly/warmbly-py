@@ -74,7 +74,7 @@ def main() -> None:
 
     # Act on every contact matching a search instead of listing ids.
     client.contacts.bulk_update(
-        select_all=True, filters={"query": "acme.com"}, subscribe=True
+        select_all=True, filters={"query": "acme.com"}, add_categories=["cat_acme"]
     )
 
     # Export the matching set back out. `xlsx` is binary; write it verbatim.

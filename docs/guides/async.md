@@ -60,7 +60,7 @@ it directly with `async for`. If you only want the first page, you may also
 ```python
 page = await client.campaigns.list(limit=50)
 print(page.total, page.has_more)
-for campaign in page.data:          # page.data is a plain list; use `for`
+for campaign in page.data:  # page.data is a plain list; use `for`
     print(campaign.id)
 
 # Fetch the next page manually:
@@ -149,9 +149,11 @@ for cid, result in zip(ids, results):
     ```python
     sem = asyncio.Semaphore(10)
 
+
     async def fetch(cid):
         async with sem:
             return await client.campaigns.retrieve(cid)
+
 
     campaigns = await asyncio.gather(*(fetch(cid) for cid in ids))
     ```

@@ -17,9 +17,11 @@ campaign = client.campaigns.retrieve("camp_123")
 import asyncio
 from warmbly import AsyncWarmbly
 
+
 async def main() -> None:
     async with AsyncWarmbly() as client:
         campaign = await client.campaigns.retrieve("camp_123")
+
 
 asyncio.run(main())
 ```

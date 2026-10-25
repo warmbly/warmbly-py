@@ -62,9 +62,9 @@ class GatewayEvent:
     EMAIL_FAILED = "EMAIL_FAILED"
     EMAIL_OPENED = "EMAIL_OPENED"
     EMAIL_CLICKED = "EMAIL_CLICKED"
-    #: A direct (non-campaign) email was opened. Needs ``view_analytics``.
+    #: A direct (non-campaign) email was opened. Needs the ``read_analytics`` scope.
     DIRECT_EMAIL_OPENED = "DIRECT_EMAIL_OPENED"
-    #: A link in a direct (non-campaign) email was clicked. Needs ``view_analytics``.
+    #: A link in a direct (non-campaign) email was clicked. Needs the ``read_analytics`` scope.
     DIRECT_EMAIL_CLICKED = "DIRECT_EMAIL_CLICKED"
     EMAIL_REPLIED = "EMAIL_REPLIED"
     EMAIL_RECEIVED = "EMAIL_RECEIVED"
@@ -77,7 +77,7 @@ class GatewayEvent:
     CONTACT_DELETED = "CONTACT_DELETED"
     CONTACTS_RELOAD = "CONTACTS_RELOAD"
     #: A background contact import moved. Carries ``org_id``, ``import_id`` and
-    #: ``status``; refetch the import. Needs ``view_contacts``.
+    #: ``status``; refetch the import. Needs the ``read_contacts`` scope.
     CONTACT_IMPORT_PROGRESS = "CONTACT_IMPORT_PROGRESS"
     #: Mirrored CRM records changed. Carries ``org_id``, ``objects`` and an
     #: optional ``contact_id``; refetch the affected lists.
@@ -99,10 +99,10 @@ class GatewayEvent:
     #: ``inbox``, ``tabs`` or ``spam``, or a ``rescue_*`` outcome.
     WARMUP_PLACEMENT = "WARMUP_PLACEMENT"
     #: A mailbox import moved. Carries ``org_id``, ``import_id`` and ``status``;
-    #: refetch the import. Needs ``manage_emails``.
+    #: refetch the import. Needs the ``read_emails`` scope.
     MAILBOX_IMPORT_PROGRESS = "MAILBOX_IMPORT_PROGRESS"
 
-    # Inbox placement tests. Needs ``view_analytics``.
+    # Inbox placement tests. Needs the ``read_analytics`` scope.
     PLACEMENT_TEST_UPDATED = "PLACEMENT_TEST_UPDATED"
 
     # Bulk-operation events.

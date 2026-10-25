@@ -259,8 +259,8 @@ on rejoin, asks the server to replay anything missed during the disconnect. This
 is on by default; disable it per subscription with `resume=False`:
 
 ```python
-await gateway.subscribe("org:org_123")                 # resume on (default)
-await gateway.subscribe("org:org_123", resume=False)   # no replay on rejoin
+await gateway.subscribe("org:org_123")  # resume on (default)
+await gateway.subscribe("org:org_123", resume=False)  # no replay on rejoin
 ```
 
 If the server cannot honor a resume (for example, the replay buffer has since
@@ -272,6 +272,7 @@ which receives `(topic, payload)`:
 async def resync(topic: str, payload: dict) -> None:
     # Re-fetch current state over REST, e.g. client.campaigns.list(...).
     print("resume failed for", topic, "-> re-syncing")
+
 
 gateway = AsyncGatewayClient(token="wmbly_...", on_resume_failed=resync)
 ```

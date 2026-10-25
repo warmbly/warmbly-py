@@ -27,7 +27,7 @@ from websockets.asyncio.client import ClientConnection, connect
 from websockets.exceptions import ConnectionClosed, InvalidStatus, WebSocketException
 
 from .._exceptions import GatewayError
-from .._utils import logger
+from .._utils import logger, websocket_logger
 from ._channel import Channel, PendingReplies
 from ._events import EventDispatcher, Handler
 from ._phoenix import (
@@ -332,7 +332,7 @@ class AsyncGatewayClient:
                 user_agent_header="warmbly-py",
                 open_timeout=_OPEN_TIMEOUT,
                 max_size=_MAX_FRAME_SIZE,
-                logger=logger,
+                logger=websocket_logger,
             )
         except InvalidStatus as exc:
             self._raise_for_refusal(exc)

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ._logs import logger, redact
+from ._logs import logger, redact, websocket_logger
 from ._scopes import (
     ALL_SCOPES,
     APP_GRANTABLE_SCOPES,
@@ -27,4 +27,5 @@ __all__ = [
     "mask_to_scopes",
     "redact",
     "scopes_to_mask",
+    "websocket_logger",
 ]
