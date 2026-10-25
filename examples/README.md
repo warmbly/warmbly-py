@@ -20,6 +20,7 @@ python examples/quickstart.py
 | [`oauth_token_manager.py`](./oauth_token_manager.py) | Persistent storage + automatic token refresh |
 | [`campaigns.py`](./campaigns.py) | Create a campaign, add steps, start/stop, read logs |
 | [`email_accounts.py`](./email_accounts.py) | Manage mailboxes, warmup controls, send an email |
+| [`placement.py`](./placement.py) | Run an inbox placement test and read where each copy landed |
 | [`contacts.py`](./contacts.py) | Search, bulk add, CSV import/export, notes |
 | [`unibox.py`](./unibox.py) | Read the inbox, label, AI-draft, reply, schedule sends |
 | [`crm.py`](./crm.py) | Pipelines and stages, deals, tasks, faceted search + summaries |

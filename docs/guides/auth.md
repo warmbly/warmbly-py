@@ -18,8 +18,8 @@ Both are passed the same way:
 ```python
 from warmbly import Warmbly
 
-client = Warmbly(api_key="wmbly_...")          # an API key
-client = Warmbly(api_key="wmat_...")           # an OAuth2 access token
+client = Warmbly(api_key="wmbly_...")  # an API key
+client = Warmbly(api_key="wmat_...")  # an OAuth2 access token
 ```
 
 Pick an **API key** when your code acts as itself. Pick an **OAuth2 access
@@ -117,8 +117,8 @@ from warmbly import Warmbly
 
 client = Warmbly(
     api_key="wmbly_...",
-    timeout=30.0,                       # seconds, or an httpx.Timeout
-    max_retries=5,                      # default is 2
+    timeout=30.0,  # seconds, or an httpx.Timeout
+    max_retries=5,  # default is 2
 )
 
 # Fine-grained timeouts via httpx.Timeout:
@@ -184,9 +184,9 @@ dashboard offers:
 ```python
 from warmbly import ALL_SCOPES, READ_ONLY_SCOPES, FULL_ACCESS_SCOPES, SCOPES
 
-READ_ONLY_SCOPES    # every read_* scope and nothing else
+READ_ONLY_SCOPES  # every read_* scope and nothing else
 FULL_ACCESS_SCOPES  # every scope (same as ALL_SCOPES)
-SCOPES              # the name -> bit mapping, if you want to build your own
+SCOPES  # the name -> bit mapping, if you want to build your own
 ```
 
 The same scope strings are used when requesting OAuth2 authorization. See the

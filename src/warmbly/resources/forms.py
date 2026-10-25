@@ -49,6 +49,10 @@ class Form(BaseModel):
     codes; ``fields`` is the ordered block list, where the layout blocks
     (``heading``, ``paragraph``, ``divider``, ``page_break``) render but
     collect nothing. ``design`` is the theme the builder's Design panel edits.
+    ``redirect_url_active`` is ``False`` when ``redirect_url`` is not on one of
+    the workspace's own domains, so visitors see ``success_message`` instead
+    (absent when there is no redirect). ``triage_enabled`` classifies each
+    submission; junk is kept but creates no contact and joins no campaign.
     """
 
     id: str
@@ -61,10 +65,12 @@ class Form(BaseModel):
     design: dict[str, Any] | None = None
     success_message: str | None = None
     redirect_url: str | None = None
+    redirect_url_active: bool | None = None
     campaign_id: str | None = None
     category_ids: Sequence[str] = []
     allowed_domains: Sequence[str] = []
     captcha_enabled: bool | None = None
+    triage_enabled: bool | None = None
     logo_url: str | None = None
     cover_url: str | None = None
     background_url: str | None = None
@@ -91,11 +97,14 @@ class FormsConfig(BaseModel):
     """What this install can do, so a builder never offers an unusable toggle.
 
     ``captcha_available`` is ``False`` when no captcha provider is configured,
-    in which case ``captcha_enabled`` on a form has no effect.
+    in which case ``captcha_enabled`` on a form has no effect. Likewise
+    ``triage_available`` is ``False`` when submission triage is not configured
+    and ``triage_enabled`` has no effect.
     """
 
     base_url: str | None = None
     captcha_available: bool | None = None
+    triage_available: bool | None = None
 
 
 class FormsDomainStatus(BaseModel):
@@ -123,6 +132,9 @@ class FormSubmission(BaseModel):
     ``data`` is keyed by field id: a checkbox group stores a list of strings,
     every other block a single string. ``campaign_id`` names the campaign whose
     email carried the personalized link the visitor arrived through, if any.
+    ``triage`` is the verdict when the form triages submissions (``buyer``,
+    ``vendor``, ``job_seeker``, ``other`` or ``junk``) and empty otherwise;
+    ``triage_confidence`` is the model's own 0-1 confidence.
     """
 
     id: str
@@ -132,6 +144,8 @@ class FormSubmission(BaseModel):
     campaign_id: str | None = None
     data: dict[str, Any] = {}
     source_url: str | None = None
+    triage: str | None = None
+    triage_confidence: float | None = None
     contact_email: str | None = None
     contact_name: str | None = None
     campaign_name: str | None = None
@@ -210,6 +224,7 @@ def _form_body(
     category_ids: NotGivenOr[Sequence[str]],
     allowed_domains: NotGivenOr[Sequence[str]],
     captcha_enabled: NotGivenOr[bool],
+    triage_enabled: NotGivenOr[bool],
 ) -> dict[str, Any]:
     """Build the update body. Omitted fields keep their stored value."""
     return drop_not_given(
@@ -224,6 +239,7 @@ def _form_body(
             "category_ids": category_ids,
             "allowed_domains": allowed_domains,
             "captcha_enabled": captcha_enabled,
+            "triage_enabled": triage_enabled,
         }
     )
 
@@ -261,6 +277,7 @@ class Forms(SyncAPIResource):
         category_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         allowed_domains: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         captcha_enabled: NotGivenOr[bool] = NOT_GIVEN,
+        triage_enabled: NotGivenOr[bool] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> Form:
         """Update a form. Omitted fields keep their stored value.
@@ -276,12 +293,18 @@ class Forms(SyncAPIResource):
                 landing in the contact's custom fields.
             design: The theme (colors, fonts, layout, header, cover).
             success_message: Shown after a successful submit.
-            redirect_url: Sent to instead of showing the success message.
+            redirect_url: Sent to instead of showing the success message, when
+                it is on one of the workspace's own domains (see the form's
+                ``redirect_url_active``); an absolute http(s) URL without
+                credentials.
             campaign_id: A campaign to add every new contact to; pass ``None``
                 to detach.
             category_ids: Categories to file new contacts under.
             allowed_domains: Domains the form may be embedded on.
             captcha_enabled: Require a captcha, where the install has one.
+            triage_enabled: Classify each submission; junk is kept but creates
+                no contact and joins no campaign. Where the install has no
+                triage (see :meth:`config`) it has no effect.
         """
         return self._patch(
             f"/forms/{form_id}",
@@ -297,6 +320,7 @@ class Forms(SyncAPIResource):
                 category_ids=category_ids,
                 allowed_domains=allowed_domains,
                 captcha_enabled=captcha_enabled,
+                triage_enabled=triage_enabled,
             ),
             options=options,
         )
@@ -481,6 +505,7 @@ class AsyncForms(AsyncAPIResource):
         category_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         allowed_domains: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         captcha_enabled: NotGivenOr[bool] = NOT_GIVEN,
+        triage_enabled: NotGivenOr[bool] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> Form:
         """Update a form. Omitted fields keep their stored value.
@@ -496,12 +521,18 @@ class AsyncForms(AsyncAPIResource):
                 landing in the contact's custom fields.
             design: The theme (colors, fonts, layout, header, cover).
             success_message: Shown after a successful submit.
-            redirect_url: Sent to instead of showing the success message.
+            redirect_url: Sent to instead of showing the success message, when
+                it is on one of the workspace's own domains (see the form's
+                ``redirect_url_active``); an absolute http(s) URL without
+                credentials.
             campaign_id: A campaign to add every new contact to; pass ``None``
                 to detach.
             category_ids: Categories to file new contacts under.
             allowed_domains: Domains the form may be embedded on.
             captcha_enabled: Require a captcha, where the install has one.
+            triage_enabled: Classify each submission; junk is kept but creates
+                no contact and joins no campaign. Where the install has no
+                triage (see :meth:`config`) it has no effect.
         """
         return await self._patch(
             f"/forms/{form_id}",
@@ -517,6 +548,7 @@ class AsyncForms(AsyncAPIResource):
                 category_ids=category_ids,
                 allowed_domains=allowed_domains,
                 captcha_enabled=captcha_enabled,
+                triage_enabled=triage_enabled,
             ),
             options=options,
         )

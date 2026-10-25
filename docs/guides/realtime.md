@@ -21,10 +21,17 @@ from warmbly import AsyncGatewayClient, GatewayClient, GatewayEvent
 
 ## Authentication and the `realtime_subscribe` scope
 
-The gateway authenticates with a bearer credential passed as `token`: an API
-key, an OAuth2 access token, or a session JWT. **The credential must carry the
-`realtime_subscribe` scope.** The token is sent in the connection query string
-and is never logged.
+The gateway authenticates with a bearer credential: an API key, an OAuth2
+access token, or a short-lived connection JWT. **The credential must carry the
+`realtime_subscribe` scope.** The client sends API keys (`wmbly_...`) and OAuth
+tokens (`wmat_...`) in the `X-Warmbly-Token` handshake header, because the
+gateway refuses them in the URL, and sends a connection JWT as the `token` query
+parameter. The credential is never logged.
+
+A key or token reaches only the workspace it was created in, and only the events
+its read scopes cover (for example `read_campaigns` for campaign pulses,
+`read_analytics` for placement tests and direct email events). Joining another
+workspace's topic is refused.
 
 ```python
 gateway = AsyncGatewayClient(token="wmbly_...")
@@ -252,8 +259,8 @@ on rejoin, asks the server to replay anything missed during the disconnect. This
 is on by default; disable it per subscription with `resume=False`:
 
 ```python
-await gateway.subscribe("org:org_123")                 # resume on (default)
-await gateway.subscribe("org:org_123", resume=False)   # no replay on rejoin
+await gateway.subscribe("org:org_123")  # resume on (default)
+await gateway.subscribe("org:org_123", resume=False)  # no replay on rejoin
 ```
 
 If the server cannot honor a resume (for example, the replay buffer has since
@@ -265,6 +272,7 @@ which receives `(topic, payload)`:
 async def resync(topic: str, payload: dict) -> None:
     # Re-fetch current state over REST, e.g. client.campaigns.list(...).
     print("resume failed for", topic, "-> re-syncing")
+
 
 gateway = AsyncGatewayClient(token="wmbly_...", on_resume_failed=resync)
 ```
@@ -288,8 +296,20 @@ except FatalDisconnect as exc:
     print("gateway rejected the connection:", exc, "code:", exc.code)
 ```
 
-Everything else (network blips, server restarts, rate-limit backpressure) is
-transient and handled internally by the reconnect loop.
+When the gateway refuses the WebSocket upgrade, the client reads its
+`{code, reason}` body and exposes both on the exception (`exc.code`,
+`exc.reason`), so a revoked key (`4004`), a missing permission or disallowed
+address (`4010`), and a credential sent in the URL (`4003`) are told apart.
+
+Everything else (network blips, server restarts, rate-limit and connection-cap
+refusals, which honor the server's `retry_after_ms`) is transient and handled
+internally by the reconnect loop.
+
+!!! note "Connection tokens"
+    A short-lived connection JWT opens exactly one socket. If you connect with
+    one, mint a fresh token before every connection attempt; the client cannot
+    mint it for you, so reconnecting with a used token fails with `4004`. API
+    keys and OAuth tokens reconnect as is.
 
 ## Lifecycle: `run_forever` and `close`
 

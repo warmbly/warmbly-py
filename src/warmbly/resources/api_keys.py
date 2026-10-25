@@ -3,12 +3,20 @@
 Maps to the ``/v1/api-keys`` route group. The plaintext ``secret`` is returned
 **only** on the create response; store it immediately, as it cannot be
 retrieved again.
+
+Creating, editing, revoking, and deleting keys is not available to OAuth app
+tokens (the API answers ``403``); use an API key or the dashboard. A key can
+never hold more than its creator: permissions, IP allowlist, and mailbox
+allowlist must all fit within the caller's own, or the create or update is
+refused.
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
 from typing import Any
+
+from pydantic import Field
 
 from .._models import BaseModel
 from .._pagination import AsyncPaginator, SyncCursorPage
@@ -27,7 +35,10 @@ __all__ = [
 
 
 class ApiKey(BaseModel):
-    """An API key. ``secret`` is present only on the create response."""
+    """An API key. ``secret`` is present only on the create response.
+
+    ``status`` is ``active``, ``revoked``, or ``expired``.
+    """
 
     id: str
     name: str
@@ -52,7 +63,8 @@ class ApiKey(BaseModel):
 
 
 class ApiKeyDeleted(BaseModel):
-    """The result of revoking an API key."""
+    """The result of revoking (``"revoked"``) or permanently deleting
+    (``"deleted"``) an API key."""
 
     status: str | None = None
 
@@ -65,10 +77,17 @@ class PermissionInfo(BaseModel):
 
 
 class ApiKeyPermissions(BaseModel):
-    """The catalog of available permissions and convenience presets."""
+    """The catalog of available permissions and convenience presets.
+
+    ``grantable`` is the permission mask the caller may put on a key (a member
+    is bounded by their role, a key by its own permissions) and ``app_scopes``
+    is the mask an OAuth app may request.
+    """
 
     permissions: Sequence[PermissionInfo] = []
     presets: dict[str, int] = {}
+    grantable: int | None = None
+    app_scopes: int | None = None
 
 
 class ApiKeyUsageSummary(BaseModel):
@@ -83,7 +102,7 @@ class ApiKeyUsageSummary(BaseModel):
 
 class ApiKeyUsageAnalytics(BaseModel):
     api_key_id: str | None = None
-    from_: str | None = None
+    from_: str | None = Field(default=None, alias="from")
     to: str | None = None
     interval: str | None = None
     buckets: Sequence[dict[str, Any]] = []
@@ -120,6 +139,10 @@ class ApiKeys(SyncAPIResource):
         options: RequestOptions | None = None,
     ) -> ApiKey:
         """Create an API key. The one-time ``secret`` is on the returned object.
+
+        The key cannot hold permissions, IPs, or mailboxes the caller does not
+        itself have (a member is bounded by their role). Not available to
+        OAuth app tokens.
 
         Args:
             name: A human-readable label for the key.
@@ -199,12 +222,30 @@ class ApiKeys(SyncAPIResource):
         reason: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> ApiKeyDeleted:
-        """Revoke an API key."""
+        """Revoke an API key. Not available to OAuth app tokens.
+
+        The key keeps existing, as ``revoked``; :meth:`delete_permanently`
+        removes it for good.
+        """
         query = drop_not_given({"reason": reason})
         return self._delete(
             f"/api-keys/{api_key_id}",
             cast_to=ApiKeyDeleted,
             query=query,
+            options=options,
+        )
+
+    def delete_permanently(
+        self, api_key_id: str, *, options: RequestOptions | None = None
+    ) -> ApiKeyDeleted:
+        """Permanently remove a revoked or expired API key.
+
+        An active key must be revoked first (see :meth:`delete`). Not available
+        to OAuth app tokens. The result's ``status`` is ``"deleted"``.
+        """
+        return self._delete(
+            f"/api-keys/{api_key_id}/permanent",
+            cast_to=ApiKeyDeleted,
             options=options,
         )
 
@@ -376,12 +417,30 @@ class AsyncApiKeys(AsyncAPIResource):
         reason: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> ApiKeyDeleted:
-        """Revoke an API key."""
+        """Revoke an API key. Not available to OAuth app tokens.
+
+        The key keeps existing, as ``revoked``; :meth:`delete_permanently`
+        removes it for good.
+        """
         query = drop_not_given({"reason": reason})
         return await self._delete(
             f"/api-keys/{api_key_id}",
             cast_to=ApiKeyDeleted,
             query=query,
+            options=options,
+        )
+
+    async def delete_permanently(
+        self, api_key_id: str, *, options: RequestOptions | None = None
+    ) -> ApiKeyDeleted:
+        """Permanently remove a revoked or expired API key.
+
+        An active key must be revoked first (see :meth:`delete`). Not available
+        to OAuth app tokens. The result's ``status`` is ``"deleted"``.
+        """
+        return await self._delete(
+            f"/api-keys/{api_key_id}/permanent",
+            cast_to=ApiKeyDeleted,
             options=options,
         )
 

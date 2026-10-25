@@ -219,17 +219,27 @@ def test_transient_disconnect_default_message() -> None:
     assert str(exc) == "Gateway connection lost."
 
 
-def test_build_url_quotes_token_and_appends_vsn() -> None:
+def test_build_url_quotes_jwt_token_and_appends_vsn() -> None:
     client = AsyncGatewayClient(
-        token="wmbly/with spaces&x", base_url="wss://rt.example.com/"
+        token="jwt/with spaces&x", base_url="wss://rt.example.com/"
     )
     url = client._build_url()
     # The base_url trailing slash is stripped in __init__.
     assert url.startswith("wss://rt.example.com/socket/websocket?token=")
-    assert "wmbly%2Fwith%20spaces%26x" in url
+    assert "jwt%2Fwith%20spaces%26x" in url
     assert url.endswith("&vsn=2.0.0")
     # No raw special characters leaked from the token.
     assert "with spaces" not in url
+    assert client._handshake_headers() == {}
+
+
+@pytest.mark.parametrize("token", ["wmbly_secret", "wmat_secret"])
+def test_long_lived_credentials_use_header_not_url(token: str) -> None:
+    client = AsyncGatewayClient(token=token, base_url="wss://rt.example.com")
+    url = client._build_url()
+    assert url == "wss://rt.example.com/socket/websocket?vsn=2.0.0"
+    assert token not in url
+    assert client._handshake_headers() == {"X-Warmbly-Token": token}
 
 
 def test_require_ws_when_never_connected_raises() -> None:
@@ -1102,21 +1112,89 @@ async def test_presence_state_broadcast_updates_presence_map(
 # ---------------------------------------------------------------------------
 
 
+def _refusal(status: int, body: bytes) -> Any:
+    async def _bad_connect(*args: Any, **kwargs: Any) -> Any:
+        raise InvalidStatus(Response(status, "Refused", Headers(), body))
+
+    return _bad_connect
+
+
 @pytest.mark.anyio
-async def test_open_socket_invalid_status_is_fatal(
+async def test_open_socket_invalid_status_without_body_is_fatal(
     anyio_backend: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def _bad_connect(*args: Any, **kwargs: Any) -> Any:
-        response = Response(403, "Forbidden", Headers())
-        raise InvalidStatus(response)
-
-    monkeypatch.setattr(conn, "connect", _bad_connect)
+    monkeypatch.setattr(conn, "connect", _refusal(403, b""))
     client = AsyncGatewayClient(token="t", base_url="ws://localhost:1")
     with pytest.raises(FatalDisconnect) as info:
         await asyncio.wait_for(client._open_socket(), timeout=_TIMEOUT)
     assert "HTTP 403" in str(info.value)
+    assert info.value.code is None
+    assert info.value.reason is None
     await client.close()
+
+
+@pytest.mark.anyio
+async def test_open_socket_refusal_body_code_and_reason_are_surfaced(
+    anyio_backend: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    body = json.dumps(
+        {
+            "code": 4003,
+            "reason": "Send API keys and OAuth tokens in the x-warmbly-token header, not the URL",
+        }
+    ).encode()
+    monkeypatch.setattr(conn, "connect", _refusal(403, body))
+    client = AsyncGatewayClient(token="t", base_url="ws://localhost:1")
+    with pytest.raises(FatalDisconnect) as info:
+        await asyncio.wait_for(client._open_socket(), timeout=_TIMEOUT)
+    assert info.value.code == 4003
+    assert info.value.reason is not None
+    assert "x-warmbly-token" in info.value.reason
+    assert "x-warmbly-token" in str(info.value)
+    await client.close()
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("code", [4007, 4009])
+async def test_open_socket_backpressure_refusal_is_transient_with_retry_hint(
+    anyio_backend: str,
+    monkeypatch: pytest.MonkeyPatch,
+    code: int,
+) -> None:
+    body = json.dumps(
+        {"code": code, "reason": "Rate limited", "retry_after_ms": 1500}
+    ).encode()
+    monkeypatch.setattr(conn, "connect", _refusal(403, body))
+    client = AsyncGatewayClient(token="t", base_url="ws://localhost:1")
+    with pytest.raises(TransientDisconnect) as info:
+        await asyncio.wait_for(client._open_socket(), timeout=_TIMEOUT)
+    assert str(info.value) == "Rate limited"
+    assert client._retry_after == 1.5
+    await client.close()
+
+
+@pytest.mark.anyio
+async def test_open_socket_backpressure_without_hint_or_reason(
+    anyio_backend: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(conn, "connect", _refusal(503, b""))
+    client = AsyncGatewayClient(token="t", base_url="ws://localhost:1")
+    with pytest.raises(TransientDisconnect) as info:
+        await asyncio.wait_for(client._open_socket(), timeout=_TIMEOUT)
+    assert "HTTP 503" in str(info.value)
+    assert client._retry_after is None
+    await client.close()
+
+
+@pytest.mark.parametrize(
+    "body",
+    [b"not json", b"[1, 2]", b'{"code": true, "reason": 5, "retry_after_ms": "x"}'],
+)
+def test_parse_refusal_tolerates_malformed_bodies(body: bytes) -> None:
+    assert AsyncGatewayClient._parse_refusal(body) == (None, None, None)
 
 
 @pytest.mark.anyio

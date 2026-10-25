@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 import pytest
 
 from warmbly._utils._logs import redact, redact_headers
@@ -163,3 +165,21 @@ def test_redact_headers_masks_signature_and_passes_others() -> None:
     assert out["Authorization"] == _REDACTED
     assert out["X-Warmbly-Signature"] == _REDACTED
     assert out["Content-Type"] == "application/json"
+
+
+def test_websocket_logger_scrubs_credentials(caplog: pytest.LogCaptureFixture) -> None:
+    from warmbly._utils import websocket_logger
+
+    caplog.set_level(logging.DEBUG, logger="warmbly.websockets")
+    websocket_logger.propagate = True
+    websocket_logger.debug("> %s: %s", "X-Warmbly-Token", "wmbly_secret123")
+    websocket_logger.debug(
+        "> GET /socket/websocket?token=eyJhbGciOi.abc&vsn=2.0.0 HTTP/1.1"
+    )
+    text = caplog.text
+    assert "wmbly_secret123" not in text
+    assert "eyJhbGciOi" not in text
+    assert "vsn=2.0.0" in text
+    assert redact_headers({"X-Warmbly-Token": "wmbly_x"}) == {
+        "X-Warmbly-Token": "[redacted]"
+    }

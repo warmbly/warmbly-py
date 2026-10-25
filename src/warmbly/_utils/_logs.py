@@ -14,7 +14,7 @@ import logging
 import re
 from collections.abc import Mapping
 
-__all__ = ["logger", "redact", "redact_headers"]
+__all__ = ["logger", "redact", "redact_headers", "websocket_logger"]
 
 logger = logging.getLogger("warmbly")
 logger.addHandler(logging.NullHandler())
@@ -25,6 +25,7 @@ _SENSITIVE_HEADERS = frozenset(
         "authorization",
         "proxy-authorization",
         "x-api-key",
+        "x-warmbly-token",
         "api-key",
         "x-warmbly-signature",
         "cookie",
@@ -85,3 +86,23 @@ def redact_headers(headers: Mapping[str, str]) -> dict[str, str]:
         key: (_REDACTED if key.lower() in _SENSITIVE_HEADERS else _scrub_text(val))
         for key, val in headers.items()
     }
+
+
+_QUERY_TOKEN_RE = re.compile(r"([?&]token=)[^&\s]+")
+
+
+class _ScrubFilter(logging.Filter):
+    """Redact credentials from records emitted by a third-party library."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = _QUERY_TOKEN_RE.sub(rf"\1{_REDACTED}", record.getMessage())
+        record.msg = _scrub_text(message)
+        record.args = None
+        return True
+
+
+#: The logger handed to ``websockets``, which logs the handshake request line and
+#: headers at DEBUG. Records pass through :class:`_ScrubFilter` first, so a
+#: credential never reaches a handler.
+websocket_logger = logging.getLogger("warmbly.websockets")
+websocket_logger.addFilter(_ScrubFilter())

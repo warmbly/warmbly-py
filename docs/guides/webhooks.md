@@ -36,7 +36,7 @@ raises [`WarmblyError`][warmbly.WarmblyError].
 from warmbly import verify_webhook_signature, WarmblyError
 
 event = verify_webhook_signature(
-    payload=request.body,                            # raw bytes or str, NOT re-serialized
+    payload=request.body,  # raw bytes or str, NOT re-serialized
     signature=request.headers["X-Warmbly-Signature"],
     secret=endpoint_secret,
 )
@@ -72,6 +72,7 @@ It's available as a top-level import (no client instance needed):
 
 ```python
 from warmbly import verify_webhook_signature
+
 # verify_signature is an alias for the same function
 from warmbly import verify_signature
 ```

@@ -17,9 +17,11 @@ campaign = client.campaigns.retrieve("camp_123")
 import asyncio
 from warmbly import AsyncWarmbly
 
+
 async def main() -> None:
     async with AsyncWarmbly() as client:
         campaign = await client.campaigns.retrieve("camp_123")
+
 
 asyncio.run(main())
 ```
@@ -43,6 +45,17 @@ Top-level helpers re-exported from the `warmbly` package.
 ### mask_to_scopes
 
 ::: warmbly.mask_to_scopes
+
+### APP_GRANTABLE_SCOPES
+
+The mask of every scope a third-party OAuth app may request: all scopes except
+`api_keys`.
+
+```python
+from warmbly import APP_GRANTABLE_SCOPES, mask_to_scopes
+
+mask_to_scopes(APP_GRANTABLE_SCOPES)
+```
 
 ### verify_webhook_signature
 

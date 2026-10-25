@@ -76,6 +76,10 @@ class AITools(SyncAPIResource):
     ) -> SyncCursorPage[AgentTool]:
         """List the tools this credential may call.
 
+        A key limited to some mailboxes is refused (``PermissionDeniedError``),
+        since tools act across the whole workspace, and so is a member session
+        whose role lacks the AI assistant.
+
         Args:
             format: ``"warmbly"`` (default) for the registry shape, or
                 ``"openai"`` (aliases: ``"hermes"``, ``"functions"``) for
@@ -105,9 +109,15 @@ class AITools(SyncAPIResource):
         Raises:
             NotFoundError: The tool does not exist, or is send-class and so is
                 never callable over this surface.
-            PermissionDeniedError: The credential lacks the tool's permission.
-            UnprocessableEntityError: The tool itself failed; the message is
-                the tool's own, for the agent to read and react to.
+            PermissionDeniedError: The credential lacks the tool's permission, a
+                key limited to some mailboxes was used (tools act across the
+                whole workspace), a member session lacks the AI assistant, or
+                the change needs a fresh confirmation (the error identifier is
+                ``reauth_required``).
+            UnprocessableEntityError: The tool itself refused the call; the
+                message is the tool's own, for the agent to read and react to.
+                A failure the tool does not mean to expose is an
+                ``InternalServerError`` instead.
         """
         return self._post(
             f"/ai/tools/{name}/call",
@@ -127,6 +137,10 @@ class AsyncAITools(AsyncAPIResource):
         options: RequestOptions | None = None,
     ) -> AsyncPaginator[AgentTool]:
         """List the tools this credential may call.
+
+        A key limited to some mailboxes is refused (``PermissionDeniedError``),
+        since tools act across the whole workspace, and so is a member session
+        whose role lacks the AI assistant.
 
         Args:
             format: ``"warmbly"`` (default) for the registry shape, or
@@ -157,9 +171,15 @@ class AsyncAITools(AsyncAPIResource):
         Raises:
             NotFoundError: The tool does not exist, or is send-class and so is
                 never callable over this surface.
-            PermissionDeniedError: The credential lacks the tool's permission.
-            UnprocessableEntityError: The tool itself failed; the message is
-                the tool's own, for the agent to read and react to.
+            PermissionDeniedError: The credential lacks the tool's permission, a
+                key limited to some mailboxes was used (tools act across the
+                whole workspace), a member session lacks the AI assistant, or
+                the change needs a fresh confirmation (the error identifier is
+                ``reauth_required``).
+            UnprocessableEntityError: The tool itself refused the call; the
+                message is the tool's own, for the agent to read and react to.
+                A failure the tool does not mean to expose is an
+                ``InternalServerError`` instead.
         """
         return await self._post(
             f"/ai/tools/{name}/call",

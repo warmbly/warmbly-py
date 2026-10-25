@@ -27,7 +27,15 @@ class AuditLog(BaseModel):
     """One entry in the audit trail.
 
     ``user_id`` is the actor's id; ``actor`` carries their display details when
-    the server could resolve them.
+    the server could resolve them. ``entity_type`` names what was touched, for
+    example ``campaign``, ``campaign_lead`` (one contact inside one campaign;
+    ``entity_id`` is the contact and ``metadata`` carries the campaign),
+    ``contact``, ``email_account``, ``mailbox_import``, ``mailbox_grant``,
+    ``email_image``, ``api_key``, ``webhook``, ``integration``, ``crm_task``,
+    ``ai_tool_policy``, ``app_listing``, ``oauth_application``,
+    ``oauth_authorization``, ``placement_test``, ``placement_monitor`` or
+    ``placement_batch``. The set grows over time, so treat an unfamiliar value
+    as valid.
     """
 
     id: str
@@ -66,7 +74,7 @@ class AuditLogs(SyncAPIResource):
 
         Args:
             actor_id: Restrict to actions by one user.
-            entity_type: Restrict to one kind of entity.
+            entity_type: Restrict to one kind of entity (see :class:`AuditLog`).
             entity_id: Restrict to one specific entity.
             action: Restrict to one action verb.
             date: A single day to scope to.
@@ -114,7 +122,7 @@ class AsyncAuditLogs(AsyncAPIResource):
 
         Args:
             actor_id: Restrict to actions by one user.
-            entity_type: Restrict to one kind of entity.
+            entity_type: Restrict to one kind of entity (see :class:`AuditLog`).
             entity_id: Restrict to one specific entity.
             action: Restrict to one action verb.
             date: A single day to scope to.

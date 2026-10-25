@@ -19,9 +19,11 @@ from warmbly.gateway import AsyncGatewayClient, GatewayEvent
 
 gw = AsyncGatewayClient(token="wmbly_...")
 
+
 @gw.on_event(GatewayEvent.CAMPAIGN_STARTED)
 async def handle(topic, payload):
     print(payload["campaign_id"])
+
 
 await gw.connect()
 await gw.subscribe("org:org_123", intents=["CAMPAIGN"])

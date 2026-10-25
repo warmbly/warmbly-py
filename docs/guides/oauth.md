@@ -36,7 +36,7 @@ from warmbly.oauth import OAuth2Client
 
 oauth = OAuth2Client(
     client_id="wmcid_...",
-    client_secret="wmcs_...",                       # omit for a public client
+    client_secret="wmcs_...",  # omit for a public client
     redirect_uri="https://app.example.com/callback",
 )
 ```
@@ -57,8 +57,11 @@ The client owns an HTTP connection; close it when you are done (or use it as a
 context manager):
 
 ```python
-with OAuth2Client(client_id="wmcid_...", client_secret="wmcs_...",
-                  redirect_uri="https://app.example.com/callback") as oauth:
+with OAuth2Client(
+    client_id="wmcid_...",
+    client_secret="wmcs_...",
+    redirect_uri="https://app.example.com/callback",
+) as oauth:
     ...  # use oauth here
 # the underlying HTTP client is closed on exit
 ```
@@ -102,16 +105,16 @@ mismatch:
 
 ```python
 token = oauth.exchange_code(
-    code,                          # the `code` query param from the callback
-    code_verifier=verifier,        # the verifier from step 1
-    state=returned_state,          # the `state` query param from the callback
-    expected_state=state,          # the state you stored in step 1
+    code,  # the `code` query param from the callback
+    code_verifier=verifier,  # the verifier from step 1
+    state=returned_state,  # the `state` query param from the callback
+    expected_state=state,  # the state you stored in step 1
 )
 
-print(token.access_token)          # wmat_...
-print(token.refresh_token)         # wmrt_...
-print(token.expires_in)            # 3600
-print(token.scopes)                # ['read_campaigns', 'write_campaigns']
+print(token.access_token)  # wmat_...
+print(token.refresh_token)  # wmrt_...
+print(token.expires_in)  # 3600
+print(token.scopes)  # ['read_campaigns', 'write_campaigns']
 ```
 
 The returned [`OAuth2Token`][warmbly.oauth.OAuth2Token] exposes
@@ -162,7 +165,7 @@ Revoke an access or refresh token with
 reports success, so this returns `None` and only raises on a transport failure:
 
 ```python
-oauth.revoke(token.refresh_token)   # revoking a refresh token revokes the grant
+oauth.revoke(token.refresh_token)  # revoking a refresh token revokes the grant
 ```
 
 ## Token storage
@@ -194,7 +197,7 @@ storage = FileTokenStorage("~/.warmbly/token.json")
 storage = KeyringTokenStorage(service="warmbly", username="alice@example.com")
 
 storage.save(token)
-loaded = storage.load()             # OAuth2Token | None
+loaded = storage.load()  # OAuth2Token | None
 storage.clear()
 ```
 
@@ -215,7 +218,7 @@ from warmbly.oauth import OAuth2Client, FileTokenStorage, TokenManager
 
 oauth = OAuth2Client(client_id="wmcid_...", client_secret="wmcs_...")
 storage = FileTokenStorage("~/.warmbly/token.json")
-storage.save(token)                 # seed with the token from exchange_code
+storage.save(token)  # seed with the token from exchange_code
 
 manager = TokenManager(storage, oauth.refresh_token)
 
@@ -245,8 +248,9 @@ from warmbly import AsyncWarmbly
 from warmbly.oauth import AsyncOAuth2Client, FileTokenStorage, AsyncTokenManager
 
 oauth = AsyncOAuth2Client(client_id="wmcid_...", client_secret="wmcs_...")
-manager = AsyncTokenManager(FileTokenStorage("~/.warmbly/token.json"),
-                            oauth.refresh_token)
+manager = AsyncTokenManager(
+    FileTokenStorage("~/.warmbly/token.json"), oauth.refresh_token
+)
 
 api = AsyncWarmbly(api_key=await manager.access_token())
 ```
@@ -276,8 +280,8 @@ app = client.oauth_applications.create(
     website_url="https://example.com",
 )
 
-print(app.client_id)        # wmcid_..., use this in OAuth2Client
-print(app.client_secret)    # wmcs_...; shown ONCE; store it now
+print(app.client_id)  # wmcid_..., use this in OAuth2Client
+print(app.client_secret)  # wmcs_...; shown ONCE; store it now
 ```
 
 Note that `scopes` is the integer bitmask
@@ -306,7 +310,7 @@ If a secret is leaked, rotate it. The new secret is returned once:
 
 ```python
 result = client.oauth_applications.rotate_secret("app_123")
-print(result.client_secret)   # the new wmcs_...; store it now
+print(result.client_secret)  # the new wmcs_...; store it now
 ```
 
 ### Webhook signing secret
