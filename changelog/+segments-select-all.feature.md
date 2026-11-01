@@ -1,1 +1,0 @@
-`segments.set_members()` can name its contacts as a select-all (`all=True` with `filters` and `exclude`) instead of an id list, and `contacts` is now optional. `SegmentField` gains `option_labels`, the display names of an enum field's values.

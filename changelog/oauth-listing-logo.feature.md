@@ -1,1 +1,0 @@
-OAuth application directory listings and logos: `oauth_applications.get_listing()`, `put_listing()` and `delete_listing()` manage an application's community directory page, and `set_logo()` and `delete_logo()` upload or remove its logo on the application itself. `OAuthApplication` gains `suspended_at` and `suspended_reason`.

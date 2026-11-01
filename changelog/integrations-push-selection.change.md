@@ -1,1 +1,0 @@
-`integrations.push()` can now name its contacts as a select-all (`select_all=True` with `filters` and `exclude`) or with `contacts`, and `contact_ids` is now optional. One push still takes at most 500 contacts.

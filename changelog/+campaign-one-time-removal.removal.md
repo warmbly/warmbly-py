@@ -1,1 +1,0 @@
-Breaking: removed `kind` from `campaigns.create()` and from `Campaign`, and `one_time` from `CampaignsOverview`. One-time campaigns were retired in the API, which no longer reads `kind` on create or returns it.

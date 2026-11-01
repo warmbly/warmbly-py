@@ -1,1 +1,0 @@
-Lead sync sources can pin every synced row into segments: `create_source()` and `update_source()` take `segment_ids`, `LeadSyncSource` exposes `segment_ids`, and `list_sources()` can filter with `segment_id`.

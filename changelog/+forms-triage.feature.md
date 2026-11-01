@@ -1,1 +1,0 @@
-Forms gain submission triage: `forms.update()` takes `triage_enabled`, `Form` exposes `triage_enabled` and `redirect_url_active`, `FormSubmission` exposes `triage` and `triage_confidence`, `FormsConfig` exposes `triage_available`, and `FormsDomainStatus` exposes the `txt_name` and `txt_value` ownership record and the `proof_missing` status.

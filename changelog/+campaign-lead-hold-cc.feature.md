@@ -1,1 +1,0 @@
-Per-lead controls on a campaign: `campaigns.get_lead_hold()`, `pause_lead()` and `resume_lead()` park one contact's flow without unsubscribing them, and `get_lead_cc()`, `set_lead_cc()` and `suggest_lead_cc()` manage the contacts copied on every email to one lead.

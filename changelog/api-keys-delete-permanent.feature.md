@@ -1,1 +1,0 @@
-`api_keys.delete_permanent()` removes a revoked or expired API key and its usage logs for good. `ApiKeyPermissions` gains `grantable`, the permission bitmask the caller may put on a key, and `app_scopes`, the bitmask an OAuth application may be granted.

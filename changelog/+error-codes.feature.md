@@ -1,1 +1,0 @@
-Added `warmbly.ErrorCode`, named constants for the machine-readable `code` values the API documents, and a `reason` attribute on `APIError` for the optional finer key some error codes carry. Unknown codes and reasons are still delivered as plain strings.

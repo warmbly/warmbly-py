@@ -1,1 +1,0 @@
-Added `integrations.list_community_apps()` (auto-paginating) and `integrations.get_community_app()` to browse the community app directory, `integrations.rotate_inbound_url()` to mint a new inbound URL for a Calendly or Cal.com connection, and `integrations.set_signing_key()` to require signed deliveries on one. `IntegrationCatalogEntry` gains `rank`.

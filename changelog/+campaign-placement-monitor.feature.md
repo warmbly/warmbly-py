@@ -1,1 +1,0 @@
-`campaigns.get_placement_monitor()`, `set_placement_monitor()` and `delete_placement_monitor()` manage a campaign's scheduled placement test (interval, panel, alert threshold, pause on alert). `campaigns.send_plan()` reads today's sending plan with the limits that decided it.

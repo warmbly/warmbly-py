@@ -1,1 +1,0 @@
-`analytics.direct()` reports hand-written mail volume, replies and opt-in tracking, `analytics.inbox_tagging()` and `list_inbox_tagging()` expose the automatic inbox-tagging review, and `analytics.warmup_placement()` reports where warmup mail landed per day and per recipient provider. `analytics.list_accounts()` pages through account statuses.
