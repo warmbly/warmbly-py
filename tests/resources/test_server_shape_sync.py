@@ -149,7 +149,7 @@ def test_segments_select_all_and_option_labels_sync(client: Warmbly) -> None:
     result = client.segments.set_members(
         "seg_1",
         mode="exclude",
-        all=True,
+        select_all=True,
         filters={"search": "acme"},
         exclude=["c_9"],
     )
@@ -194,7 +194,7 @@ async def test_segments_select_all_async(aclient: AsyncWarmbly) -> None:
     members = respx.post(f"{BASE_URL}/segments/seg_1/members").mock(
         return_value=httpx.Response(200, json={"updated": 7})
     )
-    result = await aclient.segments.set_members("seg_1", mode="auto", all=True)
+    result = await aclient.segments.set_members("seg_1", mode="auto", select_all=True)
     assert result.updated == 7
     assert json.loads(_last(members).content) == {"mode": "auto", "all": True}
 

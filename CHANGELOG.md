@@ -37,7 +37,7 @@ assembled from news fragments in `changelog/` by
 - `Plan` exposes `price_yearly`, and `OutreachSettings` exposes the `inbox_tagging` branch (the actions a classified reply may take).
 - `analytics.direct()` reports hand-written mail volume, replies and opt-in tracking, `analytics.inbox_tagging()` and `list_inbox_tagging()` expose the automatic inbox-tagging review, and `analytics.warmup_placement()` reports where warmup mail landed per day and per recipient provider. `analytics.list_accounts()` pages through account statuses.
 - `campaigns.get_placement_monitor()`, `set_placement_monitor()` and `delete_placement_monitor()` manage a campaign's scheduled placement test (interval, panel, alert threshold, pause on alert). `campaigns.send_plan()` reads today's sending plan with the limits that decided it.
-- `segments.set_members()` can name its contacts as a select-all (`all=True` with `filters` and `exclude`) instead of an id list, and `contacts` is now optional. `SegmentField` gains `option_labels`, the display names of an enum field's values.
+- `segments.set_members()` can name its contacts as a select-all (`select_all=True` with `filters` and `exclude`) instead of an id list, and `contacts` is now optional. `SegmentField` gains `option_labels`, the display names of an enum field's values.
 
 ### Changed
 

@@ -137,6 +137,8 @@ def _check_settings(s) -> None:  # type: ignore[no-untyped-def]
     assert s.config.field_map == {"first_name": "firstname"}
     assert s.config.field_direction == {"first_name": "both"}
     assert s.config.for_provider == "hubspot"
+    assert s.config.to_dict()["for"] == "hubspot"
+    assert "for_provider" not in s.config.to_dict()
     assert s.config.future_key == 1
     assert s.account.name == "Acme Portal"
     assert s.account.missing_scopes == ["crm.objects.deals.write"]

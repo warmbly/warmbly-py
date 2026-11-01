@@ -158,7 +158,7 @@ def _members_body(
     *,
     mode: str,
     contacts: NotGivenOr[Sequence[str]],
-    all: NotGivenOr[bool],
+    select_all: NotGivenOr[bool],
     filters: NotGivenOr[Mapping[str, Any]],
     exclude: NotGivenOr[Sequence[str]],
 ) -> dict[str, Any]:
@@ -167,7 +167,7 @@ def _members_body(
         {
             "mode": mode,
             "contacts": contacts,
-            "all": all,
+            "all": select_all,
             "filters": filters,
             "exclude": exclude,
         }
@@ -291,7 +291,7 @@ class Segments(SyncAPIResource):
         *,
         mode: str,
         contacts: NotGivenOr[Sequence[str]] = NOT_GIVEN,
-        all: NotGivenOr[bool] = NOT_GIVEN,
+        select_all: NotGivenOr[bool] = NOT_GIVEN,
         filters: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
         exclude: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         options: RequestOptions | None = None,
@@ -299,7 +299,7 @@ class Segments(SyncAPIResource):
         """Pin contacts into or out of a segment.
 
         Name the contacts either as an explicit id list (``contacts``) or, with
-        ``all=True``, as every contact matching ``filters`` (the body
+        ``select_all=True``, as every contact matching ``filters`` (the body
         ``contacts.search`` takes) minus the ids in ``exclude``. A selection
         that names both prefers the filter.
 
@@ -310,7 +310,7 @@ class Segments(SyncAPIResource):
             mode: ``"include"``, ``"exclude"``, or ``"auto"`` to clear the
                 override so the conditions decide again.
             contacts: The contact ids to override, up to 10,000 per request.
-            all: Select every contact matching *filters* instead of
+            select_all: Select every contact matching *filters* instead of
                 *contacts*. The server refuses a selection past 250,000.
             filters: The search filter body for an ``all`` selection.
             exclude: Contact ids to drop from an ``all`` selection.
@@ -321,7 +321,7 @@ class Segments(SyncAPIResource):
             body=_members_body(
                 mode=mode,
                 contacts=contacts,
-                all=all,
+                select_all=select_all,
                 filters=filters,
                 exclude=exclude,
             ),
@@ -492,7 +492,7 @@ class AsyncSegments(AsyncAPIResource):
         *,
         mode: str,
         contacts: NotGivenOr[Sequence[str]] = NOT_GIVEN,
-        all: NotGivenOr[bool] = NOT_GIVEN,
+        select_all: NotGivenOr[bool] = NOT_GIVEN,
         filters: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
         exclude: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         options: RequestOptions | None = None,
@@ -500,7 +500,7 @@ class AsyncSegments(AsyncAPIResource):
         """Pin contacts into or out of a segment.
 
         Name the contacts either as an explicit id list (``contacts``) or, with
-        ``all=True``, as every contact matching ``filters`` (the body
+        ``select_all=True``, as every contact matching ``filters`` (the body
         ``contacts.search`` takes) minus the ids in ``exclude``. A selection
         that names both prefers the filter.
 
@@ -511,7 +511,7 @@ class AsyncSegments(AsyncAPIResource):
             mode: ``"include"``, ``"exclude"``, or ``"auto"`` to clear the
                 override so the conditions decide again.
             contacts: The contact ids to override, up to 10,000 per request.
-            all: Select every contact matching *filters* instead of
+            select_all: Select every contact matching *filters* instead of
                 *contacts*. The server refuses a selection past 250,000.
             filters: The search filter body for an ``all`` selection.
             exclude: Contact ids to drop from an ``all`` selection.
@@ -522,7 +522,7 @@ class AsyncSegments(AsyncAPIResource):
             body=_members_body(
                 mode=mode,
                 contacts=contacts,
-                all=all,
+                select_all=select_all,
                 filters=filters,
                 exclude=exclude,
             ),

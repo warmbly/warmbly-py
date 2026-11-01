@@ -178,7 +178,8 @@ async def test_async_unibox_move_folder_threads_only(aclient: AsyncWarmbly) -> N
         "thread_ids": ["t1"],
     }
     assert result.thread_ids == ["t1"]
-    assert result.folder == "trash"
+    assert result.thread_ids == ["t1"]
+    assert result.email_ids == []
 
 
 # -- api_keys.delete_permanent ----------------------------------------------

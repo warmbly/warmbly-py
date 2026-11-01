@@ -24,6 +24,7 @@ from .._pagination import AsyncPaginator, SyncCursorPage
 from .._resource import AsyncAPIResource, SyncAPIResource
 from .._types import NOT_GIVEN, NotGivenOr, RequestOptions, is_given
 from .._utils import drop_not_given
+from ._nullsafe import NullSafeModel
 
 __all__ = [
     "AgentDraft",
@@ -157,7 +158,7 @@ class ThreadLabels(BaseModel):
     data: Sequence[dict[str, Any]] = []
 
 
-class SeenResult(BaseModel):
+class SeenResult(NullSafeModel):
     """The echo of a bulk mark-seen request."""
 
     email_ids: Sequence[str] = []
@@ -166,7 +167,7 @@ class SeenResult(BaseModel):
     seen: bool | None = None
 
 
-class MoveFolderResult(BaseModel):
+class MoveFolderResult(NullSafeModel):
     """The echo of a bulk move-to-folder request."""
 
     email_ids: Sequence[str] = []

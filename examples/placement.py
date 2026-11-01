@@ -20,7 +20,8 @@ def main() -> None:
     overview = client.placement.overview().data
     for panel in overview.panels:
         print(panel.panel, "available" if panel.available else panel.reason)
-    print("used", overview.usage.used, "of", overview.usage.limit)
+    if overview.usage is not None:
+        print("used", overview.usage.used, "of", overview.usage.limit)
 
     # Start a test from one mailbox. Past the monthly allowance the call is
     # refused unless you agree to a price with max_credits.
@@ -38,9 +39,12 @@ def main() -> None:
         if test.status != "running":
             break
         time.sleep(30)
-    print("inbox rate:", test.summary.inbox_rate, "spam rate:", test.summary.spam_rate)
+    if test.summary is not None:
+        print(
+            "inbox rate:", test.summary.inbox_rate, "spam rate:", test.summary.spam_rate
+        )
     for result in test.results:
-        print(f"{result.family_label:20} {result.folder}")
+        print(f"{result.family_label or result.family or '?':20} {result.folder}")
 
     # Or test a whole campaign's senders, after checking what it would cost.
     plan = {
