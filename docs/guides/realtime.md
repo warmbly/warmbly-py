@@ -22,18 +22,37 @@ from warmbly import AsyncGatewayClient, GatewayClient, GatewayEvent
 ## Authentication and the `realtime_subscribe` scope
 
 The gateway authenticates with a bearer credential passed as `token`: an API
-key, an OAuth2 access token, or a session JWT. **The credential must carry the
-`realtime_subscribe` scope.** The token is sent in the connection query string
-and is never logged.
+key (`wmbly_...`), an OAuth2 access token (`wmat_...`), or a short-lived
+connection JWT. **An API key or OAuth token must carry the `realtime_subscribe`
+scope.** The client sends keys and OAuth tokens in the `X-Warmbly-Token`
+handshake header, because the gateway refuses them in the URL, and sends a
+connection JWT as the `token` query parameter. Which one is chosen from the
+token prefix, and the token is never logged.
 
 ```python
 gateway = AsyncGatewayClient(token="wmbly_...")
 ```
 
-If the token is missing, invalid, or lacks the required scope, the gateway
-rejects the connection with a fatal close code and the client raises
-`FatalDisconnect` (see
+If the token is missing, invalid, revoked, or lacks the required scope, the
+gateway rejects the connection and the client raises `FatalDisconnect` (see
 [Fatal vs. transient failures](#fatal-vs-transient-failures)).
+
+A key or token reaches only the workspace it was created in, and there only the
+events its read scopes cover, never more than its holder's own member
+permissions:
+
+| Scope | Event families delivered |
+|---|---|
+| `read_emails` | Mailbox, warmup and mailbox import events, and the `account:` topic. |
+| `read_campaigns` | Campaign activity, task progress, and send, open, click and reply pulses. |
+| `read_contacts` | Contact, page hit, form, research and contact import events. |
+| `read_unibox` | Inbox events and AI reply drafts. |
+| `read_analytics` | Placement tests and direct email events. |
+
+Team, billing and settings events never reach a key or token. A credential
+limited to selected mailboxes or campaigns only receives events that name one it
+was granted, and joining another workspace's topic is rejected with
+`not_a_member`.
 
 !!! note "Base URL"
     By default the client connects to `wss://realtime.warmbly.com`. Override it
@@ -166,6 +185,19 @@ rather than finishing. `GatewayEvent.FORM_SUBMISSION_CREATED` and
 `GatewayEvent.ACCOUNT_SYNC_STATE` reports a mailbox's import progress and any
 fair-use hold on it.
 
+The newer families are `GatewayEvent.WARMUP_PLACEMENT` (a partner saw one of
+your warmup emails land; `status` is `inbox`, `tabs`, `spam` or a `rescue_*`
+outcome), `GatewayEvent.PLACEMENT_TEST_UPDATED` (an inbox placement test or
+batch moved; carries `test_id` or `batch_id` and `status`),
+`GatewayEvent.MAILBOX_IMPORT_PROGRESS` and `GatewayEvent.CONTACT_IMPORT_PROGRESS`
+(an import moved; carry `import_id` and `status`, so refetch the import for the
+rows), `GatewayEvent.CRM_SYNCED` (mirrored CRM records changed; carries
+`objects`), and `GatewayEvent.DIRECT_EMAIL_OPENED` and
+`GatewayEvent.DIRECT_EMAIL_CLICKED` (tracking for one-off emails). Open and
+click events also carry `client_type`, `device_hidden`, `os` and `browser` when
+the tracking service could tell. Payloads are plain dictionaries, so a field the
+server adds shows up without an SDK upgrade.
+
 ### `wait_for`: await a single event
 
 Instead of a long-lived handler, you can suspend until the next matching event
@@ -275,7 +307,11 @@ Not every failure is retried. Authentication and permission rejections are
 **fatal**: the supervisor will not loop on them, because they require you to fix
 the credential and reconnect deliberately. These surface as
 `FatalDisconnect` from `connect()` or
-`run_forever()`:
+`run_forever()`. A refused handshake carries the server's `{code, reason}`, so
+`exc.code` is the gateway code (for example `4004`) and the message includes the
+reason, such as `Access token revoked`. A handshake refused for rate limiting
+(`4007`) or the connection cap (`4009`) is retried after the server's
+`retry_after_ms`:
 
 ```python
 from warmbly.gateway import FatalDisconnect

@@ -155,6 +155,27 @@ new_token = oauth.refresh_token(token.refresh_token)
     re-authenticate. The [TokenManager](#automatic-refresh-with-tokenmanager)
     handles all of this for you.
 
+!!! warning "Reusing a refresh token revokes the grant"
+    Presenting a refresh token that was already exchanged (two workers
+    refreshing in parallel, or a retry with the old token) revokes the whole
+    grant, and the next refresh raises `OAuthError` with `invalid_grant`. Keep
+    one refresh in flight per grant. The token managers below serialize them.
+
+## Granted scopes can be narrower than requested
+
+A token carries the intersection of the scopes your app was registered with,
+the scopes you asked for, and the scopes the approving member's role covers.
+`api_keys` is never granted to an app (`warmbly.APP_GRANTABLE_SCOPES` is every
+other scope). Read `token.scopes` for what you actually got. The cap follows the
+member: if their role is reduced later, calls that need a permission they no
+longer hold answer `403`.
+
+An OAuth token also cannot manage API keys or OAuth apps; those calls answer
+`403` with `ErrorCode.OAUTH_TOKEN_NOT_ALLOWED`.
+
+A server-side failure on the token endpoint raises `OAuthError` with
+`error="server_error"` and a `request_id` to quote to support.
+
 ## Revoking a token
 
 Revoke an access or refresh token with

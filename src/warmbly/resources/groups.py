@@ -8,6 +8,10 @@ categories group contacts and unibox conversations.
 There is no list endpoint: groups arrive embedded in the resources they
 organize (a campaign's ``folders``, a mailbox's ``tags``, a contact's
 ``categories``).
+
+Groups belong to the organization, not to whoever created them: every member
+sees and may change the same labels, and a request needs an organization
+selected (an API key always has one).
 """
 
 from __future__ import annotations

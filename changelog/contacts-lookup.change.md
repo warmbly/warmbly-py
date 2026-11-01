@@ -1,0 +1,1 @@
+`contacts.lookup()` no longer requires `email`: it also accepts `thread_id` (resolving a reply that came from an alias to the lead the campaign wrote to) and `account_id`. `ContactLookup` gains `match`, which is `email` or `thread`.

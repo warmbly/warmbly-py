@@ -1,0 +1,1 @@
+`templates.analyze()` runs an AI spam analysis on template content and names the word or sentence at fault, where it sits, and what to write instead. It charges AI credits and returns the rules score and a recipient-side judgment alongside the findings. `TemplateScore` no longer declares the `grade` and `suggestions` attributes, which the server never sent.

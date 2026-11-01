@@ -75,7 +75,9 @@ class SegmentField(BaseModel):
 
     ``kind`` is one of ``text``, ``enum``, ``bool``, ``date``, ``number``,
     ``category``, ``campaign`` or ``segment``; ``options`` lists the accepted
-    values of an enum field.
+    values of an enum field and ``option_labels`` names those values for
+    display where the value alone is not readable (a value missing from it
+    shows as itself).
     """
 
     field: str | None = None
@@ -83,6 +85,7 @@ class SegmentField(BaseModel):
     group: str | None = None
     kind: str | None = None
     options: Sequence[str] = []
+    option_labels: dict[str, str] = {}
 
 
 class SegmentPreview(BaseModel):
@@ -147,6 +150,26 @@ def _segment_body(
             "color": color,
             "match": match,
             "conditions": conditions,
+        }
+    )
+
+
+def _members_body(
+    *,
+    mode: str,
+    contacts: NotGivenOr[Sequence[str]],
+    all: NotGivenOr[bool],
+    filters: NotGivenOr[Mapping[str, Any]],
+    exclude: NotGivenOr[Sequence[str]],
+) -> dict[str, Any]:
+    """Build the manual-override body from an id list or a select-all filter."""
+    return drop_not_given(
+        {
+            "mode": mode,
+            "contacts": contacts,
+            "all": all,
+            "filters": filters,
+            "exclude": exclude,
         }
     )
 
@@ -266,22 +289,42 @@ class Segments(SyncAPIResource):
         self,
         segment_id: str,
         *,
-        contacts: Sequence[str],
         mode: str,
+        contacts: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        all: NotGivenOr[bool] = NOT_GIVEN,
+        filters: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        exclude: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> SegmentMembersUpdated:
         """Pin contacts into or out of a segment.
 
+        Name the contacts either as an explicit id list (``contacts``) or, with
+        ``all=True``, as every contact matching ``filters`` (the body
+        ``contacts.search`` takes) minus the ids in ``exclude``. A selection
+        that names both prefers the filter.
+
+        Requires the manage-contacts permission (API scope ``write_contacts``).
+
         Args:
             segment_id: The segment id.
-            contacts: The contact ids to override.
             mode: ``"include"``, ``"exclude"``, or ``"auto"`` to clear the
                 override so the conditions decide again.
+            contacts: The contact ids to override, up to 10,000 per request.
+            all: Select every contact matching *filters* instead of
+                *contacts*. The server refuses a selection past 250,000.
+            filters: The search filter body for an ``all`` selection.
+            exclude: Contact ids to drop from an ``all`` selection.
         """
         return self._post(
             f"/segments/{segment_id}/members",
             cast_to=SegmentMembersUpdated,
-            body={"contacts": list(contacts), "mode": mode},
+            body=_members_body(
+                mode=mode,
+                contacts=contacts,
+                all=all,
+                filters=filters,
+                exclude=exclude,
+            ),
             options=options,
         )
 
@@ -447,22 +490,42 @@ class AsyncSegments(AsyncAPIResource):
         self,
         segment_id: str,
         *,
-        contacts: Sequence[str],
         mode: str,
+        contacts: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        all: NotGivenOr[bool] = NOT_GIVEN,
+        filters: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        exclude: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> SegmentMembersUpdated:
         """Pin contacts into or out of a segment.
 
+        Name the contacts either as an explicit id list (``contacts``) or, with
+        ``all=True``, as every contact matching ``filters`` (the body
+        ``contacts.search`` takes) minus the ids in ``exclude``. A selection
+        that names both prefers the filter.
+
+        Requires the manage-contacts permission (API scope ``write_contacts``).
+
         Args:
             segment_id: The segment id.
-            contacts: The contact ids to override.
             mode: ``"include"``, ``"exclude"``, or ``"auto"`` to clear the
                 override so the conditions decide again.
+            contacts: The contact ids to override, up to 10,000 per request.
+            all: Select every contact matching *filters* instead of
+                *contacts*. The server refuses a selection past 250,000.
+            filters: The search filter body for an ``all`` selection.
+            exclude: Contact ids to drop from an ``all`` selection.
         """
         return await self._post(
             f"/segments/{segment_id}/members",
             cast_to=SegmentMembersUpdated,
-            body={"contacts": list(contacts), "mode": mode},
+            body=_members_body(
+                mode=mode,
+                contacts=contacts,
+                all=all,
+                filters=filters,
+                exclude=exclude,
+            ),
             options=options,
         )
 

@@ -1,0 +1,1 @@
+Salesforce on a contact: `contacts.salesforce()` returns the contact panel (connected orgs, linked Lead or Contact records, opportunities, tasks and sync state), `sync_salesforce()` matches or creates the record and pushes the contact, and `unlink_salesforce()` drops a link.

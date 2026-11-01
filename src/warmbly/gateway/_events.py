@@ -38,6 +38,15 @@ class GatewayEvent:
     upper-cases the event name, replaces separators with ``_``, and keeps the
     event if any intent token is a substring. ``intents=["CAMPAIGN"]`` therefore
     matches every ``CAMPAIGN_*`` event.
+
+    On an API key or OAuth token the org channel only delivers the families
+    the credential's read scopes cover: ``read_emails`` (mailbox, warmup and
+    mailbox import), ``read_campaigns`` (campaign activity, task progress and
+    send, open, click and reply pulses), ``read_contacts`` (contacts, page
+    hits, forms, research and contact imports), ``read_unibox`` (inbox events
+    and AI drafts) and ``read_analytics`` (placement tests and direct email
+    events). A credential limited to selected resources also only receives
+    events that name a campaign or mailbox it was granted.
     """
 
     # Campaign lifecycle.
@@ -62,6 +71,10 @@ class GatewayEvent:
     EMAIL_FAILED = "EMAIL_FAILED"
     EMAIL_OPENED = "EMAIL_OPENED"
     EMAIL_CLICKED = "EMAIL_CLICKED"
+    #: An open of a one-off (non-campaign) email. Needs ``read_analytics``.
+    DIRECT_EMAIL_OPENED = "DIRECT_EMAIL_OPENED"
+    #: A click in a one-off (non-campaign) email. Needs ``read_analytics``.
+    DIRECT_EMAIL_CLICKED = "DIRECT_EMAIL_CLICKED"
     EMAIL_REPLIED = "EMAIL_REPLIED"
     EMAIL_RECEIVED = "EMAIL_RECEIVED"
     EMAIL_UPDATED = "EMAIL_UPDATED"
@@ -72,6 +85,13 @@ class GatewayEvent:
     CONTACT_UPDATED = "CONTACT_UPDATED"
     CONTACT_DELETED = "CONTACT_DELETED"
     CONTACTS_RELOAD = "CONTACTS_RELOAD"
+    #: A background contact import moved (``queued``, ``running``,
+    #: ``completed``, ``failed`` or ``cancelled``). Carries ``import_id`` and
+    #: ``status`` only.
+    CONTACT_IMPORT_PROGRESS = "CONTACT_IMPORT_PROGRESS"
+    #: Mirrored CRM records changed. Carries ``objects`` and, optionally,
+    #: ``contact_id``.
+    CRM_SYNCED = "CRM_SYNCED"
 
     # Hosted forms and website tracking.
     FORM_SUBMISSION_CREATED = "FORM_SUBMISSION_CREATED"
@@ -85,6 +105,16 @@ class GatewayEvent:
     ACCOUNT_HEALTH_CHANGED = "ACCOUNT_HEALTH_CHANGED"
     #: A mailbox's import progress or fair-use hold changed.
     ACCOUNT_SYNC_STATE = "ACCOUNT_SYNC_STATE"
+    #: A partner saw one of the workspace's warmup emails land. ``status`` is
+    #: ``inbox``, ``tabs`` or ``spam``, or a ``rescue_*`` outcome.
+    WARMUP_PLACEMENT = "WARMUP_PLACEMENT"
+    #: A mailbox import moved. Carries ``import_id`` and ``status``
+    #: (``running``, ``completed`` or ``cancelled``).
+    MAILBOX_IMPORT_PROGRESS = "MAILBOX_IMPORT_PROGRESS"
+    #: An inbox placement test (or batch) started, got a verdict or finished.
+    #: Carries ``test_id`` or ``batch_id`` and ``status``. Needs
+    #: ``read_analytics``.
+    PLACEMENT_TEST_UPDATED = "PLACEMENT_TEST_UPDATED"
 
     # Bulk-operation events.
     BULK_STARTED = "BULK_STARTED"

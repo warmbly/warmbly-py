@@ -1,0 +1,1 @@
+Breaking: removed `description` from `teams.create()` and `teams.update()` and `description` and `member_count` from `Team`. The API has no such fields, so the value was never stored and the attributes were always `None`.

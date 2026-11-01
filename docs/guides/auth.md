@@ -189,5 +189,8 @@ FULL_ACCESS_SCOPES  # every scope (same as ALL_SCOPES)
 SCOPES              # the name -> bit mapping, if you want to build your own
 ```
 
+`APP_GRANTABLE_SCOPES` is every scope except `api_keys`: the most an OAuth app
+can ever be granted, since key management stays with people.
+
 The same scope strings are used when requesting OAuth2 authorization. See the
 [OAuth2 guide](oauth.md).

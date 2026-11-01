@@ -23,6 +23,7 @@ python examples/quickstart.py
 | [`contacts.py`](./contacts.py) | Search, bulk add, CSV import/export, notes |
 | [`unibox.py`](./unibox.py) | Read the inbox, label, AI-draft, reply, schedule sends |
 | [`crm.py`](./crm.py) | Pipelines and stages, deals, tasks, faceted search + summaries |
+| [`placement.py`](./placement.py) | Run inbox placement tests and batches, schedule a campaign monitor |
 | [`advisor.py`](./advisor.py) | Read deliverability findings and apply the fixes |
 | [`pagination.py`](./pagination.py) | Auto-iterate every page, or walk pages manually |
 | [`error_handling.py`](./error_handling.py) | The exception hierarchy, rate limits, retries, timeouts |

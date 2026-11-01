@@ -47,10 +47,8 @@ class Team(BaseModel):
     id: str
     organization_id: str | None = None
     name: str | None = None
-    description: str | None = None
     color: str | None = None
     members: Sequence[TeamMember] = []
-    member_count: int | None = None
     created_at: str | None = None
     updated_at: str | None = None
 
@@ -99,7 +97,6 @@ class Teams(SyncAPIResource):
         self,
         *,
         name: str,
-        description: NotGivenOr[str] = NOT_GIVEN,
         color: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> Team:
@@ -107,12 +104,9 @@ class Teams(SyncAPIResource):
 
         Args:
             name: The team name.
-            description: An optional longer description.
             color: An optional display colour.
         """
-        body: dict[str, Any] = drop_not_given(
-            {"name": name, "description": description, "color": color}
-        )
+        body: dict[str, Any] = drop_not_given({"name": name, "color": color})
         return self._post("/teams", cast_to=Team, body=body, options=options)
 
     def retrieve(self, team_id: str, *, options: RequestOptions | None = None) -> Team:
@@ -124,14 +118,11 @@ class Teams(SyncAPIResource):
         team_id: str,
         *,
         name: NotGivenOr[str] = NOT_GIVEN,
-        description: NotGivenOr[str] = NOT_GIVEN,
         color: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> Team:
-        """Update a team's name, description, or colour."""
-        body = drop_not_given(
-            {"name": name, "description": description, "color": color}
-        )
+        """Update a team's name or colour."""
+        body = drop_not_given({"name": name, "color": color})
         return self._patch(
             f"/teams/{team_id}", cast_to=Team, body=body, options=options
         )
@@ -191,7 +182,6 @@ class AsyncTeams(AsyncAPIResource):
         self,
         *,
         name: str,
-        description: NotGivenOr[str] = NOT_GIVEN,
         color: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> Team:
@@ -199,12 +189,9 @@ class AsyncTeams(AsyncAPIResource):
 
         Args:
             name: The team name.
-            description: An optional longer description.
             color: An optional display colour.
         """
-        body: dict[str, Any] = drop_not_given(
-            {"name": name, "description": description, "color": color}
-        )
+        body: dict[str, Any] = drop_not_given({"name": name, "color": color})
         return await self._post("/teams", cast_to=Team, body=body, options=options)
 
     async def retrieve(
@@ -218,14 +205,11 @@ class AsyncTeams(AsyncAPIResource):
         team_id: str,
         *,
         name: NotGivenOr[str] = NOT_GIVEN,
-        description: NotGivenOr[str] = NOT_GIVEN,
         color: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> Team:
-        """Update a team's name, description, or colour."""
-        body = drop_not_given(
-            {"name": name, "description": description, "color": color}
-        )
+        """Update a team's name or colour."""
+        body = drop_not_given({"name": name, "color": color})
         return await self._patch(
             f"/teams/{team_id}", cast_to=Team, body=body, options=options
         )

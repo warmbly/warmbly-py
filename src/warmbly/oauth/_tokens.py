@@ -48,7 +48,10 @@ class OAuth2Token(BaseModel):
             (``3600`` for Warmbly access tokens).
         refresh_token: The refresh token (``wmrt_`` prefix), if granted. It
             **rotates**: each refresh returns a new one and invalidates the old.
-        scope: Space-delimited granted scopes, when the server narrows them.
+        scope: Space-delimited granted scopes. This is the granted set, which
+            can be narrower than what the authorization request asked for (the
+            approving member's role caps it) and can shrink later if the
+            member's role does.
         expires_at: Absolute Unix timestamp at which ``access_token`` expires,
             computed from ``expires_in`` at construction time. ``None`` if the
             server omitted ``expires_in``.

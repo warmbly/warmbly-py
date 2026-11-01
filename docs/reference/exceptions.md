@@ -102,3 +102,9 @@ except warmbly.WarmblyError as exc:
 ### GatewayError
 
 ::: warmbly.GatewayError
+
+## Error codes
+
+### ErrorCode
+
+::: warmbly.ErrorCode

@@ -1,0 +1,1 @@
+Added `crm.bulk_update_tasks()` and `crm.bulk_delete_tasks()`, which act on a list of task ids or on a select-all (`select_all=True` with the search `filters` and `exclude`, up to 50,000 tasks) and return how many tasks were touched.

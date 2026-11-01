@@ -10,6 +10,7 @@ notice. Interactive OAuth2 flows live in :mod:`warmbly.oauth`.
 from __future__ import annotations
 
 from ._client import AsyncWarmbly, Warmbly
+from ._error_codes import ErrorCode
 from ._exceptions import (
     APIConnectionError,
     APIError,
@@ -35,6 +36,7 @@ from ._models import BaseModel
 from ._types import NOT_GIVEN, NotGiven, Omit, RequestOptions, Timeout
 from ._utils import (
     ALL_SCOPES,
+    APP_GRANTABLE_SCOPES,
     FULL_ACCESS_SCOPES,
     READ_ONLY_SCOPES,
     SCOPES,
@@ -68,6 +70,7 @@ __all__ = [  # noqa: RUF022 - grouped by category for readability
     "verify_signature",
     # Models / types
     "BaseModel",
+    "ErrorCode",
     "NOT_GIVEN",
     "NotGiven",
     "Omit",
@@ -78,6 +81,7 @@ __all__ = [  # noqa: RUF022 - grouped by category for readability
     "mask_to_scopes",
     "SCOPES",
     "ALL_SCOPES",
+    "APP_GRANTABLE_SCOPES",
     "READ_ONLY_SCOPES",
     "FULL_ACCESS_SCOPES",
     # Exceptions
