@@ -82,13 +82,17 @@ def _error_from_response(response: httpx.Response) -> OAuthError:
         body = response.json()
     except ValueError:
         body = None
+    request_id = response.headers.get("x-request-id")
     if isinstance(body, dict) and body.get("error"):
         return OAuthError(
-            str(body["error"]), _as_optional_str(body.get("error_description"))
+            str(body["error"]),
+            _as_optional_str(body.get("error_description")),
+            request_id=_as_optional_str(body.get("request_id")) or request_id,
         )
     return OAuthError(
         "http_error",
         f"OAuth endpoint returned HTTP {response.status_code}.",
+        request_id=request_id,
     )
 
 
@@ -138,7 +142,11 @@ class _OAuth2ClientBase:
 
         Args:
             scopes: The scopes to request (space-joined into the ``scope``
-                parameter).
+                parameter). The grant is the intersection of the app's
+                registered scopes, these, and what the approving member's
+                role covers, so the issued token may carry fewer
+                (:attr:`OAuth2Token.scopes` is authoritative). ``api_keys`` is
+                never granted to an app.
             state: An optional caller-provided CSRF state; a 32-byte URL-safe
                 random value is generated when omitted.
 
@@ -317,7 +325,11 @@ class OAuth2Client(_OAuth2ClientBase):
         """Exchange a refresh token for a fresh token set.
 
         Warmbly rotates refresh tokens: the response carries a new
-        ``refresh_token`` that supersedes the one passed in.
+        ``refresh_token`` that supersedes the one passed in. Presenting a
+        refresh token that was already exchanged (two workers refreshing in
+        parallel, a retry with the old token) revokes the whole grant and the
+        user must authorize again, so serialize refreshes per grant; the
+        bundled token managers do.
 
         Args:
             refresh_token: The current refresh token (``wmrt_``).

@@ -80,6 +80,11 @@ class AITools(SyncAPIResource):
             format: ``"warmbly"`` (default) for the registry shape, or
                 ``"openai"`` (aliases: ``"hermes"``, ``"functions"``) for
                 OpenAI function-calling objects.
+
+        Raises:
+            PermissionDeniedError: The credential is an API key limited to
+                specific mailboxes, or a member session whose role does not
+                include the AI assistant.
         """
         return self._get_api_list(
             "/ai/tools",
@@ -105,9 +110,15 @@ class AITools(SyncAPIResource):
         Raises:
             NotFoundError: The tool does not exist, or is send-class and so is
                 never callable over this surface.
-            PermissionDeniedError: The credential lacks the tool's permission.
-            UnprocessableEntityError: The tool itself failed; the message is
-                the tool's own, for the agent to read and react to.
+            PermissionDeniedError: The credential lacks the tool's permission;
+                the credential is an API key limited to specific mailboxes
+                (the tools act across the whole workspace, so use the REST
+                endpoints instead); a member session's role does not include
+                the AI assistant; or the change needs a fresh confirmation
+                (error code ``reauth_required``).
+            UnprocessableEntityError: The tool failed with a message meant for
+                the caller, for the agent to read and react to. Any other
+                tool failure arrives as a server error.
         """
         return self._post(
             f"/ai/tools/{name}/call",
@@ -132,6 +143,11 @@ class AsyncAITools(AsyncAPIResource):
             format: ``"warmbly"`` (default) for the registry shape, or
                 ``"openai"`` (aliases: ``"hermes"``, ``"functions"``) for
                 OpenAI function-calling objects.
+
+        Raises:
+            PermissionDeniedError: The credential is an API key limited to
+                specific mailboxes, or a member session whose role does not
+                include the AI assistant.
         """
         return self._get_api_list(
             "/ai/tools",
@@ -157,9 +173,15 @@ class AsyncAITools(AsyncAPIResource):
         Raises:
             NotFoundError: The tool does not exist, or is send-class and so is
                 never callable over this surface.
-            PermissionDeniedError: The credential lacks the tool's permission.
-            UnprocessableEntityError: The tool itself failed; the message is
-                the tool's own, for the agent to read and react to.
+            PermissionDeniedError: The credential lacks the tool's permission;
+                the credential is an API key limited to specific mailboxes
+                (the tools act across the whole workspace, so use the REST
+                endpoints instead); a member session's role does not include
+                the AI assistant; or the change needs a fresh confirmation
+                (error code ``reauth_required``).
+            UnprocessableEntityError: The tool failed with a message meant for
+                the caller, for the agent to read and react to. Any other
+                tool failure arrives as a server error.
         """
         return await self._post(
             f"/ai/tools/{name}/call",

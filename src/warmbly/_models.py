@@ -42,7 +42,7 @@ class BaseModel(pydantic.BaseModel):
 
     def to_dict(self) -> dict[str, Any]:
         """Return the model as a JSON-compatible ``dict``."""
-        return self.model_dump(mode="json")
+        return self.model_dump(mode="json", by_alias=True)
 
     def to_json(self, *, indent: int | None = 2) -> str:
         """Return the model serialized to a JSON string."""

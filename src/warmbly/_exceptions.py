@@ -48,17 +48,23 @@ class APIError(WarmblyError):
         message: A human-readable description of the failure.
         body: The parsed response body, when one was returned.
         code: The machine-readable ``code`` from the error envelope, if present.
+            :class:`warmbly.ErrorCode` names the documented values.
+        reason: The optional finer ``reason`` key some codes carry when one code
+            has more than one next step. Treat an unknown or missing value as
+            the plain ``code``.
     """
 
     message: str
     body: object | None
     code: str | None
+    reason: str | None
 
     def __init__(self, message: str, *, body: object | None = None) -> None:
         super().__init__(message)
         self.message = message
         self.body = body
-        self.code = body.get("code") if isinstance(body, dict) else None
+        self.code = _str_field(body, "code")
+        self.reason = _str_field(body, "reason")
 
 
 class APIConnectionError(APIError):
@@ -206,15 +212,26 @@ class OAuthError(WarmblyError):
     Attributes:
         error: The OAuth error code, e.g. ``invalid_grant``, ``invalid_client``.
         error_description: A human-readable explanation, when provided.
+        request_id: The request id the server attached to a ``server_error``
+            response (body ``request_id`` or ``X-Request-Id`` header), for
+            support tickets. ``None`` otherwise.
     """
 
     error: str
     error_description: str | None
+    request_id: str | None
 
-    def __init__(self, error: str, error_description: str | None = None) -> None:
+    def __init__(
+        self,
+        error: str,
+        error_description: str | None = None,
+        *,
+        request_id: str | None = None,
+    ) -> None:
         super().__init__(error_description or error)
         self.error = error
         self.error_description = error_description
+        self.request_id = request_id
 
 
 class GatewayError(WarmblyError):
@@ -268,6 +285,14 @@ def make_status_error(
         headers=headers,
         body=body,
     )
+
+
+def _str_field(body: object | None, key: str) -> str | None:
+    if isinstance(body, dict):
+        value = body.get(key)
+        if isinstance(value, str):
+            return value
+    return None
 
 
 def _extract_message(body: object | None) -> str | None:

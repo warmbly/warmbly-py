@@ -30,15 +30,16 @@ class OutreachSettings(BaseModel):
     """The organization's outreach settings.
 
     Each attribute is one branch of the settings tree: bounce handling, task
-    reliability, A/B defaults, reply-intent keywords, send-time optimization,
-    preflight checks, the workspace opt-out footer, and which dashboard panels
-    are shown.
+    reliability, A/B defaults, reply-intent keywords, the actions a classified
+    reply may take (``inbox_tagging``), send-time optimization, preflight
+    checks, the workspace opt-out footer, and which dashboard panels are shown.
     """
 
     bounce_pipeline: dict[str, Any] | None = None
     task_reliability: dict[str, Any] | None = None
     ab_testing: dict[str, Any] | None = None
     reply_intent: dict[str, Any] | None = None
+    inbox_tagging: dict[str, Any] | None = None
     send_time_optimization: dict[str, Any] | None = None
     preflight: dict[str, Any] | None = None
     unsubscribe: dict[str, Any] | None = None
@@ -50,7 +51,10 @@ class Outreach(SyncAPIResource):
     """Synchronous ``outreach`` resource."""
 
     def settings(self, *, options: RequestOptions | None = None) -> OutreachSettings:
-        """Read the organization's outreach settings."""
+        """Read the organization's outreach settings.
+
+        Requires the manage-settings permission (API scope ``write_campaigns``).
+        """
         return self._get(
             "/outreach/settings", cast_to=OutreachSettings, options=options
         )
@@ -65,7 +69,10 @@ class Outreach(SyncAPIResource):
 
         This is a whole-document write, not a merge: read
         :meth:`settings` first, change the branch you care about, and send the
-        result back.
+        result back. A field left out of the document takes its default rather
+        than its stored value.
+
+        Requires the manage-settings permission (API scope ``write_campaigns``).
 
         Args:
             settings: The full settings tree. The ``unsubscribe`` branch is the
@@ -88,7 +95,10 @@ class AsyncOutreach(AsyncAPIResource):
     async def settings(
         self, *, options: RequestOptions | None = None
     ) -> OutreachSettings:
-        """Read the organization's outreach settings."""
+        """Read the organization's outreach settings.
+
+        Requires the manage-settings permission (API scope ``write_campaigns``).
+        """
         return await self._get(
             "/outreach/settings", cast_to=OutreachSettings, options=options
         )
@@ -103,7 +113,10 @@ class AsyncOutreach(AsyncAPIResource):
 
         This is a whole-document write, not a merge: read
         :meth:`settings` first, change the branch you care about, and send the
-        result back.
+        result back. A field left out of the document takes its default rather
+        than its stored value.
+
+        Requires the manage-settings permission (API scope ``write_campaigns``).
 
         Args:
             settings: The full settings tree. The ``unsubscribe`` branch is the

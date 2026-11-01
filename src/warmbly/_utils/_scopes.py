@@ -14,6 +14,7 @@ from typing import Literal
 
 __all__ = [
     "ALL_SCOPES",
+    "APP_GRANTABLE_SCOPES",
     "FULL_ACCESS_SCOPES",
     "READ_ONLY_SCOPES",
     "SCOPES",
@@ -87,6 +88,14 @@ READ_ONLY_SCOPES: int = sum(
 
 FULL_ACCESS_SCOPES: int = ALL_SCOPES
 """The backend's ``full_access`` preset: every scope."""
+
+
+APP_GRANTABLE_SCOPES: int = ALL_SCOPES & ~SCOPES["api_keys"]
+"""Every scope an OAuth app may be granted: all of them except ``api_keys``.
+
+Key management stays with people, so an OAuth access token can never hold
+``api_keys`` and cannot create, edit, revoke or delete API keys.
+"""
 
 
 def scopes_to_mask(names: Iterable[str]) -> int:

@@ -12,21 +12,38 @@ webhook-style providers.
 
 Sub-objects (``config``, ``display_fields``, mapping entries) are modeled
 permissively because provider shapes vary and the catalog grows.
+
+Provider-specific calls live on sub-namespaces: ``client.integrations.apollo``,
+``client.integrations.salesforce`` and ``client.integrations.clay`` (see
+:mod:`warmbly.resources.integration_apps`). The community app directory is
+browsed with :meth:`Integrations.list_community_apps` and
+:meth:`Integrations.get_community_app`.
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from .._models import BaseModel
 from .._pagination import AsyncPaginator, SyncCursorPage
 from .._resource import AsyncAPIResource, SyncAPIResource
-from .._types import NOT_GIVEN, NotGivenOr, RequestOptions
+from .._types import NOT_GIVEN, NotGiven, NotGivenOr, RequestOptions
 from .._utils import drop_not_given
+from ._nullsafe import NullSafeModel
+from .integration_apps import (
+    AsyncIntegrationApollo,
+    AsyncIntegrationClay,
+    AsyncIntegrationSalesforce,
+    IntegrationApollo,
+    IntegrationClay,
+    IntegrationSalesforce,
+)
 
 __all__ = [
     "AsyncIntegrations",
+    "CommunityApp",
+    "CommunityAppPermission",
     "IntegrationBooking",
     "IntegrationCatalogEntry",
     "IntegrationConnection",
@@ -36,6 +53,7 @@ __all__ = [
     "IntegrationEventDeleted",
     "IntegrationFieldMapping",
     "IntegrationFieldMappings",
+    "IntegrationInboundUrl",
     "IntegrationRun",
     "IntegrationTestResult",
     "IntegrationWebhookSecret",
@@ -44,11 +62,20 @@ __all__ = [
 ]
 
 
+def _as_list(value: NotGivenOr[Sequence[str]]) -> NotGivenOr[list[str]]:
+    return value if isinstance(value, NotGiven) else list(value)
+
+
+def _as_dict(value: NotGivenOr[Mapping[str, Any]]) -> NotGivenOr[dict[str, Any]]:
+    return value if isinstance(value, NotGiven) else dict(value)
+
+
 class IntegrationCatalogEntry(BaseModel):
     """A provider available to connect from the integrations catalog.
 
     ``configured`` reports whether this deployment has the credentials needed
-    to offer the provider at all.
+    to offer the provider at all. ``rank`` is the provider's popularity on this
+    instance, 1 being the most used.
     """
 
     provider: str
@@ -67,6 +94,7 @@ class IntegrationCatalogEntry(BaseModel):
     supports_push: bool | None = None
     capability: dict[str, Any] | None = None
     configured: bool | None = None
+    rank: int | None = None
 
 
 class IntegrationConnection(BaseModel):
@@ -236,6 +264,51 @@ class IntegrationBooking(BaseModel):
     campaign_id: str | None = None
     created_at: str | None = None
     updated_at: str | None = None
+
+
+class IntegrationInboundUrl(BaseModel):
+    """The new inbound URL minted for a Calendly or Cal.com connection."""
+
+    inbound_webhook_url: str | None = None
+
+
+class CommunityAppPermission(BaseModel):
+    """One API permission a community app asks for."""
+
+    name: str | None = None
+    value: int | None = None
+    description: str | None = None
+    category: str | None = None
+
+
+class CommunityApp(NullSafeModel):
+    """A community directory listing as a browsing workspace sees it.
+
+    ``scopes`` is the permission bitmask and ``permissions`` spells it out.
+    ``status`` is ``"published"``, ``"featured"`` or ``"hidden"``; unknown
+    values are passed through. ``installed`` says whether this workspace
+    already uses the app.
+    """
+
+    application_id: str | None = None
+    slug: str | None = None
+    name: str | None = None
+    tagline: str | None = None
+    description: str | None = None
+    category: str | None = None
+    logo_url: str | None = None
+    website_url: str | None = None
+    install_url: str | None = None
+    support_url: str | None = None
+    privacy_url: str | None = None
+    developer: str | None = None
+    scopes: int | None = None
+    permissions: Sequence[CommunityAppPermission] = []
+    status: str | None = None
+    listed: bool | None = None
+    installs: int | None = None
+    installed: bool | None = None
+    published_at: str | None = None
 
 
 class Integrations(SyncAPIResource):
@@ -465,22 +538,43 @@ class Integrations(SyncAPIResource):
         self,
         connection_id: str,
         *,
-        contact_ids: Sequence[str],
+        contacts: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        select_all: NotGivenOr[bool] = NOT_GIVEN,
+        filters: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        exclude: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        contact_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> PushResult:
         """Upsert contacts into a connected CRM, synchronously.
 
         Every upsert is keyed by email, so repeating a push converges rather
-        than duplicating records.
+        than duplicating records. Name the contacts with *contacts* (or the
+        older *contact_ids*), or with *select_all* plus the search *filters*
+        the list was showing. The push is synchronous against the provider's
+        API, so one call takes at most 500 contacts.
 
         Args:
             connection_id: The connection to push to.
-            contact_ids: The contacts to upsert.
+            contacts: Contact ids to upsert.
+            select_all: Push every contact matching *filters* instead.
+            filters: The body ``client.contacts.search`` takes, as a mapping.
+            exclude: Ids to drop from a select-all.
+            contact_ids: Alias of *contacts* kept for older callers.
+
+        Requires the use-integrations permission (API scope ``integrations``).
         """
         return self._post(
             f"/integrations/connections/{connection_id}/push",
             cast_to=PushResult,
-            body={"contact_ids": list(contact_ids)},
+            body=drop_not_given(
+                {
+                    "contacts": _as_list(contacts),
+                    "all": select_all,
+                    "filters": _as_dict(filters),
+                    "exclude": _as_list(exclude),
+                    "contact_ids": _as_list(contact_ids),
+                }
+            ),
             options=options,
         )
 
@@ -499,9 +593,117 @@ class Integrations(SyncAPIResource):
             options=options,
         )
 
+    @property
+    def apollo(self) -> IntegrationApollo:
+        """Apollo list imports and contact enrichment."""
+        return IntegrationApollo(self._client)
+
+    @property
+    def salesforce(self) -> IntegrationSalesforce:
+        """Salesforce sync settings, imports and activity."""
+        return IntegrationSalesforce(self._client)
+
+    @property
+    def clay(self) -> IntegrationClay:
+        """Clay inbound defaults and the outbound table."""
+        return IntegrationClay(self._client)
+
+    def list_community_apps(
+        self,
+        *,
+        limit: NotGivenOr[int] = NOT_GIVEN,
+        cursor: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> SyncCursorPage[CommunityApp]:
+        """List the community directory listings shown in discovery.
+
+        Featured apps come first, then the most installed (auto-paginating).
+
+        Args:
+            limit: Page size, 1 to 200 (default 100).
+            cursor: Resume from a previous page.
+
+        Requires the ``integrations`` API scope.
+        """
+        return self._get_api_list(
+            "/integrations/community",
+            model=CommunityApp,
+            query={"limit": limit, "cursor": cursor},
+            options=options,
+        )
+
+    def get_community_app(
+        self, slug: str, *, options: RequestOptions | None = None
+    ) -> CommunityApp:
+        """Open a published community listing by its link, listed or not.
+
+        Requires the ``integrations`` API scope.
+        """
+        return self._get(
+            f"/integrations/community/{slug}", cast_to=CommunityApp, options=options
+        )
+
+    def rotate_inbound_url(
+        self, connection_id: str, *, options: RequestOptions | None = None
+    ) -> IntegrationInboundUrl:
+        """Mint a new inbound URL for a Calendly or Cal.com connection.
+
+        The previous URL stops working immediately, so update the provider's
+        webhook with the returned ``inbound_webhook_url``. Needs a paid plan.
+
+        Requires the manage-settings permission (API scope ``integrations``).
+        """
+        return self._post(
+            f"/integrations/connections/{connection_id}/rotate-inbound-url",
+            cast_to=IntegrationInboundUrl,
+            options=options,
+        )
+
+    def set_signing_key(
+        self,
+        connection_id: str,
+        *,
+        signing_key: str,
+        options: RequestOptions | None = None,
+    ) -> IntegrationConnectionDetail:
+        """Set the key a Calendly or Cal.com connection's deliveries are signed with.
+
+        Once set, deliveries must carry a valid signature as well as the URL
+        secret. Repeating the call with the same key converges. Needs a paid
+        plan. The returned detail populates only ``connection``.
+
+        Args:
+            connection_id: The connection to configure.
+            signing_key: The provider's signing key, 8 to 512 characters. An
+                empty string goes back to the URL secret alone.
+
+        Requires the manage-settings permission (API scope ``integrations``).
+        """
+        return self._put(
+            f"/integrations/connections/{connection_id}/signing-key",
+            cast_to=IntegrationConnectionDetail,
+            body={"signing_key": signing_key},
+            options=options,
+        )
+
 
 class AsyncIntegrations(AsyncAPIResource):
     """Asynchronous ``integrations`` resource."""
+
+    @property
+    def apollo(self) -> AsyncIntegrationApollo:
+        """Apollo list imports and contact enrichment."""
+        return AsyncIntegrationApollo(self._client)
+
+    @property
+    def salesforce(self) -> AsyncIntegrationSalesforce:
+        """Salesforce sync settings, imports and activity."""
+        return AsyncIntegrationSalesforce(self._client)
+
+    @property
+    def clay(self) -> AsyncIntegrationClay:
+        """Clay inbound defaults and the outbound table."""
+        return AsyncIntegrationClay(self._client)
 
     def catalog(
         self, *, options: RequestOptions | None = None
@@ -727,22 +929,43 @@ class AsyncIntegrations(AsyncAPIResource):
         self,
         connection_id: str,
         *,
-        contact_ids: Sequence[str],
+        contacts: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        select_all: NotGivenOr[bool] = NOT_GIVEN,
+        filters: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        exclude: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        contact_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> PushResult:
         """Upsert contacts into a connected CRM, synchronously.
 
         Every upsert is keyed by email, so repeating a push converges rather
-        than duplicating records.
+        than duplicating records. Name the contacts with *contacts* (or the
+        older *contact_ids*), or with *select_all* plus the search *filters*
+        the list was showing. The push is synchronous against the provider's
+        API, so one call takes at most 500 contacts.
 
         Args:
             connection_id: The connection to push to.
-            contact_ids: The contacts to upsert.
+            contacts: Contact ids to upsert.
+            select_all: Push every contact matching *filters* instead.
+            filters: The body ``client.contacts.search`` takes, as a mapping.
+            exclude: Ids to drop from a select-all.
+            contact_ids: Alias of *contacts* kept for older callers.
+
+        Requires the use-integrations permission (API scope ``integrations``).
         """
         return await self._post(
             f"/integrations/connections/{connection_id}/push",
             cast_to=PushResult,
-            body={"contact_ids": list(contact_ids)},
+            body=drop_not_given(
+                {
+                    "contacts": _as_list(contacts),
+                    "all": select_all,
+                    "filters": _as_dict(filters),
+                    "exclude": _as_list(exclude),
+                    "contact_ids": _as_list(contact_ids),
+                }
+            ),
             options=options,
         )
 
@@ -758,5 +981,83 @@ class AsyncIntegrations(AsyncAPIResource):
             "/integrations/bookings",
             model=IntegrationBooking,
             data_key="bookings",
+            options=options,
+        )
+
+    def list_community_apps(
+        self,
+        *,
+        limit: NotGivenOr[int] = NOT_GIVEN,
+        cursor: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> AsyncPaginator[CommunityApp]:
+        """List the community directory listings shown in discovery.
+
+        Featured apps come first, then the most installed (auto-paginating).
+
+        Args:
+            limit: Page size, 1 to 200 (default 100).
+            cursor: Resume from a previous page.
+
+        Requires the ``integrations`` API scope.
+        """
+        return self._get_api_list(
+            "/integrations/community",
+            model=CommunityApp,
+            query={"limit": limit, "cursor": cursor},
+            options=options,
+        )
+
+    async def get_community_app(
+        self, slug: str, *, options: RequestOptions | None = None
+    ) -> CommunityApp:
+        """Open a published community listing by its link, listed or not.
+
+        Requires the ``integrations`` API scope.
+        """
+        return await self._get(
+            f"/integrations/community/{slug}", cast_to=CommunityApp, options=options
+        )
+
+    async def rotate_inbound_url(
+        self, connection_id: str, *, options: RequestOptions | None = None
+    ) -> IntegrationInboundUrl:
+        """Mint a new inbound URL for a Calendly or Cal.com connection.
+
+        The previous URL stops working immediately, so update the provider's
+        webhook with the returned ``inbound_webhook_url``. Needs a paid plan.
+
+        Requires the manage-settings permission (API scope ``integrations``).
+        """
+        return await self._post(
+            f"/integrations/connections/{connection_id}/rotate-inbound-url",
+            cast_to=IntegrationInboundUrl,
+            options=options,
+        )
+
+    async def set_signing_key(
+        self,
+        connection_id: str,
+        *,
+        signing_key: str,
+        options: RequestOptions | None = None,
+    ) -> IntegrationConnectionDetail:
+        """Set the key a Calendly or Cal.com connection's deliveries are signed with.
+
+        Once set, deliveries must carry a valid signature as well as the URL
+        secret. Repeating the call with the same key converges. Needs a paid
+        plan. The returned detail populates only ``connection``.
+
+        Args:
+            connection_id: The connection to configure.
+            signing_key: The provider's signing key, 8 to 512 characters. An
+                empty string goes back to the URL secret alone.
+
+        Requires the manage-settings permission (API scope ``integrations``).
+        """
+        return await self._put(
+            f"/integrations/connections/{connection_id}/signing-key",
+            cast_to=IntegrationConnectionDetail,
+            body={"signing_key": signing_key},
             options=options,
         )

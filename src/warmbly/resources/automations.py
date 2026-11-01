@@ -120,6 +120,11 @@ class Automations(SyncAPIResource):
             graph: ``{"nodes": [...], "edges": [...]}``.
             enabled: Whether it runs immediately.
             filter: A predicate that gates the trigger.
+
+        Raises:
+            BadRequestError: The graph is invalid. An action node whose action
+                does not run on its selected integration is refused with the
+                error code ``action_provider_mismatch``.
         """
         return self._post(
             "/automations",
@@ -155,7 +160,13 @@ class Automations(SyncAPIResource):
         filter: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> Automation:
-        """Update an automation, or toggle it with *enabled*."""
+        """Update an automation, or toggle it with *enabled*.
+
+        Raises:
+            BadRequestError: The graph is invalid, including an action node
+                whose action does not run on its selected integration (error
+                code ``action_provider_mismatch``).
+        """
         return self._patch(
             f"/automations/{automation_id}",
             cast_to=Automation,
@@ -270,6 +281,11 @@ class AsyncAutomations(AsyncAPIResource):
             graph: ``{"nodes": [...], "edges": [...]}``.
             enabled: Whether it runs immediately.
             filter: A predicate that gates the trigger.
+
+        Raises:
+            BadRequestError: The graph is invalid. An action node whose action
+                does not run on its selected integration is refused with the
+                error code ``action_provider_mismatch``.
         """
         return await self._post(
             "/automations",
@@ -305,7 +321,13 @@ class AsyncAutomations(AsyncAPIResource):
         filter: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> Automation:
-        """Update an automation, or toggle it with *enabled*."""
+        """Update an automation, or toggle it with *enabled*.
+
+        Raises:
+            BadRequestError: The graph is invalid, including an action node
+                whose action does not run on its selected integration (error
+                code ``action_provider_mismatch``).
+        """
         return await self._patch(
             f"/automations/{automation_id}",
             cast_to=Automation,

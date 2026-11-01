@@ -49,6 +49,10 @@ class Form(BaseModel):
     codes; ``fields`` is the ordered block list, where the layout blocks
     (``heading``, ``paragraph``, ``divider``, ``page_break``) render but
     collect nothing. ``design`` is the theme the builder's Design panel edits.
+    ``redirect_url_active`` is ``False`` when ``redirect_url`` is not on one of
+    the workspace's own domains, in which case visitors see ``success_message``
+    instead. ``triage_enabled`` classifies each submission; junk is kept but
+    creates no contact.
     """
 
     id: str
@@ -61,10 +65,12 @@ class Form(BaseModel):
     design: dict[str, Any] | None = None
     success_message: str | None = None
     redirect_url: str | None = None
+    redirect_url_active: bool | None = None
     campaign_id: str | None = None
     category_ids: Sequence[str] = []
     allowed_domains: Sequence[str] = []
     captcha_enabled: bool | None = None
+    triage_enabled: bool | None = None
     logo_url: str | None = None
     cover_url: str | None = None
     background_url: str | None = None
@@ -91,11 +97,13 @@ class FormsConfig(BaseModel):
     """What this install can do, so a builder never offers an unusable toggle.
 
     ``captcha_available`` is ``False`` when no captcha provider is configured,
-    in which case ``captcha_enabled`` on a form has no effect.
+    in which case ``captcha_enabled`` on a form has no effect; likewise
+    ``triage_available`` and ``triage_enabled``.
     """
 
     base_url: str | None = None
     captcha_available: bool | None = None
+    triage_available: bool | None = None
 
 
 class FormsDomainStatus(BaseModel):
@@ -103,8 +111,9 @@ class FormsDomainStatus(BaseModel):
 
     ``cname_target`` is the value to point the CNAME at. ``status`` is stable
     and machine-readable: ``verified``, ``unset``, ``no_target``,
-    ``not_found``, ``wrong_target`` or ``lookup_error``; ``observed`` is what
-    DNS actually returned. Only a verified domain is used to build form URLs.
+    ``not_found``, ``wrong_target``, ``proof_missing`` or ``lookup_error``;
+    ``observed`` is what DNS actually returned. ``txt_name`` and ``txt_value``
+    are the ownership record a new verification needs beside the CNAME. Only a verified domain is used to build form URLs.
     """
 
     forms_domain: str | None = None
@@ -114,6 +123,8 @@ class FormsDomainStatus(BaseModel):
     status: str | None = None
     message: str | None = None
     observed: str | None = None
+    txt_name: str | None = None
+    txt_value: str | None = None
     forms_host_unresolvable: bool | None = None
 
 
@@ -121,7 +132,9 @@ class FormSubmission(BaseModel):
     """One submission, kept verbatim.
 
     ``data`` is keyed by field id: a checkbox group stores a list of strings,
-    every other block a single string. ``campaign_id`` names the campaign whose
+    every other block a single string. ``triage`` is the verdict (``buyer``,
+    ``vendor``, ``job_seeker``, ``other`` or ``junk``), empty when the form did
+    not triage, with the model's ``triage_confidence``. ``campaign_id`` names the campaign whose
     email carried the personalized link the visitor arrived through, if any.
     """
 
@@ -132,6 +145,8 @@ class FormSubmission(BaseModel):
     campaign_id: str | None = None
     data: dict[str, Any] = {}
     source_url: str | None = None
+    triage: str | None = None
+    triage_confidence: float | None = None
     contact_email: str | None = None
     contact_name: str | None = None
     campaign_name: str | None = None
@@ -210,6 +225,7 @@ def _form_body(
     category_ids: NotGivenOr[Sequence[str]],
     allowed_domains: NotGivenOr[Sequence[str]],
     captcha_enabled: NotGivenOr[bool],
+    triage_enabled: NotGivenOr[bool],
 ) -> dict[str, Any]:
     """Build the update body. Omitted fields keep their stored value."""
     return drop_not_given(
@@ -224,6 +240,7 @@ def _form_body(
             "category_ids": category_ids,
             "allowed_domains": allowed_domains,
             "captcha_enabled": captcha_enabled,
+            "triage_enabled": triage_enabled,
         }
     )
 
@@ -261,6 +278,7 @@ class Forms(SyncAPIResource):
         category_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         allowed_domains: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         captcha_enabled: NotGivenOr[bool] = NOT_GIVEN,
+        triage_enabled: NotGivenOr[bool] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> Form:
         """Update a form. Omitted fields keep their stored value.
@@ -282,6 +300,11 @@ class Forms(SyncAPIResource):
             category_ids: Categories to file new contacts under.
             allowed_domains: Domains the form may be embedded on.
             captcha_enabled: Require a captcha, where the install has one.
+            triage_enabled: Classify each submission; junk is kept but creates
+                no contact and joins no campaign. Needs ``triage_available``
+                on :meth:`config`.
+
+        Requires the manage-contacts permission (API scope ``write_contacts``).
         """
         return self._patch(
             f"/forms/{form_id}",
@@ -297,6 +320,7 @@ class Forms(SyncAPIResource):
                 category_ids=category_ids,
                 allowed_domains=allowed_domains,
                 captcha_enabled=captcha_enabled,
+                triage_enabled=triage_enabled,
             ),
             options=options,
         )
@@ -481,6 +505,7 @@ class AsyncForms(AsyncAPIResource):
         category_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         allowed_domains: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         captcha_enabled: NotGivenOr[bool] = NOT_GIVEN,
+        triage_enabled: NotGivenOr[bool] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> Form:
         """Update a form. Omitted fields keep their stored value.
@@ -502,6 +527,11 @@ class AsyncForms(AsyncAPIResource):
             category_ids: Categories to file new contacts under.
             allowed_domains: Domains the form may be embedded on.
             captcha_enabled: Require a captcha, where the install has one.
+            triage_enabled: Classify each submission; junk is kept but creates
+                no contact and joins no campaign. Needs ``triage_available``
+                on :meth:`config`.
+
+        Requires the manage-contacts permission (API scope ``write_contacts``).
         """
         return await self._patch(
             f"/forms/{form_id}",
@@ -517,6 +547,7 @@ class AsyncForms(AsyncAPIResource):
                 category_ids=category_ids,
                 allowed_domains=allowed_domains,
                 captcha_enabled=captcha_enabled,
+                triage_enabled=triage_enabled,
             ),
             options=options,
         )

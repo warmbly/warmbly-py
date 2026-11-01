@@ -27,6 +27,9 @@ from .._utils import drop_not_given
 
 __all__ = [
     "AsyncOAuthApplications",
+    "OAuthAppListing",
+    "OAuthAppListingDeleted",
+    "OAuthAppListingResult",
     "OAuthApplication",
     "OAuthApplicationDeleted",
     "OAuthApplicationLogo",
@@ -43,7 +46,12 @@ class OAuthApplication(BaseModel):
 
     ``is_public`` marks a PKCE-only client with no secret;
     ``dynamically_registered`` marks one created through RFC 7591 dynamic
-    client registration rather than the dashboard.
+    client registration rather than the dashboard. ``suspended_at`` and
+    ``suspended_reason`` are set when an operator has suspended the app; the
+    owner cannot lift that and writes to the app are refused while it holds.
+    ``logo_url`` can only be a logo uploaded through Warmbly
+    (:meth:`OAuthApplications.set_logo` or
+    :meth:`OAuthApplications.upload_logo`).
     """
 
     id: str
@@ -63,8 +71,51 @@ class OAuthApplication(BaseModel):
     status: str | None = None
     is_public: bool | None = None
     dynamically_registered: bool | None = None
+    suspended_at: str | None = None
+    suspended_reason: str | None = None
     created_at: str | None = None
     updated_at: str | None = None
+
+
+class OAuthAppListing(BaseModel):
+    """An application's page in the community directory.
+
+    ``status`` is ``published`` (reachable by its link, and listed in
+    discovery once enough workspaces use it), ``featured`` (picked by an
+    operator, always listed) or ``hidden`` (taken down by an operator).
+    ``status_note`` and ``status_at`` explain a moderation decision.
+    """
+
+    application_id: str | None = None
+    organization_id: str | None = None
+    slug: str | None = None
+    tagline: str | None = None
+    description: str | None = None
+    category: str | None = None
+    install_url: str | None = None
+    support_url: str | None = None
+    privacy_url: str | None = None
+    status: str | None = None
+    status_note: str | None = None
+    status_at: str | None = None
+    submitted_at: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+class OAuthAppListingResult(BaseModel):
+    """The envelope around a directory listing.
+
+    ``listing`` is ``None`` while the application is unpublished.
+    """
+
+    listing: OAuthAppListing | None = None
+
+
+class OAuthAppListingDeleted(BaseModel):
+    """The result of unpublishing an application's listing."""
+
+    deleted: bool | None = None
 
 
 class OAuthApplicationDeleted(BaseModel):
@@ -335,6 +386,123 @@ class OAuthApplications(SyncAPIResource):
             options=options,
         )
 
+    def get_listing(
+        self, application_id: str, *, options: RequestOptions | None = None
+    ) -> OAuthAppListingResult:
+        """Read the application's community directory listing.
+
+        Needs ``api_keys`` (the key-management permission) and a session or
+        API key, not an OAuth app token. ``listing`` is ``None`` while the
+        application is unpublished.
+        """
+        return self._get(
+            f"/oauth/applications/{application_id}/listing",
+            cast_to=OAuthAppListingResult,
+            options=options,
+        )
+
+    def put_listing(
+        self,
+        application_id: str,
+        *,
+        slug: NotGivenOr[str] = NOT_GIVEN,
+        tagline: NotGivenOr[str] = NOT_GIVEN,
+        description: NotGivenOr[str] = NOT_GIVEN,
+        category: NotGivenOr[str] = NOT_GIVEN,
+        install_url: NotGivenOr[str] = NOT_GIVEN,
+        support_url: NotGivenOr[str] = NOT_GIVEN,
+        privacy_url: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> OAuthAppListingResult:
+        """Publish or edit the application's directory listing.
+
+        Needs ``api_keys``. The call replaces the listing, so repeating it
+        converges. The server validates the fields (the slug is the listing's
+        link; the category is one of the directory categories such as
+        ``crm``, ``automation``, ``notifications``, ``meetings``, ``data``,
+        ``verification``, ``ai`` or ``other``).
+
+        Args:
+            application_id: The application id.
+            slug: The listing's link name.
+            tagline: A one-line summary.
+            description: The full description.
+            category: The directory category.
+            install_url: Where a workspace goes to set the app up.
+            support_url: Where users get help.
+            privacy_url: The privacy policy.
+        """
+        return self._put(
+            f"/oauth/applications/{application_id}/listing",
+            cast_to=OAuthAppListingResult,
+            body=drop_not_given(
+                {
+                    "slug": slug,
+                    "tagline": tagline,
+                    "description": description,
+                    "category": category,
+                    "install_url": install_url,
+                    "support_url": support_url,
+                    "privacy_url": privacy_url,
+                }
+            ),
+            options=options,
+        )
+
+    def delete_listing(
+        self, application_id: str, *, options: RequestOptions | None = None
+    ) -> OAuthAppListingDeleted:
+        """Unpublish the application's directory listing. Needs ``api_keys``."""
+        return self._delete(
+            f"/oauth/applications/{application_id}/listing",
+            cast_to=OAuthAppListingDeleted,
+            options=options,
+        )
+
+    def set_logo(
+        self,
+        application_id: str,
+        *,
+        file: bytes,
+        filename: str = "logo.png",
+        content_type: str = "image/png",
+        options: RequestOptions | None = None,
+    ) -> OAuthApplication:
+        """Upload an image and set it as the application's logo.
+
+        Needs ``api_keys``. The server re-encodes and stores the image and
+        sets ``logo_url`` on the application, deleting the previous image
+        once nothing points at it. Returns the updated application. PNG or
+        JPEG, at most 2 MB, between 32 and 1024 pixels on each side. Refused
+        while the application is suspended.
+
+        Args:
+            application_id: The application id.
+            file: The raw image bytes.
+            filename: The filename to send in the multipart part.
+            content_type: The image's MIME type.
+        """
+        return self._client.request(
+            cast_to=OAuthApplication,
+            method="POST",
+            path=f"/oauth/applications/{application_id}/logo",
+            files={"file": (filename, file, content_type)},
+            options=options,
+        )
+
+    def delete_logo(
+        self, application_id: str, *, options: RequestOptions | None = None
+    ) -> OAuthApplication:
+        """Remove the application's logo. Needs ``api_keys``.
+
+        Returns the updated application.
+        """
+        return self._delete(
+            f"/oauth/applications/{application_id}/logo",
+            cast_to=OAuthApplication,
+            options=options,
+        )
+
     def upload_logo(
         self,
         *,
@@ -345,6 +513,7 @@ class OAuthApplications(SyncAPIResource):
     ) -> OAuthApplicationLogo:
         """Upload an application logo and return its hosted URL.
 
+        PNG or JPEG, at most 2 MB, between 32 and 1024 pixels on each side.
         Sits outside ``/applications/{id}`` on purpose, so it can be called
         during registration, before an application id exists.
 
@@ -543,6 +712,123 @@ class AsyncOAuthApplications(AsyncAPIResource):
                 "limit": limit,
                 "cursor": cursor,
             },
+            options=options,
+        )
+
+    async def get_listing(
+        self, application_id: str, *, options: RequestOptions | None = None
+    ) -> OAuthAppListingResult:
+        """Read the application's community directory listing.
+
+        Needs ``api_keys`` (the key-management permission) and a session or
+        API key, not an OAuth app token. ``listing`` is ``None`` while the
+        application is unpublished.
+        """
+        return await self._get(
+            f"/oauth/applications/{application_id}/listing",
+            cast_to=OAuthAppListingResult,
+            options=options,
+        )
+
+    async def put_listing(
+        self,
+        application_id: str,
+        *,
+        slug: NotGivenOr[str] = NOT_GIVEN,
+        tagline: NotGivenOr[str] = NOT_GIVEN,
+        description: NotGivenOr[str] = NOT_GIVEN,
+        category: NotGivenOr[str] = NOT_GIVEN,
+        install_url: NotGivenOr[str] = NOT_GIVEN,
+        support_url: NotGivenOr[str] = NOT_GIVEN,
+        privacy_url: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> OAuthAppListingResult:
+        """Publish or edit the application's directory listing.
+
+        Needs ``api_keys``. The call replaces the listing, so repeating it
+        converges. The server validates the fields (the slug is the listing's
+        link; the category is one of the directory categories such as
+        ``crm``, ``automation``, ``notifications``, ``meetings``, ``data``,
+        ``verification``, ``ai`` or ``other``).
+
+        Args:
+            application_id: The application id.
+            slug: The listing's link name.
+            tagline: A one-line summary.
+            description: The full description.
+            category: The directory category.
+            install_url: Where a workspace goes to set the app up.
+            support_url: Where users get help.
+            privacy_url: The privacy policy.
+        """
+        return await self._put(
+            f"/oauth/applications/{application_id}/listing",
+            cast_to=OAuthAppListingResult,
+            body=drop_not_given(
+                {
+                    "slug": slug,
+                    "tagline": tagline,
+                    "description": description,
+                    "category": category,
+                    "install_url": install_url,
+                    "support_url": support_url,
+                    "privacy_url": privacy_url,
+                }
+            ),
+            options=options,
+        )
+
+    async def delete_listing(
+        self, application_id: str, *, options: RequestOptions | None = None
+    ) -> OAuthAppListingDeleted:
+        """Unpublish the application's directory listing. Needs ``api_keys``."""
+        return await self._delete(
+            f"/oauth/applications/{application_id}/listing",
+            cast_to=OAuthAppListingDeleted,
+            options=options,
+        )
+
+    async def set_logo(
+        self,
+        application_id: str,
+        *,
+        file: bytes,
+        filename: str = "logo.png",
+        content_type: str = "image/png",
+        options: RequestOptions | None = None,
+    ) -> OAuthApplication:
+        """Upload an image and set it as the application's logo.
+
+        Needs ``api_keys``. The server re-encodes and stores the image and
+        sets ``logo_url`` on the application, deleting the previous image
+        once nothing points at it. Returns the updated application. PNG or
+        JPEG, at most 2 MB, between 32 and 1024 pixels on each side. Refused
+        while the application is suspended.
+
+        Args:
+            application_id: The application id.
+            file: The raw image bytes.
+            filename: The filename to send in the multipart part.
+            content_type: The image's MIME type.
+        """
+        return await self._client.request(
+            cast_to=OAuthApplication,
+            method="POST",
+            path=f"/oauth/applications/{application_id}/logo",
+            files={"file": (filename, file, content_type)},
+            options=options,
+        )
+
+    async def delete_logo(
+        self, application_id: str, *, options: RequestOptions | None = None
+    ) -> OAuthApplication:
+        """Remove the application's logo. Needs ``api_keys``.
+
+        Returns the updated application.
+        """
+        return await self._delete(
+            f"/oauth/applications/{application_id}/logo",
+            cast_to=OAuthApplication,
             options=options,
         )
 

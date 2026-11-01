@@ -145,6 +145,7 @@ except APIStatusError as exc:
     print(exc.message)      # human-readable message from the error envelope
     print(exc.request_id)   # X-Request-Id header, quote this to support
     print(exc.code)         # machine-readable "code" from the body, if any
+    print(exc.reason)       # optional finer key some codes carry
     print(exc.body)         # parsed response body (dict, or raw text)
     print(exc.headers)      # response headers as a plain mapping
     print(str(exc))         # "[422] <message> (request_id: <id>)"
@@ -158,11 +159,34 @@ except APIStatusError as exc:
 | `.message` | `APIError` | Human-readable message (from `message`/`error` in the body). |
 | `.body` | `APIError` | Parsed JSON body (`dict`), or raw text, or `None`. |
 | `.code` | `APIError` | The `code` field from the error envelope, if present. |
+| `.reason` | `APIError` | The optional finer `reason` key some codes carry, if present. |
 | `.retry_after` | `RateLimitError` | Seconds to wait before retrying (`float \| None`). |
 
 The backend error envelope looks like `{"error", "message", "code",
 "request_id"}`; `.message` and `.code` are pulled from it automatically, and
 `.request_id` comes from the response header.
+
+### Branching on `code`
+
+Client logic should branch on `code`, not on the human-readable `message`.
+[`ErrorCode`][warmbly.ErrorCode] names the codes the API documents:
+
+```python
+from warmbly import ErrorCode, PermissionDeniedError
+
+try:
+    client.api_keys.create(name="ci", permissions=mask)
+except PermissionDeniedError as exc:
+    if exc.code == ErrorCode.API_KEY_PERMISSIONS_EXCEED_CALLER:
+        ...  # ask for fewer permissions than the caller holds
+```
+
+The API can add codes at any time. An unknown `code` or `reason` is still
+delivered as a plain string, so treat an unrecognized `reason` as the plain
+`code`. A request that repeats a query parameter, or sends `Authorization`,
+`X-Warmbly-Token`, `Idempotency-Key` or `Origin` twice, is answered `400` with
+`ErrorCode.DUPLICATE_QUERY_PARAMETER` or `ErrorCode.DUPLICATE_HEADER`; the SDK
+never does either.
 
 ## Rate limits and `retry_after`
 

@@ -46,6 +46,10 @@ for campaign in client.campaigns.list():
 
 ::: warmbly.resources.emails.Emails
 
+## Email images
+
+::: warmbly.resources.email_images.EmailImages
+
 ## Contacts
 
 ::: warmbly.resources.contacts.Contacts
@@ -74,6 +78,10 @@ for campaign in client.campaigns.list():
 
 ::: warmbly.resources.analytics.Analytics
 
+## Placement
+
+::: warmbly.resources.placement.Placement
+
 ## Advisor
 
 ::: warmbly.resources.advisor.Advisor
@@ -81,6 +89,24 @@ for campaign in client.campaigns.list():
 ## Integrations
 
 ::: warmbly.resources.integrations.Integrations
+
+### Apollo
+
+Reached as `client.integrations.apollo`.
+
+::: warmbly.resources.integration_apps.IntegrationApollo
+
+### Salesforce
+
+Reached as `client.integrations.salesforce`.
+
+::: warmbly.resources.integration_apps.IntegrationSalesforce
+
+### Clay
+
+Reached as `client.integrations.clay`.
+
+::: warmbly.resources.integration_apps.IntegrationClay
 
 ## Automations
 

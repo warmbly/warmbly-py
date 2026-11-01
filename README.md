@@ -111,10 +111,10 @@ from warmbly import AsyncGatewayClient
 
 
 async def main() -> None:
-    gateway = AsyncGatewayClient(token="wmbly_...")  # needs the realtime_subscribe scope
+    gateway = AsyncGatewayClient(token="wmbly_...")  # needs the realtime_subscribe scope; keys and OAuth tokens go in a header
 
     @gateway.on_event("CAMPAIGN_STARTED")
-    async def handle(payload: dict) -> None:
+    async def handle(topic: str, payload: dict) -> None:
         print("campaign started:", payload["campaign_id"])
 
     await gateway.connect()
@@ -208,7 +208,7 @@ Each API group hangs off the client as an attribute:
 | **Sending** | `campaigns`, `emails`, `templates`, `generation`, `outreach`, `deliverability`, `warmup_routing`, `suppressions` |
 | **Audience** | `contacts`, `segments`, `forms`, `folders`, `tags`, `categories` |
 | **Inbox & CRM** | `unibox`, `crm`, `meetings`, `automations`, `lead_sync` |
-| **Insight** | `analytics`, `advisor`, `audit_logs`, `tasks` |
+| **Insight** | `analytics`, `placement`, `advisor`, `audit_logs`, `tasks` |
 | **Platform** | `me`, `api_keys`, `oauth_applications`, `teams`, `webhooks`, `integrations`, `plans`, `timezones` |
 | **AI** | `ai_skills`, `ai_tools` |
 

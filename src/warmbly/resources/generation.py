@@ -74,10 +74,11 @@ class Generation(SyncAPIResource):
         """Rewrite a passage under an instruction. Charges AI credits.
 
         Args:
-            text: The passage to rewrite.
-            instruction: How to change it.
+            text: The passage to rewrite, up to 8,000 characters.
+            instruction: How to change it, up to 2,000 characters.
             context: The surrounding draft, so the rewrite fits its
-                neighbours.
+                neighbours (up to 8,000 characters). It is context only and
+                is not returned.
             tone: The voice to write in.
         """
         return self._post(
@@ -112,7 +113,9 @@ class Generation(SyncAPIResource):
             prompt: What the variable should produce.
             mode: ``"instant"`` for a straight completion, or ``"research"`` to
                 let the model gather context first (costs more).
-            contact_id: The contact to personalize for.
+            contact_id: The contact to personalize for. Reading the contact's
+                fields also needs the view-contacts permission (API scope
+                ``read_contacts``).
             tone: The voice to write in.
             web_search: Allow the model to search the web in research mode.
             context_before: The email text preceding the variable.
@@ -171,10 +174,11 @@ class AsyncGeneration(AsyncAPIResource):
         """Rewrite a passage under an instruction. Charges AI credits.
 
         Args:
-            text: The passage to rewrite.
-            instruction: How to change it.
+            text: The passage to rewrite, up to 8,000 characters.
+            instruction: How to change it, up to 2,000 characters.
             context: The surrounding draft, so the rewrite fits its
-                neighbours.
+                neighbours (up to 8,000 characters). It is context only and
+                is not returned.
             tone: The voice to write in.
         """
         return await self._post(
@@ -209,7 +213,9 @@ class AsyncGeneration(AsyncAPIResource):
             prompt: What the variable should produce.
             mode: ``"instant"`` for a straight completion, or ``"research"`` to
                 let the model gather context first (costs more).
-            contact_id: The contact to personalize for.
+            contact_id: The contact to personalize for. Reading the contact's
+                fields also needs the view-contacts permission (API scope
+                ``read_contacts``).
             tone: The voice to write in.
             web_search: Allow the model to search the web in research mode.
             context_before: The email text preceding the variable.
