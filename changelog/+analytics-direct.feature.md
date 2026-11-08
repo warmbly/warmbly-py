@@ -1,1 +1,0 @@
-Added `analytics.direct` for hand-written mail volume, replies and opt-in tracking, `analytics.inbox_tagging` (auto-paging) and `analytics.inbox_tagging_summary` for the automatic inbox-tagging review feed, and `analytics.warmup_placement` for where warmup mail landed.
