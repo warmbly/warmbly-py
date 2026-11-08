@@ -32,11 +32,13 @@ from .resources import (
     AITools,
     Analytics,
     ApiKeys,
+    Apollo,
     AsyncAdvisor,
     AsyncAISkills,
     AsyncAITools,
     AsyncAnalytics,
     AsyncApiKeys,
+    AsyncApollo,
     AsyncAuditLogs,
     AsyncAutomations,
     AsyncCampaigns,
@@ -44,11 +46,13 @@ from .resources import (
     AsyncContacts,
     AsyncCrm,
     AsyncDeliverability,
+    AsyncEmailImages,
     AsyncEmails,
     AsyncFolders,
     AsyncForms,
     AsyncGeneration,
     AsyncIntegrations,
+    AsyncLeads,
     AsyncLeadSync,
     AsyncMe,
     AsyncMeetings,
@@ -56,6 +60,7 @@ from .resources import (
     AsyncOutreach,
     AsyncPlacement,
     AsyncPlans,
+    AsyncSalesforce,
     AsyncSegments,
     AsyncSuppressions,
     AsyncTags,
@@ -73,11 +78,13 @@ from .resources import (
     Contacts,
     Crm,
     Deliverability,
+    EmailImages,
     Emails,
     Folders,
     Forms,
     Generation,
     Integrations,
+    Leads,
     LeadSync,
     Me,
     Meetings,
@@ -85,6 +92,7 @@ from .resources import (
     Outreach,
     Placement,
     Plans,
+    Salesforce,
     Segments,
     Suppressions,
     Tags,
@@ -286,6 +294,22 @@ class Warmbly(SyncAPIClient):
         return Suppressions(self)
 
     @cached_property
+    def apollo(self) -> Apollo:
+        return Apollo(self)
+
+    @cached_property
+    def salesforce(self) -> Salesforce:
+        return Salesforce(self)
+
+    @cached_property
+    def leads(self) -> Leads:
+        return Leads(self)
+
+    @cached_property
+    def email_images(self) -> EmailImages:
+        return EmailImages(self)
+
+    @cached_property
     def ai_tools(self) -> AITools:
         return AITools(self)
 
@@ -451,6 +475,22 @@ class AsyncWarmbly(AsyncAPIClient):
     @cached_property
     def suppressions(self) -> AsyncSuppressions:
         return AsyncSuppressions(self)
+
+    @cached_property
+    def apollo(self) -> AsyncApollo:
+        return AsyncApollo(self)
+
+    @cached_property
+    def salesforce(self) -> AsyncSalesforce:
+        return AsyncSalesforce(self)
+
+    @cached_property
+    def leads(self) -> AsyncLeads:
+        return AsyncLeads(self)
+
+    @cached_property
+    def email_images(self) -> AsyncEmailImages:
+        return AsyncEmailImages(self)
 
     @cached_property
     def ai_tools(self) -> AsyncAITools:

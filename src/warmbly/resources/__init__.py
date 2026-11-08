@@ -7,12 +7,14 @@ from .ai_skills import AISkills, AsyncAISkills
 from .ai_tools import AITools, AsyncAITools
 from .analytics import Analytics, AsyncAnalytics
 from .api_keys import ApiKeys, AsyncApiKeys
+from .apollo import Apollo, AsyncApollo
 from .audit_logs import AsyncAuditLogs, AuditLogs
 from .automations import AsyncAutomations, Automations
 from .campaigns import AsyncCampaigns, Campaigns
 from .contacts import AsyncContacts, Contacts
 from .crm import AsyncCrm, Crm
 from .deliverability import AsyncDeliverability, Deliverability
+from .email_images import AsyncEmailImages, EmailImages
 from .emails import AsyncEmails, Emails
 from .forms import AsyncForms, Forms
 from .generation import AsyncGeneration, Generation
@@ -29,11 +31,13 @@ from .groups import (
 from .identity import AsyncMe, Me
 from .integrations import AsyncIntegrations, Integrations
 from .lead_sync import AsyncLeadSync, LeadSync
+from .leads import AsyncLeads, Leads
 from .meetings import AsyncMeetings, Meetings
 from .oauth_applications import AsyncOAuthApplications, OAuthApplications
 from .outreach import AsyncOutreach, Outreach
 from .placement import AsyncPlacement, Placement
 from .plans import AsyncPlans, Plans
+from .salesforce import AsyncSalesforce, Salesforce
 from .segments import AsyncSegments, Segments
 from .suppressions import AsyncSuppressions, Suppressions
 from .tasks import AsyncTasks, Tasks
@@ -55,11 +59,13 @@ __all__ = [
     "Advisor",
     "Analytics",
     "ApiKeys",
+    "Apollo",
     "AsyncAISkills",
     "AsyncAITools",
     "AsyncAdvisor",
     "AsyncAnalytics",
     "AsyncApiKeys",
+    "AsyncApollo",
     "AsyncAuditLogs",
     "AsyncAutomations",
     "AsyncCampaigns",
@@ -67,6 +73,7 @@ __all__ = [
     "AsyncContacts",
     "AsyncCrm",
     "AsyncDeliverability",
+    "AsyncEmailImages",
     "AsyncEmails",
     "AsyncFolders",
     "AsyncForms",
@@ -74,12 +81,14 @@ __all__ = [
     "AsyncGroups",
     "AsyncIntegrations",
     "AsyncLeadSync",
+    "AsyncLeads",
     "AsyncMe",
     "AsyncMeetings",
     "AsyncOAuthApplications",
     "AsyncOutreach",
     "AsyncPlacement",
     "AsyncPlans",
+    "AsyncSalesforce",
     "AsyncSegments",
     "AsyncSuppressions",
     "AsyncTags",
@@ -97,6 +106,7 @@ __all__ = [
     "Contacts",
     "Crm",
     "Deliverability",
+    "EmailImages",
     "Emails",
     "Folders",
     "Forms",
@@ -104,12 +114,14 @@ __all__ = [
     "Groups",
     "Integrations",
     "LeadSync",
+    "Leads",
     "Me",
     "Meetings",
     "OAuthApplications",
     "Outreach",
     "Placement",
     "Plans",
+    "Salesforce",
     "Segments",
     "Suppressions",
     "Tags",

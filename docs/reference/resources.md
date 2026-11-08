@@ -58,9 +58,25 @@ for campaign in client.campaigns.list():
 
 ::: warmbly.resources.forms.Forms
 
+## Apollo
+
+::: warmbly.resources.apollo.Apollo
+
+## Salesforce
+
+::: warmbly.resources.salesforce.Salesforce
+
 ## Suppressions
 
 ::: warmbly.resources.suppressions.Suppressions
+
+## Leads
+
+::: warmbly.resources.leads.Leads
+
+## Email images
+
+::: warmbly.resources.email_images.EmailImages
 
 ## Unibox
 

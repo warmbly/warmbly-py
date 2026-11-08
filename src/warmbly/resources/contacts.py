@@ -21,6 +21,7 @@ from .._pagination import AsyncPaginator, SyncCursorPage
 from .._resource import AsyncAPIResource, SyncAPIResource
 from .._types import NOT_GIVEN, NotGiven, NotGivenOr, RequestOptions
 from .._utils import drop_not_given
+from .crm import CrmExternalRef
 from .salesforce import ContactSalesforcePanel
 
 __all__ = [
@@ -208,7 +209,10 @@ class CustomFieldKeys(BaseModel):
 
 
 class ContactNote(BaseModel):
-    """A note attached to a contact."""
+    """A note attached to a contact.
+
+    ``external`` is set when the note lives in a connected CRM.
+    """
 
     id: str
     contact_id: str | None = None
@@ -216,6 +220,7 @@ class ContactNote(BaseModel):
     user_id: str | None = None
     content: str | None = None
     user: dict[str, Any] | None = None
+    external: CrmExternalRef | None = None
     created_at: str | None = None
     updated_at: str | None = None
 
