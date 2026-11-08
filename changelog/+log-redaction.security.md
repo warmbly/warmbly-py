@@ -1,0 +1,1 @@
+- Redaction now covers `api_key`, `signing_key`, `auth_token` and `webhook_url` in debug request logs.

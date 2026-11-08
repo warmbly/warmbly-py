@@ -1,0 +1,1 @@
+The inbound webhook URL on integration connections and the signing secret returned by `connection_webhook_secret` are now left out of the model `repr`, so printing or logging a response no longer exposes them.

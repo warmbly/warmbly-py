@@ -503,7 +503,10 @@ def test_crm_bulk_tasks_sync(client: Warmbly) -> None:
     patch = respx.patch(f"{BASE_URL}/crm/tasks").mock(
         return_value=httpx.Response(200, json={"affected": 12})
     )
-    assert client.crm.bulk_update_tasks(tasks=["t1", "t2"], status="completed").affected == 12
+    assert (
+        client.crm.bulk_update_tasks(tasks=["t1", "t2"], status="completed").affected
+        == 12
+    )
     assert _body(patch) == {"tasks": ["t1", "t2"], "status": "completed"}
     client.crm.bulk_update_tasks(
         select_all=True,
