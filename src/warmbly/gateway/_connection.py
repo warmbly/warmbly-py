@@ -17,6 +17,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import math
 import random
 import sys
 import time
@@ -384,12 +385,15 @@ class AsyncGatewayClient:
             message = f"{message}: {reason}"
         if code in _BACKPRESSURE_CODES:
             ms = data.get("retry_after_ms")
-            return _RetryableRefusal(
-                message,
-                retry_after=float(ms) / 1000.0
-                if isinstance(ms, (int, float))
-                else None,
-            )
+            retry_after: float | None = None
+            if (
+                isinstance(ms, (int, float))
+                and not isinstance(ms, bool)
+                and math.isfinite(ms)
+                and ms > 0
+            ):
+                retry_after = float(ms) / 1000.0
+            return _RetryableRefusal(message, retry_after=retry_after)
         return FatalDisconnect(message, code=code)
 
     async def close(self) -> None:

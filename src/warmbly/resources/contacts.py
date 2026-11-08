@@ -1055,7 +1055,11 @@ class Contacts(SyncAPIResource):
             exclude: Contact ids to drop from a select-all.
         """
         body: Any
-        if isinstance(select_all, NotGiven) and isinstance(filters, NotGiven):
+        if (
+            isinstance(select_all, NotGiven)
+            and isinstance(filters, NotGiven)
+            and isinstance(exclude, NotGiven)
+        ):
             body = list(contact_ids or [])
         else:
             body = drop_not_given(
@@ -2010,7 +2014,11 @@ class AsyncContacts(AsyncAPIResource):
             exclude: Contact ids to drop from a select-all.
         """
         body: Any
-        if isinstance(select_all, NotGiven) and isinstance(filters, NotGiven):
+        if (
+            isinstance(select_all, NotGiven)
+            and isinstance(filters, NotGiven)
+            and isinstance(exclude, NotGiven)
+        ):
             body = list(contact_ids or [])
         else:
             body = drop_not_given(

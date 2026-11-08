@@ -636,6 +636,7 @@ class Placement(SyncAPIResource):
 
     def overview(
         self,
+        *,
         options: RequestOptions | None = None,
     ) -> PlacementOverviewEnvelope:
         """Get the seed panels the workspace can test on and its monthly allowance.
@@ -650,6 +651,7 @@ class Placement(SyncAPIResource):
 
     def coverage(
         self,
+        *,
         options: RequestOptions | None = None,
     ) -> PlacementCoverageEnvelope:
         """Report how much of the connected fleet delivered a test in the last 7 and 30 days.
@@ -1070,6 +1072,7 @@ class AsyncPlacement(AsyncAPIResource):
 
     async def overview(
         self,
+        *,
         options: RequestOptions | None = None,
     ) -> PlacementOverviewEnvelope:
         """Get the seed panels the workspace can test on and its monthly allowance.
@@ -1084,6 +1087,7 @@ class AsyncPlacement(AsyncAPIResource):
 
     async def coverage(
         self,
+        *,
         options: RequestOptions | None = None,
     ) -> PlacementCoverageEnvelope:
         """Report how much of the connected fleet delivered a test in the last 7 and 30 days.

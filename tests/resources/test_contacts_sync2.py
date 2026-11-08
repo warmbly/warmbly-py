@@ -531,6 +531,11 @@ def test_lookup_and_selection_sync(client: Warmbly) -> None:
         "filters": {"query": "x"},
         "exclude": ["c2"],
     }
+    client.contacts.bulk_delete(["c1", "c2"], exclude=["c2"])
+    assert json.loads(_last(delete).content) == {
+        "contacts": ["c1", "c2"],
+        "exclude": ["c2"],
+    }
     client.contacts.bulk_delete(["c1"], select_all=True)
     assert json.loads(_last(delete).content) == {"contacts": ["c1"], "all": True}
 

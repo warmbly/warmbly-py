@@ -319,6 +319,10 @@ def test_refusal_backpressure_variants() -> None:
     without = refusal(_status(b'{"code": 4007, "retry_after_ms": "soon"}'))
     assert isinstance(without, _RetryableRefusal)
     assert without.retry_after is None
+    for bad in ("true", "-5", "0", "NaN", "Infinity"):
+        hint = refusal(_status(b'{"code": 4007, "retry_after_ms": %s}' % bad.encode()))
+        assert isinstance(hint, _RetryableRefusal)
+        assert hint.retry_after is None
 
 
 # -- structured join errors --------------------------------------------------

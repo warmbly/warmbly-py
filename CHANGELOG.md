@@ -39,6 +39,10 @@ assembled from news fragments in `changelog/` by
 
 - `kind` on campaigns and `one_time` on the campaigns overview are retired: current servers no longer return them and ignore `kind` on create. The parameters are kept so existing calls keep working.
 
+### Fixed
+
+- Gateway `retry_after_ms` hints that are not positive finite numbers are ignored in favour of normal backoff, and `contacts.bulk_delete` now forwards `exclude` even without `select_all` or `filters`.
+
 ### Security
 
 - Debug request logs now redact `api_key`, `signing_key`, `auth_token` and `webhook_url` request fields.
