@@ -14,8 +14,10 @@ from typing import Literal
 
 __all__ = [
     "ALL_SCOPES",
+    "APP_GRANTABLE_SCOPES",
     "FULL_ACCESS_SCOPES",
     "READ_ONLY_SCOPES",
+    "ROLE_PERMISSIONS",
     "SCOPES",
     "Scope",
     "mask_to_scopes",
@@ -87,6 +89,42 @@ READ_ONLY_SCOPES: int = sum(
 
 FULL_ACCESS_SCOPES: int = ALL_SCOPES
 """The backend's ``full_access`` preset: every scope."""
+
+APP_GRANTABLE_SCOPES: int = ALL_SCOPES & ~SCOPES["api_keys"]
+"""Every scope an OAuth app may be granted. ``api_keys`` stays with people."""
+
+ROLE_PERMISSIONS: dict[str, tuple[str, ...]] = {
+    "read_emails": ("view_campaigns",),
+    "read_campaigns": ("view_campaigns",),
+    "read_contacts": ("view_contacts",),
+    "read_unibox": ("access_unibox",),
+    "read_analytics": ("view_analytics",),
+    "write_emails": ("manage_emails",),
+    "write_campaigns": ("manage_campaigns",),
+    "write_contacts": ("manage_contacts",),
+    "write_unibox": ("access_unibox",),
+    "bulk_contacts": ("manage_contacts",),
+    "bulk_campaigns": ("manage_campaigns",),
+    "realtime_subscribe": (),
+    "webhooks": ("manage_settings",),
+    "api_keys": ("manage_api_keys",),
+    "send_campaigns": ("send_campaigns",),
+    "read_templates": ("view_campaigns",),
+    "write_templates": ("manage_campaigns",),
+    "read_crm": ("view_contacts",),
+    "write_crm": ("manage_contacts",),
+    "read_audit_logs": ("view_analytics",),
+    "integrations": ("use_integrations",),
+    "warmup_routing": ("manage_settings",),
+    "ai_agent": ("use_ai",),
+    "ai_research": ("view_contacts", "use_ai"),
+}
+"""The team-role permissions a member needs to delegate each scope.
+
+A key or OAuth grant acts for a member, so it never holds a scope the member's
+role does not cover. An empty tuple means any member. The workspace owner
+covers every scope.
+"""
 
 
 def scopes_to_mask(names: Iterable[str]) -> int:

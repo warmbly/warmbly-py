@@ -1,0 +1,1 @@
+Add `ErrorCode` and `ErrorReason` constants for the documented API error codes and an `APIError.reason` attribute. Add `APP_GRANTABLE_SCOPES` and `ROLE_PERMISSIONS` scope helpers, and a `deprecated` flag on webhook event types.

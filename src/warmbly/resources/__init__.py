@@ -32,6 +32,7 @@ from .lead_sync import AsyncLeadSync, LeadSync
 from .meetings import AsyncMeetings, Meetings
 from .oauth_applications import AsyncOAuthApplications, OAuthApplications
 from .outreach import AsyncOutreach, Outreach
+from .placement import AsyncPlacement, Placement
 from .plans import AsyncPlans, Plans
 from .segments import AsyncSegments, Segments
 from .suppressions import AsyncSuppressions, Suppressions
@@ -77,6 +78,7 @@ __all__ = [
     "AsyncMeetings",
     "AsyncOAuthApplications",
     "AsyncOutreach",
+    "AsyncPlacement",
     "AsyncPlans",
     "AsyncSegments",
     "AsyncSuppressions",
@@ -106,6 +108,7 @@ __all__ = [
     "Meetings",
     "OAuthApplications",
     "Outreach",
+    "Placement",
     "Plans",
     "Segments",
     "Suppressions",

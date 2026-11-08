@@ -5,8 +5,10 @@ from __future__ import annotations
 from ._logs import logger, redact
 from ._scopes import (
     ALL_SCOPES,
+    APP_GRANTABLE_SCOPES,
     FULL_ACCESS_SCOPES,
     READ_ONLY_SCOPES,
+    ROLE_PERMISSIONS,
     SCOPES,
     Scope,
     mask_to_scopes,
@@ -16,8 +18,10 @@ from ._transform import drop_not_given
 
 __all__ = [
     "ALL_SCOPES",
+    "APP_GRANTABLE_SCOPES",
     "FULL_ACCESS_SCOPES",
     "READ_ONLY_SCOPES",
+    "ROLE_PERMISSIONS",
     "SCOPES",
     "Scope",
     "drop_not_given",

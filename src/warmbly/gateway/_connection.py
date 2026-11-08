@@ -85,6 +85,10 @@ _CLOSE_RATE_LIMITED = 4007
 _CLOSE_CONN_LIMIT = 4009
 _CLOSE_PERMISSION = 4010
 
+#: Handshake header carrying an API key or OAuth access token.
+_CREDENTIAL_HEADER = "X-Warmbly-Token"
+_HEADER_CREDENTIAL_PREFIXES = ("wmbly_", "wmat_")
+
 # Codes that must NOT be retried.
 _FATAL_CODES = frozenset(
     {_CLOSE_MISSING_TOKEN, _CLOSE_INVALID_TOKEN, _CLOSE_PERMISSION}
@@ -109,6 +113,14 @@ class TransientDisconnect(GatewayError):
 
     def __init__(self, message: str = "Gateway connection lost.") -> None:
         super().__init__(message)
+
+
+class _RetryableRefusal(TransientDisconnect):
+    """A refused handshake (rate limit, connection cap) worth retrying."""
+
+    def __init__(self, message: str, *, retry_after: float | None) -> None:
+        super().__init__(message)
+        self.retry_after = retry_after
 
 
 class FatalDisconnect(GatewayError):
@@ -159,8 +171,12 @@ class AsyncGatewayClient:
 
         Args:
             token: A bearer credential carrying the ``realtime_subscribe`` scope
-                (an API key, OAuth access token, or session JWT). It is sent in
-                the connect query string and is never logged.
+                (an API key, OAuth access token, or short-lived connection JWT).
+                API keys (``wmbly_``) and OAuth tokens (``wmat_``) are sent in
+                the ``X-Warmbly-Token`` handshake header, because the server
+                refuses them in the URL (close code 4003). A connection JWT goes
+                in the ``token`` query parameter, and is single use. The
+                credential is never logged.
             base_url: The gateway base URL. The ``/socket/websocket`` path and
                 version query are appended automatically.
             on_resume_failed: Optional callback invoked when the server reports a
@@ -311,17 +327,14 @@ class AsyncGatewayClient:
         try:
             ws = await connect(
                 url,
-                additional_headers={},
+                additional_headers=self._build_headers(),
                 user_agent_header="warmbly-py",
                 open_timeout=_OPEN_TIMEOUT,
                 max_size=_MAX_FRAME_SIZE,
                 logger=logger,
             )
         except InvalidStatus as exc:
-            code = exc.response.status_code
-            raise FatalDisconnect(
-                f"gateway refused the connection (HTTP {code})"
-            ) from exc
+            raise self._refusal(exc) from exc
         except (OSError, WebSocketException) as exc:
             raise GatewayError("could not connect to the gateway") from exc
         self._ws = ws
@@ -330,9 +343,54 @@ class AsyncGatewayClient:
         self._last_heartbeat_ack = now
         logger.debug("gateway connection opened")
 
+    def _uses_header_credential(self) -> bool:
+        return self._token.startswith(_HEADER_CREDENTIAL_PREFIXES)
+
+    def _build_headers(self) -> dict[str, str]:
+        if self._uses_header_credential():
+            return {_CREDENTIAL_HEADER: self._token}
+        return {}
+
     def _build_url(self) -> str:
+        base = f"{self._base_url}/socket/websocket"
+        if self._uses_header_credential():
+            return f"{base}?vsn=2.0.0"
         token = quote(self._token, safe="")
-        return f"{self._base_url}/socket/websocket?token={token}&vsn=2.0.0"
+        return f"{base}?token={token}&vsn=2.0.0"
+
+    @staticmethod
+    def _refusal(exc: InvalidStatus) -> GatewayError:
+        """Map a refused handshake to a fatal or retryable error.
+
+        The server answers a refused upgrade with HTTP 403 and a JSON body
+        ``{code, reason}`` (plus ``retry_after_ms`` when rate limited). Rate
+        limit and connection-cap refusals are retryable; the rest are fatal.
+        """
+        status = exc.response.status_code
+        message = f"gateway refused the connection (HTTP {status})"
+        body = exc.response.body
+        data: Any = None
+        if body:
+            try:
+                data = json.loads(body)
+            except ValueError:
+                data = None
+        if not isinstance(data, dict):
+            return FatalDisconnect(message)
+        raw_code = data.get("code")
+        code = raw_code if isinstance(raw_code, int) else None
+        reason = data.get("reason")
+        if isinstance(reason, str) and reason:
+            message = f"{message}: {reason}"
+        if code in _BACKPRESSURE_CODES:
+            ms = data.get("retry_after_ms")
+            return _RetryableRefusal(
+                message,
+                retry_after=float(ms) / 1000.0
+                if isinstance(ms, (int, float))
+                else None,
+            )
+        return FatalDisconnect(message, code=code)
 
     async def close(self) -> None:
         """Close the connection and stop reconnecting.
@@ -494,6 +552,8 @@ class AsyncGatewayClient:
                     self._fatal = exc
                     raise
                 except TransientDisconnect as exc:
+                    if isinstance(exc, _RetryableRefusal):
+                        self._retry_after = exc.retry_after
                     await self._sleep_backoff(exc)
                 except GatewayError as exc:
                     # e.g. the socket could not be (re)opened; retry with backoff.

@@ -145,6 +145,10 @@ bound to three route prefixes.
 
 ::: warmbly.resources.audit_logs.AuditLogs
 
+## Placement tests
+
+::: warmbly.resources.placement.Placement
+
 ## Plans
 
 ::: warmbly.resources.plans.Plans

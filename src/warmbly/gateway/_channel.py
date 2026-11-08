@@ -32,15 +32,26 @@ class GatewayPushError(GatewayError):
         topic: The topic the rejected push targeted.
         event: The event that was rejected.
         response: The server's error ``response`` object, when provided.
+        code: The coarse numeric class (for example 4010) of a structured join
+            refusal ``{code, reason}``, if present.
+        reason: The stable reason slug (``not_a_member``, ``campaign_not_found``,
+            ``rate_limited``, ``jwt_required``, ``admin_mfa_required``,
+            ``not_an_admin``, ...), if present.
     """
 
     topic: str
     event: str
     response: dict[str, Any]
+    code: int | None
+    reason: str | None
 
     def __init__(self, topic: str, event: str, response: dict[str, Any]) -> None:
         reason = response.get("reason") or response.get("error") or "error"
         super().__init__(f"gateway rejected {event!r} on {topic!r}: {reason}")
+        raw_code = response.get("code")
+        self.code = raw_code if isinstance(raw_code, int) else None
+        raw_reason = response.get("reason")
+        self.reason = raw_reason if isinstance(raw_reason, str) else None
         self.topic = topic
         self.event = event
         self.response = response

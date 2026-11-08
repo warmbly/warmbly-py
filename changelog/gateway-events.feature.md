@@ -1,0 +1,1 @@
+Gateway: add event constants for `WARMUP_PLACEMENT`, `WARMUP_ACTIVITY`, `PLACEMENT_TEST_UPDATED`, `MAILBOX_IMPORT_PROGRESS`, `CONTACT_IMPORT_PROGRESS`, `CRM_SYNCED`, `DIRECT_EMAIL_OPENED` and `DIRECT_EMAIL_CLICKED`, plus `EVENT_PERMISSIONS`, `intent_matches` and `normalize_event_type`. `GatewayPushError` now exposes the structured `code` and `reason` of a refused join.

@@ -21,19 +21,33 @@ from warmbly import AsyncGatewayClient, GatewayClient, GatewayEvent
 
 ## Authentication and the `realtime_subscribe` scope
 
-The gateway authenticates with a bearer credential passed as `token`: an API
-key, an OAuth2 access token, or a session JWT. **The credential must carry the
-`realtime_subscribe` scope.** The token is sent in the connection query string
-and is never logged.
+The gateway authenticates with a bearer credential: an API key, an OAuth2
+access token, or a short-lived connection JWT. **The credential must carry the
+`realtime_subscribe` scope.** API keys (`wmbly_...`) and OAuth tokens
+(`wmat_...`) are sent in the `X-Warmbly-Token` handshake header, because the
+server refuses them in the URL with code 4003. A connection JWT is sent in the
+`token` query parameter; it opens one socket and then expires, so mint a fresh
+one for every connection attempt. The SDK picks the right place from the
+credential prefix, and the credential is never logged.
+
+A key or token only reaches the workspace it was created in, and only the
+events its read scopes cover (for example `read_campaigns` for campaign
+pulses, `read_analytics` for placement tests). Team, billing and settings
+events never reach a key or token.
 
 ```python
 gateway = AsyncGatewayClient(token="wmbly_...")
 ```
 
 If the token is missing, invalid, or lacks the required scope, the gateway
-rejects the connection with a fatal close code and the client raises
-`FatalDisconnect` (see
-[Fatal vs. transient failures](#fatal-vs-transient-failures)).
+refuses the upgrade with HTTP 403 and a JSON body `{code, reason}`. The client
+raises `FatalDisconnect` with `code` and the server's `reason` in its message
+(see [Fatal vs. transient failures](#fatal-vs-transient-failures)). A rate
+limit (4007) or connection cap (4009) refusal is retried after `retry_after_ms`.
+
+A failed `subscribe()` raises `GatewayPushError`, whose `code` and `reason`
+attributes carry the structured refusal (for example `4010` and
+`not_a_member`).
 
 !!! note "Base URL"
     By default the client connects to `wss://realtime.warmbly.com`. Override it

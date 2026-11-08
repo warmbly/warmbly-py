@@ -39,12 +39,18 @@ from ._connection import (
     FatalDisconnect,
     TransientDisconnect,
 )
-from ._events import GatewayEvent
+from ._events import (
+    EVENT_PERMISSIONS,
+    GatewayEvent,
+    intent_matches,
+    normalize_event_type,
+)
 from ._phoenix import Frame, PhoenixCodec
 from ._sync import GatewayClient
 
 __all__ = [
     "DEFAULT_BASE_URL",
+    "EVENT_PERMISSIONS",
     "AsyncGatewayClient",
     "FatalDisconnect",
     "Frame",
@@ -54,4 +60,6 @@ __all__ = [
     "GatewayPushError",
     "PhoenixCodec",
     "TransientDisconnect",
+    "intent_matches",
+    "normalize_event_type",
 ]

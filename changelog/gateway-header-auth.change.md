@@ -1,0 +1,1 @@
+Gateway: API keys (`wmbly_`) and OAuth tokens (`wmat_`) are now sent in the `X-Warmbly-Token` handshake header instead of the URL, which the server now refuses. A refused handshake raises `FatalDisconnect` with the server's `code` and `reason`, and rate-limit or connection-cap refusals are retried.

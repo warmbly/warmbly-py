@@ -28,6 +28,14 @@ await gw.subscribe("org:org_123", intents=["CAMPAIGN"])
 await gw.run_forever()
 ```
 
+New event families are exposed as constants too, for example
+`GatewayEvent.PLACEMENT_TEST_UPDATED`, `MAILBOX_IMPORT_PROGRESS`,
+`CONTACT_IMPORT_PROGRESS`, `CRM_SYNCED`, `WARMUP_PLACEMENT` and
+`WARMUP_ACTIVITY`. Unknown event names are still delivered to `on_event`
+handlers. `EVENT_PERMISSIONS` maps an event to the workspace permission the
+server requires, and `intent_matches(event_type, intents)` mirrors the server's
+intent filter.
+
 ## AsyncGatewayClient
 
 ::: warmbly.AsyncGatewayClient
