@@ -68,6 +68,10 @@ def test_redact_leaves_non_token_strings_alone() -> None:
         "secret",
         "password",
         "token",
+        "api_key",
+        "signing_key",
+        "auth_token",
+        "webhook_url",
     ],
 )
 def test_redact_scrubs_sensitive_field_names(field: str) -> None:

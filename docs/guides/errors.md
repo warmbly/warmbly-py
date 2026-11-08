@@ -160,6 +160,13 @@ except APIStatusError as exc:
 | `.code` | `APIError` | The `code` field from the error envelope, if present. |
 | `.retry_after` | `RateLimitError` | Seconds to wait before retrying (`float \| None`). |
 
+| `.reason` | `APIError` | The optional finer `reason` key some codes carry, if present. |
+
+Named constants for the documented codes live on
+[`ErrorCode`][warmbly.ErrorCode] (for example
+`exc.code == ErrorCode.INSUFFICIENT_CREDITS`); the server may add codes at any
+time, so keep a fallback for unknown values.
+
 The backend error envelope looks like `{"error", "message", "code",
 "request_id"}`; `.message` and `.code` are pulled from it automatically, and
 `.request_id` comes from the response header.

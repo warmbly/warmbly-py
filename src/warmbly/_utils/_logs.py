@@ -42,6 +42,10 @@ _SENSITIVE_FIELDS = frozenset(
         "access_token",
         "secret",
         "password",
+        "api_key",
+        "signing_key",
+        "auth_token",
+        "webhook_url",
         "token",
     }
 )

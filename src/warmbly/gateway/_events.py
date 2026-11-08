@@ -14,10 +14,19 @@ task so a single misbehaving handler cannot stall the receive loop.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable
+import re
+from collections.abc import Awaitable, Callable, Iterable
 from typing import Any
 
-__all__ = ["EventDispatcher", "EventKey", "GatewayEvent", "Handler"]
+__all__ = [
+    "EVENT_PERMISSIONS",
+    "EventDispatcher",
+    "EventKey",
+    "GatewayEvent",
+    "Handler",
+    "intent_matches",
+    "normalize_event_type",
+]
 
 #: A user event handler. Receives the topic and the event payload.
 Handler = Callable[[str, dict[str, Any]], Awaitable[None]]
@@ -66,6 +75,10 @@ class GatewayEvent:
     EMAIL_RECEIVED = "EMAIL_RECEIVED"
     EMAIL_UPDATED = "EMAIL_UPDATED"
     EMAIL_DELETED = "EMAIL_DELETED"
+    #: A direct (non-campaign) email was opened. Gated on ``READ_ANALYTICS``.
+    DIRECT_EMAIL_OPENED = "DIRECT_EMAIL_OPENED"
+    #: A link in a direct (non-campaign) email was clicked.
+    DIRECT_EMAIL_CLICKED = "DIRECT_EMAIL_CLICKED"
 
     # Contact events.
     CONTACT_CREATED = "CONTACT_CREATED"
@@ -85,6 +98,31 @@ class GatewayEvent:
     ACCOUNT_HEALTH_CHANGED = "ACCOUNT_HEALTH_CHANGED"
     #: A mailbox's import progress or fair-use hold changed.
     ACCOUNT_SYNC_STATE = "ACCOUNT_SYNC_STATE"
+    #: A warmup partner found one of the workspace's warmup emails. ``status``
+    #: is ``inbox``, ``tabs``, ``spam``, or ``rescue_moved`` /
+    #: ``rescue_already_out`` / ``rescue_gone`` / ``rescue_failed``.
+    WARMUP_PLACEMENT = "WARMUP_PLACEMENT"
+    #: A workspace mailbox sent or received warmup mail (``email_account_id``).
+    WARMUP_ACTIVITY = "WARMUP_ACTIVITY"
+    #: A mailbox import moved. Carries ``org_id``, ``import_id`` and ``status``
+    #: (``running``, ``completed``, ``cancelled``); refetch the import. Needs
+    #: ``manage_emails``.
+    MAILBOX_IMPORT_PROGRESS = "MAILBOX_IMPORT_PROGRESS"
+
+    # Inbox placement tests.
+    #: A placement test or batch started, got a verdict, or finished. Carries
+    #: ``org_id``, ``status`` and ``test_id`` or ``batch_id`` (plus
+    #: ``campaign_id`` for a campaign-step test). Needs ``view_analytics``.
+    PLACEMENT_TEST_UPDATED = "PLACEMENT_TEST_UPDATED"
+
+    # Background contact import and CRM mirror.
+    #: A background contact import moved. Carries ``org_id``, ``import_id`` and
+    #: ``status`` (``queued``, ``running``, ``completed``, ``failed``,
+    #: ``cancelled``). Needs ``view_contacts``.
+    CONTACT_IMPORT_PROGRESS = "CONTACT_IMPORT_PROGRESS"
+    #: Mirrored CRM records changed. Carries ``org_id``, ``objects`` (list of
+    #: object names) and optionally ``contact_id``.
+    CRM_SYNCED = "CRM_SYNCED"
 
     # Bulk-operation events.
     BULK_STARTED = "BULK_STARTED"
@@ -126,6 +164,52 @@ class GatewayEvent:
     RATE_LIMITED = "rate_limited"
     RESUMED = "resumed"
     RESUME_FAILED = "resume_failed"
+
+
+#: Server-side permission needed to receive an event family on ``org:*``.
+#: Informational: the server enforces it, and a missing permission means the
+#: event is simply never delivered.
+EVENT_PERMISSIONS: dict[str, str] = {
+    GatewayEvent.AI_DRAFT_READY: "access_unibox",
+    GatewayEvent.EMAIL_RECEIVED: "access_unibox",
+    GatewayEvent.EMAIL_UPDATED: "access_unibox",
+    GatewayEvent.EMAIL_DELETED: "access_unibox",
+    GatewayEvent.PLACEMENT_TEST_UPDATED: "view_analytics",
+    GatewayEvent.DIRECT_EMAIL_OPENED: "view_analytics",
+    GatewayEvent.DIRECT_EMAIL_CLICKED: "view_analytics",
+    GatewayEvent.MAILBOX_IMPORT_PROGRESS: "manage_emails",
+    GatewayEvent.WARMUP_PLACEMENT: "manage_emails",
+    GatewayEvent.WARMUP_ACTIVITY: "manage_emails",
+    GatewayEvent.CONTACT_IMPORT_PROGRESS: "view_contacts",
+}
+
+_INTENT_SEPARATORS = re.compile(r"[.:\s-]+")
+
+
+def normalize_event_type(value: str) -> str:
+    """Normalize an event name the way the gateway does for intent matching.
+
+    Already-canonical names (``A-Z``, ``0-9``, ``_``) pass through unchanged;
+    anything else is upper-cased with ``.``, ``:``, whitespace and ``-`` runs
+    replaced by a single ``_``.
+    """
+    if re.fullmatch(r"[A-Z0-9_]*", value):
+        return value
+    return _INTENT_SEPARATORS.sub("_", value.upper())
+
+
+def intent_matches(event_type: str, intents: Iterable[str] | None) -> bool:
+    """Whether *event_type* passes an ``org:*`` intent filter.
+
+    No intents (``None`` or empty) forwards everything; otherwise the event
+    passes when its normalized name contains any normalized intent token.
+    Never raises for unknown event names.
+    """
+    tokens = [normalize_event_type(str(i)) for i in intents or ()]
+    if not tokens:
+        return True
+    name = normalize_event_type(event_type)
+    return any(t in name for t in tokens)
 
 
 class _Waiter:
