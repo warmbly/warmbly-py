@@ -28,12 +28,14 @@ from ._exceptions import WarmblyError
 from ._types import Timeout
 from .resources import (
     Advisor,
+    Agency,
     AISkills,
     AITools,
     Analytics,
     ApiKeys,
     Apollo,
     AsyncAdvisor,
+    AsyncAgency,
     AsyncAISkills,
     AsyncAITools,
     AsyncAnalytics,
@@ -56,10 +58,12 @@ from .resources import (
     AsyncLeadSync,
     AsyncMe,
     AsyncMeetings,
+    AsyncMigrations,
     AsyncOAuthApplications,
     AsyncOutreach,
     AsyncPlacement,
     AsyncPlans,
+    AsyncReports,
     AsyncSalesforce,
     AsyncSegments,
     AsyncSuppressions,
@@ -88,10 +92,12 @@ from .resources import (
     LeadSync,
     Me,
     Meetings,
+    Migrations,
     OAuthApplications,
     Outreach,
     Placement,
     Plans,
+    Reports,
     Salesforce,
     Segments,
     Suppressions,
@@ -294,6 +300,18 @@ class Warmbly(SyncAPIClient):
         return Suppressions(self)
 
     @cached_property
+    def migrations(self) -> Migrations:
+        return Migrations(self)
+
+    @cached_property
+    def reports(self) -> Reports:
+        return Reports(self)
+
+    @cached_property
+    def agency(self) -> Agency:
+        return Agency(self)
+
+    @cached_property
     def apollo(self) -> Apollo:
         return Apollo(self)
 
@@ -475,6 +493,18 @@ class AsyncWarmbly(AsyncAPIClient):
     @cached_property
     def suppressions(self) -> AsyncSuppressions:
         return AsyncSuppressions(self)
+
+    @cached_property
+    def migrations(self) -> AsyncMigrations:
+        return AsyncMigrations(self)
+
+    @cached_property
+    def reports(self) -> AsyncReports:
+        return AsyncReports(self)
+
+    @cached_property
+    def agency(self) -> AsyncAgency:
+        return AsyncAgency(self)
 
     @cached_property
     def apollo(self) -> AsyncApollo:

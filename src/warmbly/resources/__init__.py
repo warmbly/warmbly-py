@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .advisor import Advisor, AsyncAdvisor
+from .agency import Agency, AsyncAgency
 from .ai_skills import AISkills, AsyncAISkills
 from .ai_tools import AITools, AsyncAITools
 from .analytics import Analytics, AsyncAnalytics
@@ -33,10 +34,12 @@ from .integrations import AsyncIntegrations, Integrations
 from .lead_sync import AsyncLeadSync, LeadSync
 from .leads import AsyncLeads, Leads
 from .meetings import AsyncMeetings, Meetings
+from .migrations import AsyncMigrations, Migrations
 from .oauth_applications import AsyncOAuthApplications, OAuthApplications
 from .outreach import AsyncOutreach, Outreach
 from .placement import AsyncPlacement, Placement
 from .plans import AsyncPlans, Plans
+from .reports import AsyncReports, Reports
 from .salesforce import AsyncSalesforce, Salesforce
 from .segments import AsyncSegments, Segments
 from .suppressions import AsyncSuppressions, Suppressions
@@ -57,12 +60,14 @@ __all__ = [
     "AISkills",
     "AITools",
     "Advisor",
+    "Agency",
     "Analytics",
     "ApiKeys",
     "Apollo",
     "AsyncAISkills",
     "AsyncAITools",
     "AsyncAdvisor",
+    "AsyncAgency",
     "AsyncAnalytics",
     "AsyncApiKeys",
     "AsyncApollo",
@@ -84,10 +89,12 @@ __all__ = [
     "AsyncLeads",
     "AsyncMe",
     "AsyncMeetings",
+    "AsyncMigrations",
     "AsyncOAuthApplications",
     "AsyncOutreach",
     "AsyncPlacement",
     "AsyncPlans",
+    "AsyncReports",
     "AsyncSalesforce",
     "AsyncSegments",
     "AsyncSuppressions",
@@ -117,10 +124,12 @@ __all__ = [
     "Leads",
     "Me",
     "Meetings",
+    "Migrations",
     "OAuthApplications",
     "Outreach",
     "Placement",
     "Plans",
+    "Reports",
     "Salesforce",
     "Segments",
     "Suppressions",
