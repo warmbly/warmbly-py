@@ -1,4 +1,4 @@
-"""The ``crm`` resource: pipelines, deals, tasks, and task types.
+"""The ``crm`` resource: pipelines, deals, tasks, task types, and CRM mode.
 
 Maps to the ``/v1/crm`` route group. A pipeline owns ordered stages; a deal
 sits in exactly one stage; tasks hang off contacts and deals and carry a
@@ -8,6 +8,14 @@ Deals and tasks each expose three read paths: a cheap cursor ``list`` with a
 couple of filters, a faceted ``search`` that filters server-side across the
 whole organization, and a ``summary`` that aggregates over the *same* filter
 body so header totals are true sums rather than a reduce over one page.
+
+A workspace runs its CRM either on Warmbly's own or on a connected one
+(HubSpot, Pipedrive). The *CRM mode* methods (``settings``, ``metadata``,
+``owners``, ``sync``, ``backfill``, the provider-side contact record and the
+provider list import) only work once a provider is connected and chosen; in
+Warmbly's own CRM they answer ``409`` with the identifier ``crm_not_connected``.
+In provider mode, records read through the pipeline, deal, task and note
+methods carry an ``external`` reference to where they live.
 """
 
 from __future__ import annotations
@@ -18,12 +26,25 @@ from typing import Any
 from .._models import BaseModel
 from .._pagination import AsyncPaginator, SyncCursorPage
 from .._resource import AsyncAPIResource, SyncAPIResource
-from .._types import NOT_GIVEN, NotGivenOr, RequestOptions
+from .._types import NOT_GIVEN, NotGiven, NotGivenOr, RequestOptions
 from .._utils import drop_not_given
 
 __all__ = [
     "AsyncCrm",
     "Crm",
+    "CrmAccount",
+    "CrmAffected",
+    "CrmBackfillPreview",
+    "CrmBulkTasksResult",
+    "CrmContactView",
+    "CrmExternalRef",
+    "CrmImportPreview",
+    "CrmImportResult",
+    "CrmList",
+    "CrmMetadata",
+    "CrmOwner",
+    "CrmSettings",
+    "CrmSyncHealth",
     "CrmTask",
     "CrmTaskDeleted",
     "CrmTaskType",
@@ -41,8 +62,27 @@ __all__ = [
 ]
 
 
+class CrmExternalRef(BaseModel):
+    """Where a CRM record lives outside Warmbly.
+
+    Attached to deals, tasks, notes and pipelines read in provider mode.
+    ``provider`` is ``hubspot`` or ``pipedrive``; ``owner_name`` is the
+    provider-side owner when that owner is not a workspace member.
+    """
+
+    provider: str | None = None
+    external_id: str | None = None
+    url: str | None = None
+    synced_at: str | None = None
+    owner_name: str | None = None
+
+
 class PipelineStage(BaseModel):
-    """A stage within a pipeline."""
+    """A stage within a pipeline.
+
+    ``closed``, ``won`` and ``probability`` come from a connected CRM's stage
+    metadata and are absent for Warmbly's own stages.
+    """
 
     id: str
     pipeline_id: str | None = None
@@ -50,6 +90,9 @@ class PipelineStage(BaseModel):
     color: str | None = None
     position: int | None = None
     deal_count: int | None = None
+    closed: bool | None = None
+    won: bool | None = None
+    probability: float | None = None
     created_at: str | None = None
     updated_at: str | None = None
 
@@ -62,6 +105,7 @@ class Pipeline(BaseModel):
     name: str | None = None
     position: int | None = None
     stages: Sequence[PipelineStage] = []
+    external: CrmExternalRef | None = None
     created_at: str | None = None
     updated_at: str | None = None
 
@@ -106,6 +150,7 @@ class Deal(BaseModel):
     source_mailbox_id: str | None = None
     contact: dict[str, Any] | None = None
     stage: PipelineStage | None = None
+    external: CrmExternalRef | None = None
     created_at: str | None = None
     updated_at: str | None = None
 
@@ -188,6 +233,7 @@ class CrmTask(BaseModel):
     type: str | None = None
     status: str | None = None
     completed_at: str | None = None
+    external: CrmExternalRef | None = None
     created_at: str | None = None
     updated_at: str | None = None
 
@@ -216,6 +262,189 @@ class TasksSummary(BaseModel):
     cancelled_count: int | None = None
     overdue_count: int | None = None
     high_priority_count: int | None = None
+
+
+class CrmAccount(BaseModel):
+    """The connected provider account.
+
+    ``app_url`` is the provider's web app root for "Open in" links.
+    ``missing_scopes`` lists permissions the connection lacks for full mode,
+    in which case a reconnect is needed.
+    """
+
+    external_id: str | None = None
+    name: str | None = None
+    app_url: str | None = None
+    status: str | None = None
+    health: str | None = None
+    missing_scopes: Sequence[str] = []
+
+
+class CrmSettings(BaseModel):
+    """The workspace's CRM mode.
+
+    ``provider`` is ``native``, ``hubspot`` or ``pipedrive``. ``config`` holds
+    the setup choices: ``activity`` (which events are written to the
+    provider's timeline), ``create_contacts``, ``create_companies``,
+    ``write_properties``, ``positive_reply``, ``exit_rules``, ``guards``,
+    ``deal_pipelines``, ``display_properties``, ``field_map``,
+    ``field_direction`` and ``for``.
+    """
+
+    organization_id: str | None = None
+    provider: str | None = None
+    connection_id: str | None = None
+    config: dict[str, Any] | None = None
+    setup_completed_at: str | None = None
+    updated_at: str | None = None
+    account: CrmAccount | None = None
+
+
+class CrmMetadata(BaseModel):
+    """The provider vocabulary the pickers render.
+
+    ``lifecycle_stages``, ``lead_statuses``, ``task_types`` and ``pipelines``
+    are ``{value, label}`` options; ``properties`` are ``{name, label, type,
+    group_name, read_only}`` entries.
+    """
+
+    lifecycle_stages: Sequence[dict[str, Any]] = []
+    lead_statuses: Sequence[dict[str, Any]] = []
+    task_types: Sequence[dict[str, Any]] = []
+    properties: Sequence[dict[str, Any]] = []
+    pipelines: Sequence[dict[str, Any]] = []
+
+
+class CrmOwner(BaseModel):
+    """A provider user who can own records, and the member they map to.
+
+    ``user_pinned`` is ``True`` when a member chose the match by hand rather
+    than the server matching on address.
+    """
+
+    external_id: str
+    email: str | None = None
+    first_name: str | None = None
+    last_name: str | None = None
+    user_id: str | None = None
+    user_pinned: bool | None = None
+    archived: bool | None = None
+
+
+class CrmSyncHealth(BaseModel):
+    """The sync health panel: counts, failures and freshness.
+
+    ``cursors`` reports each incremental pull (``object_type``,
+    ``cursor_at``, ``last_run_at``, ``last_error``), ``failures`` the failed
+    sync jobs, and ``counts`` how much provider data is mirrored
+    (``contacts``, ``deals``, ``tasks``, ``pipelines``, ``owners``).
+    """
+
+    pending: int | None = None
+    failed: int | None = None
+    done_24h: int | None = None
+    last_synced_at: str | None = None
+    cursors: Sequence[dict[str, Any]] = []
+    failures: Sequence[dict[str, Any]] = []
+    counts: dict[str, Any] | None = None
+
+
+class CrmAffected(BaseModel):
+    """How many sync jobs a retry or discard touched."""
+
+    affected: int | None = None
+
+
+class CrmContactView(BaseModel):
+    """The provider side of a contact.
+
+    ``linked`` is whether the contact exists in the provider yet. ``owner`` is
+    a :class:`CrmOwner`-shaped dict; ``lifecycle_stage`` and ``lead_status``
+    are ``{value, label}``; ``company`` is ``{external_id, name, domain,
+    url}``; ``properties`` are the displayed ``{name, label, value}`` entries.
+    """
+
+    provider: str | None = None
+    linked: bool | None = None
+    external_id: str | None = None
+    url: str | None = None
+    owner: dict[str, Any] | None = None
+    lifecycle_stage: dict[str, Any] | None = None
+    lead_status: dict[str, Any] | None = None
+    company: dict[str, Any] | None = None
+    opted_out: bool | None = None
+    properties: Sequence[dict[str, Any]] = []
+    synced_at: str | None = None
+
+
+class CrmList(BaseModel):
+    """A provider contact list Warmbly can import from."""
+
+    external_id: str
+    name: str | None = None
+    size: int | None = None
+    dynamic: bool | None = None
+    updated_at: str | None = None
+
+
+class CrmImportPreview(BaseModel):
+    """Who a list import would bring in and who it skips.
+
+    ``skipped`` is ``{reason, label, count}`` entries, ``sample`` is
+    ``{email, first_name, last_name, company}`` rows, and ``truncated`` is set
+    when the list is larger than one import takes.
+    """
+
+    list_name: str | None = None
+    total: int | None = None
+    included: int | None = None
+    skipped: Sequence[dict[str, Any]] = []
+    sample: Sequence[dict[str, Any]] = []
+    truncated: bool | None = None
+
+
+class CrmImportResult(BaseModel):
+    """The contact import draft a list import produced.
+
+    Finish it with the background-import methods on
+    :class:`~warmbly.resources.contacts.Contacts` (``retrieve_import``,
+    ``analyze_import``, ``start_import``).
+    """
+
+    import_id: str | None = None
+    preview: CrmImportPreview | None = None
+
+
+class CrmBackfillPreview(BaseModel):
+    """What a backfill would copy into the provider."""
+
+    deals: int | None = None
+    tasks: int | None = None
+    notes: int | None = None
+
+
+class CrmBulkTasksResult(BaseModel):
+    """How many tasks a bulk action touched."""
+
+    affected: int | None = None
+
+
+def _task_selection(
+    *,
+    tasks: NotGivenOr[Sequence[str]],
+    select_all: NotGivenOr[bool],
+    filters: NotGivenOr[Mapping[str, Any]],
+    exclude: NotGivenOr[Sequence[str]],
+) -> dict[str, Any]:
+    """Build the selection fields shared by the bulk task actions."""
+    return drop_not_given(
+        {
+            "tasks": NOT_GIVEN if isinstance(tasks, NotGiven) else list(tasks),
+            "all": select_all,
+            "filters": filters,
+            "exclude": NOT_GIVEN if isinstance(exclude, NotGiven) else list(exclude),
+        }
+    )
 
 
 def _deal_filter(
@@ -949,6 +1178,381 @@ class Crm(SyncAPIResource):
             options=options,
         )
 
+    # -- CRM mode (HubSpot, Pipedrive) ---------------------------------------
+    def settings(self, *, options: RequestOptions | None = None) -> CrmSettings:
+        """Read the workspace's CRM mode and the connected account.
+
+        Permissions: ``READ_CRM``.
+        """
+        return self._get("/crm/settings", cast_to=CrmSettings, options=options)
+
+    def update_settings(
+        self,
+        *,
+        provider: NotGivenOr[str] = NOT_GIVEN,
+        connection_id: NotGivenOr[str] = NOT_GIVEN,
+        config: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        complete_setup: NotGivenOr[bool] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> CrmSettings:
+        """Switch the CRM and store the setup choices.
+
+        Permissions: ``INTEGRATIONS``.
+
+        Args:
+            provider: ``"native"``, ``"hubspot"`` or ``"pipedrive"``.
+            connection_id: The integration connection the provider runs on.
+            config: The setup choices (see :class:`CrmSettings`).
+            complete_setup: Stamp the setup wizard as finished.
+        """
+        return self._put(
+            "/crm/settings",
+            cast_to=CrmSettings,
+            body=drop_not_given(
+                {
+                    "provider": provider,
+                    "connection_id": connection_id,
+                    "config": NOT_GIVEN
+                    if isinstance(config, NotGiven)
+                    else dict(config),
+                    "complete_setup": complete_setup,
+                }
+            ),
+            options=options,
+        )
+
+    def metadata(self, *, options: RequestOptions | None = None) -> CrmMetadata:
+        """Read the provider's lifecycle stages, lead statuses, task types,
+        contact properties and pipelines.
+
+        Permissions: ``READ_CRM``.
+        """
+        return self._get("/crm/metadata", cast_to=CrmMetadata, options=options)
+
+    def list_owners(
+        self, *, options: RequestOptions | None = None
+    ) -> SyncCursorPage[CrmOwner]:
+        """List the provider's owners and the member each maps to.
+
+        Returned in full, unpaginated. Permissions: ``READ_CRM``.
+        """
+        return self._get_api_list("/crm/owners", model=CrmOwner, options=options)
+
+    def map_owner(
+        self,
+        external_id: str,
+        *,
+        user_id: str | None,
+        options: RequestOptions | None = None,
+    ) -> None:
+        """Pin a provider owner to a workspace member (``204``).
+
+        Permissions: ``INTEGRATIONS``.
+
+        Args:
+            external_id: The provider's owner id.
+            user_id: The member to pin, or ``None`` to clear the match.
+        """
+        return self._put(
+            f"/crm/owners/{external_id}",
+            cast_to=type(None),
+            body={"user_id": user_id},
+            options=options,
+        )
+
+    def sync_health(self, *, options: RequestOptions | None = None) -> CrmSyncHealth:
+        """Report what is waiting, what failed and when each pull ran.
+
+        Permissions: ``READ_CRM``.
+        """
+        return self._get("/crm/sync", cast_to=CrmSyncHealth, options=options)
+
+    def sync_now(self, *, options: RequestOptions | None = None) -> None:
+        """Start a full pull from the provider (``202``, no body).
+
+        Permissions: ``INTEGRATIONS``.
+        """
+        return self._post("/crm/sync", cast_to=type(None), options=options)
+
+    def retry_sync_failures(
+        self,
+        *,
+        ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> CrmAffected:
+        """Requeue failed sync jobs: all of them, or the *ids* given (max 500).
+
+        Requeueing a requeued job changes nothing. Permissions:
+        ``INTEGRATIONS``.
+        """
+        return self._post(
+            "/crm/sync/retry",
+            cast_to=CrmAffected,
+            body=drop_not_given(
+                {"ids": NOT_GIVEN if isinstance(ids, NotGiven) else list(ids)}
+            ),
+            options=options,
+        )
+
+    def discard_sync_failures(
+        self,
+        *,
+        ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> CrmAffected:
+        """Drop failed sync jobs: all of them, or the *ids* given (max 500).
+
+        Permissions: ``INTEGRATIONS``.
+        """
+        return self._post(
+            "/crm/sync/discard",
+            cast_to=CrmAffected,
+            body=drop_not_given(
+                {"ids": NOT_GIVEN if isinstance(ids, NotGiven) else list(ids)}
+            ),
+            options=options,
+        )
+
+    def backfill_preview(
+        self, *, options: RequestOptions | None = None
+    ) -> CrmBackfillPreview:
+        """Count the Warmbly-only records a switch would copy.
+
+        Permissions: ``INTEGRATIONS``.
+        """
+        return self._get("/crm/backfill", cast_to=CrmBackfillPreview, options=options)
+
+    def start_backfill(
+        self,
+        *,
+        deals: NotGivenOr[bool] = NOT_GIVEN,
+        tasks: NotGivenOr[bool] = NOT_GIVEN,
+        notes: NotGivenOr[bool] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> None:
+        """Copy Warmbly's own deals, tasks and notes into the provider once
+        (``202``, no body).
+
+        A second call while one runs is folded into it, and copied records are
+        never copied twice. Permissions: ``INTEGRATIONS``.
+        """
+        return self._post(
+            "/crm/backfill",
+            cast_to=type(None),
+            body=drop_not_given({"deals": deals, "tasks": tasks, "notes": notes}),
+            options=options,
+        )
+
+    def retrieve_contact(
+        self, contact_id: str, *, options: RequestOptions | None = None
+    ) -> CrmContactView:
+        """Read the provider side of a contact: owner, lifecycle stage, lead
+        status, company and the chosen properties.
+
+        Permissions: ``READ_CRM``.
+        """
+        return self._get(
+            f"/crm/contacts/{contact_id}", cast_to=CrmContactView, options=options
+        )
+
+    def refresh_contact(
+        self, contact_id: str, *, options: RequestOptions | None = None
+    ) -> CrmContactView:
+        """Pull a contact's provider record, deals, tasks and notes now.
+
+        Debounced per contact, so it is safe to call whenever a panel opens.
+        Permissions: ``READ_CRM``.
+        """
+        return self._post(
+            f"/crm/contacts/{contact_id}/refresh",
+            cast_to=CrmContactView,
+            options=options,
+        )
+
+    def link_contact(
+        self, contact_id: str, *, options: RequestOptions | None = None
+    ) -> CrmContactView:
+        """Find or create the contact in the provider.
+
+        Permissions: ``WRITE_CRM``.
+        """
+        return self._post(
+            f"/crm/contacts/{contact_id}/link",
+            cast_to=CrmContactView,
+            options=options,
+        )
+
+    def update_contact(
+        self,
+        contact_id: str,
+        *,
+        owner_external_id: NotGivenOr[str] = NOT_GIVEN,
+        lifecycle_stage: NotGivenOr[str] = NOT_GIVEN,
+        lead_status: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> CrmContactView:
+        """Edit a contact's owner, lifecycle stage or lead status in place.
+
+        Each value is at most 100 characters. Permissions: ``WRITE_CRM``.
+        """
+        return self._patch(
+            f"/crm/contacts/{contact_id}",
+            cast_to=CrmContactView,
+            body=drop_not_given(
+                {
+                    "owner_external_id": owner_external_id,
+                    "lifecycle_stage": lifecycle_stage,
+                    "lead_status": lead_status,
+                }
+            ),
+            options=options,
+        )
+
+    def list_lists(
+        self,
+        *,
+        q: NotGivenOr[str] = NOT_GIVEN,
+        limit: NotGivenOr[int] = NOT_GIVEN,
+        cursor: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> SyncCursorPage[CrmList]:
+        """List the provider's contact lists for import (auto-paginating).
+
+        Permissions: ``READ_CRM``.
+
+        Args:
+            q: Filter by name (at most 200 characters).
+            limit: Page size, 1 to 100 (default 25).
+            cursor: An opaque cursor from a previous page.
+        """
+        return self._get_api_list(
+            "/crm/lists",
+            model=CrmList,
+            query={"q": q, "limit": limit, "cursor": cursor},
+            options=options,
+        )
+
+    def preview_list_import(
+        self,
+        *,
+        list_id: str,
+        apply_guards: NotGivenOr[bool] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> CrmImportPreview:
+        """Count who a list import brings in and who it skips. Writes nothing.
+
+        Permissions: ``WRITE_CONTACTS``.
+
+        Args:
+            list_id: The provider list (at most 64 characters).
+            apply_guards: Drop contacts the workspace's enrolment guards
+                exclude.
+        """
+        return self._post(
+            "/crm/lists/preview",
+            cast_to=CrmImportPreview,
+            body=drop_not_given({"list_id": list_id, "apply_guards": apply_guards}),
+            options=options,
+        )
+
+    def import_list(
+        self,
+        *,
+        list_id: str,
+        apply_guards: NotGivenOr[bool] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> CrmImportResult:
+        """Turn a provider list into a contact import draft (``201``).
+
+        The draft is finished in the regular import flow, see
+        :class:`CrmImportResult`. Permissions: ``WRITE_CONTACTS``.
+
+        Args:
+            list_id: The provider list (at most 64 characters).
+            apply_guards: Drop contacts the workspace's enrolment guards
+                exclude.
+        """
+        return self._post(
+            "/crm/lists/import",
+            cast_to=CrmImportResult,
+            body=drop_not_given({"list_id": list_id, "apply_guards": apply_guards}),
+            options=options,
+        )
+
+    # -- bulk task actions ---------------------------------------------------
+    def bulk_update_tasks(
+        self,
+        *,
+        tasks: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        select_all: NotGivenOr[bool] = NOT_GIVEN,
+        filters: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        exclude: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        status: NotGivenOr[str] = NOT_GIVEN,
+        priority: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> CrmBulkTasksResult:
+        """Write one status or priority onto a whole selection of tasks.
+
+        Name the tasks by id, or by a search with *select_all* (up to 50000).
+        The response carries the count, not the rows. At least one of
+        *status* and *priority* is required. Permissions: ``WRITE_CRM``.
+
+        Args:
+            tasks: The task ids.
+            select_all: Switch the selection from *tasks* to *filters*.
+            filters: The same body :meth:`search_tasks` takes.
+            exclude: Task ids to drop from a select-all.
+            status: ``pending``, ``in_progress``, ``completed`` or
+                ``cancelled``.
+            priority: ``low``, ``medium``, ``high`` or ``urgent``.
+        """
+        return self._patch(
+            "/crm/tasks",
+            cast_to=CrmBulkTasksResult,
+            body={
+                **_task_selection(
+                    tasks=tasks, select_all=select_all, filters=filters, exclude=exclude
+                ),
+                **drop_not_given({"status": status, "priority": priority}),
+            },
+            options=options,
+        )
+
+    def bulk_delete_tasks(
+        self,
+        task_ids: Sequence[str] | None = None,
+        *,
+        select_all: NotGivenOr[bool] = NOT_GIVEN,
+        filters: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        exclude: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> CrmBulkTasksResult:
+        """Delete a whole selection of tasks.
+
+        Name the tasks by id (sent as a plain array), or by a search with
+        *select_all* (up to 50000). The response carries the count.
+        Permissions: ``WRITE_CRM``.
+
+        Args:
+            task_ids: The task ids.
+            select_all: Switch the selection from ids to *filters*.
+            filters: The same body :meth:`search_tasks` takes.
+            exclude: Task ids to drop from a select-all.
+        """
+        body: Any
+        if isinstance(select_all, NotGiven) and isinstance(filters, NotGiven):
+            body = list(task_ids or [])
+        else:
+            body = _task_selection(
+                tasks=list(task_ids or []),
+                select_all=select_all,
+                filters=filters,
+                exclude=exclude,
+            )
+        return self._delete(
+            "/crm/tasks", cast_to=CrmBulkTasksResult, body=body, options=options
+        )
+
 
 class AsyncCrm(AsyncAPIResource):
     """Asynchronous ``crm`` resource (pipelines, deals, tasks, task types)."""
@@ -1545,4 +2149,383 @@ class AsyncCrm(AsyncAPIResource):
                 reverse=NOT_GIVEN,
             ),
             options=options,
+        )
+
+    # -- CRM mode (HubSpot, Pipedrive) ---------------------------------------
+    async def settings(self, *, options: RequestOptions | None = None) -> CrmSettings:
+        """Read the workspace's CRM mode and the connected account.
+
+        Permissions: ``READ_CRM``.
+        """
+        return await self._get("/crm/settings", cast_to=CrmSettings, options=options)
+
+    async def update_settings(
+        self,
+        *,
+        provider: NotGivenOr[str] = NOT_GIVEN,
+        connection_id: NotGivenOr[str] = NOT_GIVEN,
+        config: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        complete_setup: NotGivenOr[bool] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> CrmSettings:
+        """Switch the CRM and store the setup choices.
+
+        Permissions: ``INTEGRATIONS``.
+
+        Args:
+            provider: ``"native"``, ``"hubspot"`` or ``"pipedrive"``.
+            connection_id: The integration connection the provider runs on.
+            config: The setup choices (see :class:`CrmSettings`).
+            complete_setup: Stamp the setup wizard as finished.
+        """
+        return await self._put(
+            "/crm/settings",
+            cast_to=CrmSettings,
+            body=drop_not_given(
+                {
+                    "provider": provider,
+                    "connection_id": connection_id,
+                    "config": NOT_GIVEN
+                    if isinstance(config, NotGiven)
+                    else dict(config),
+                    "complete_setup": complete_setup,
+                }
+            ),
+            options=options,
+        )
+
+    async def metadata(self, *, options: RequestOptions | None = None) -> CrmMetadata:
+        """Read the provider's lifecycle stages, lead statuses, task types,
+        contact properties and pipelines.
+
+        Permissions: ``READ_CRM``.
+        """
+        return await self._get("/crm/metadata", cast_to=CrmMetadata, options=options)
+
+    def list_owners(
+        self, *, options: RequestOptions | None = None
+    ) -> AsyncPaginator[CrmOwner]:
+        """List the provider's owners and the member each maps to.
+
+        Returned in full, unpaginated. Permissions: ``READ_CRM``.
+        """
+        return self._get_api_list("/crm/owners", model=CrmOwner, options=options)
+
+    async def map_owner(
+        self,
+        external_id: str,
+        *,
+        user_id: str | None,
+        options: RequestOptions | None = None,
+    ) -> None:
+        """Pin a provider owner to a workspace member (``204``).
+
+        Permissions: ``INTEGRATIONS``.
+
+        Args:
+            external_id: The provider's owner id.
+            user_id: The member to pin, or ``None`` to clear the match.
+        """
+        return await self._put(
+            f"/crm/owners/{external_id}",
+            cast_to=type(None),
+            body={"user_id": user_id},
+            options=options,
+        )
+
+    async def sync_health(
+        self, *, options: RequestOptions | None = None
+    ) -> CrmSyncHealth:
+        """Report what is waiting, what failed and when each pull ran.
+
+        Permissions: ``READ_CRM``.
+        """
+        return await self._get("/crm/sync", cast_to=CrmSyncHealth, options=options)
+
+    async def sync_now(self, *, options: RequestOptions | None = None) -> None:
+        """Start a full pull from the provider (``202``, no body).
+
+        Permissions: ``INTEGRATIONS``.
+        """
+        return await self._post("/crm/sync", cast_to=type(None), options=options)
+
+    async def retry_sync_failures(
+        self,
+        *,
+        ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> CrmAffected:
+        """Requeue failed sync jobs: all of them, or the *ids* given (max 500).
+
+        Requeueing a requeued job changes nothing. Permissions:
+        ``INTEGRATIONS``.
+        """
+        return await self._post(
+            "/crm/sync/retry",
+            cast_to=CrmAffected,
+            body=drop_not_given(
+                {"ids": NOT_GIVEN if isinstance(ids, NotGiven) else list(ids)}
+            ),
+            options=options,
+        )
+
+    async def discard_sync_failures(
+        self,
+        *,
+        ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> CrmAffected:
+        """Drop failed sync jobs: all of them, or the *ids* given (max 500).
+
+        Permissions: ``INTEGRATIONS``.
+        """
+        return await self._post(
+            "/crm/sync/discard",
+            cast_to=CrmAffected,
+            body=drop_not_given(
+                {"ids": NOT_GIVEN if isinstance(ids, NotGiven) else list(ids)}
+            ),
+            options=options,
+        )
+
+    async def backfill_preview(
+        self, *, options: RequestOptions | None = None
+    ) -> CrmBackfillPreview:
+        """Count the Warmbly-only records a switch would copy.
+
+        Permissions: ``INTEGRATIONS``.
+        """
+        return await self._get(
+            "/crm/backfill", cast_to=CrmBackfillPreview, options=options
+        )
+
+    async def start_backfill(
+        self,
+        *,
+        deals: NotGivenOr[bool] = NOT_GIVEN,
+        tasks: NotGivenOr[bool] = NOT_GIVEN,
+        notes: NotGivenOr[bool] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> None:
+        """Copy Warmbly's own deals, tasks and notes into the provider once
+        (``202``, no body).
+
+        A second call while one runs is folded into it, and copied records are
+        never copied twice. Permissions: ``INTEGRATIONS``.
+        """
+        return await self._post(
+            "/crm/backfill",
+            cast_to=type(None),
+            body=drop_not_given({"deals": deals, "tasks": tasks, "notes": notes}),
+            options=options,
+        )
+
+    async def retrieve_contact(
+        self, contact_id: str, *, options: RequestOptions | None = None
+    ) -> CrmContactView:
+        """Read the provider side of a contact: owner, lifecycle stage, lead
+        status, company and the chosen properties.
+
+        Permissions: ``READ_CRM``.
+        """
+        return await self._get(
+            f"/crm/contacts/{contact_id}", cast_to=CrmContactView, options=options
+        )
+
+    async def refresh_contact(
+        self, contact_id: str, *, options: RequestOptions | None = None
+    ) -> CrmContactView:
+        """Pull a contact's provider record, deals, tasks and notes now.
+
+        Debounced per contact, so it is safe to call whenever a panel opens.
+        Permissions: ``READ_CRM``.
+        """
+        return await self._post(
+            f"/crm/contacts/{contact_id}/refresh",
+            cast_to=CrmContactView,
+            options=options,
+        )
+
+    async def link_contact(
+        self, contact_id: str, *, options: RequestOptions | None = None
+    ) -> CrmContactView:
+        """Find or create the contact in the provider.
+
+        Permissions: ``WRITE_CRM``.
+        """
+        return await self._post(
+            f"/crm/contacts/{contact_id}/link",
+            cast_to=CrmContactView,
+            options=options,
+        )
+
+    async def update_contact(
+        self,
+        contact_id: str,
+        *,
+        owner_external_id: NotGivenOr[str] = NOT_GIVEN,
+        lifecycle_stage: NotGivenOr[str] = NOT_GIVEN,
+        lead_status: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> CrmContactView:
+        """Edit a contact's owner, lifecycle stage or lead status in place.
+
+        Each value is at most 100 characters. Permissions: ``WRITE_CRM``.
+        """
+        return await self._patch(
+            f"/crm/contacts/{contact_id}",
+            cast_to=CrmContactView,
+            body=drop_not_given(
+                {
+                    "owner_external_id": owner_external_id,
+                    "lifecycle_stage": lifecycle_stage,
+                    "lead_status": lead_status,
+                }
+            ),
+            options=options,
+        )
+
+    def list_lists(
+        self,
+        *,
+        q: NotGivenOr[str] = NOT_GIVEN,
+        limit: NotGivenOr[int] = NOT_GIVEN,
+        cursor: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> AsyncPaginator[CrmList]:
+        """List the provider's contact lists for import (auto-paginating).
+
+        Permissions: ``READ_CRM``.
+
+        Args:
+            q: Filter by name (at most 200 characters).
+            limit: Page size, 1 to 100 (default 25).
+            cursor: An opaque cursor from a previous page.
+        """
+        return self._get_api_list(
+            "/crm/lists",
+            model=CrmList,
+            query={"q": q, "limit": limit, "cursor": cursor},
+            options=options,
+        )
+
+    async def preview_list_import(
+        self,
+        *,
+        list_id: str,
+        apply_guards: NotGivenOr[bool] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> CrmImportPreview:
+        """Count who a list import brings in and who it skips. Writes nothing.
+
+        Permissions: ``WRITE_CONTACTS``.
+
+        Args:
+            list_id: The provider list (at most 64 characters).
+            apply_guards: Drop contacts the workspace's enrolment guards
+                exclude.
+        """
+        return await self._post(
+            "/crm/lists/preview",
+            cast_to=CrmImportPreview,
+            body=drop_not_given({"list_id": list_id, "apply_guards": apply_guards}),
+            options=options,
+        )
+
+    async def import_list(
+        self,
+        *,
+        list_id: str,
+        apply_guards: NotGivenOr[bool] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> CrmImportResult:
+        """Turn a provider list into a contact import draft (``201``).
+
+        The draft is finished in the regular import flow, see
+        :class:`CrmImportResult`. Permissions: ``WRITE_CONTACTS``.
+
+        Args:
+            list_id: The provider list (at most 64 characters).
+            apply_guards: Drop contacts the workspace's enrolment guards
+                exclude.
+        """
+        return await self._post(
+            "/crm/lists/import",
+            cast_to=CrmImportResult,
+            body=drop_not_given({"list_id": list_id, "apply_guards": apply_guards}),
+            options=options,
+        )
+
+    # -- bulk task actions ---------------------------------------------------
+    async def bulk_update_tasks(
+        self,
+        *,
+        tasks: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        select_all: NotGivenOr[bool] = NOT_GIVEN,
+        filters: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        exclude: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        status: NotGivenOr[str] = NOT_GIVEN,
+        priority: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> CrmBulkTasksResult:
+        """Write one status or priority onto a whole selection of tasks.
+
+        Name the tasks by id, or by a search with *select_all* (up to 50000).
+        The response carries the count, not the rows. At least one of
+        *status* and *priority* is required. Permissions: ``WRITE_CRM``.
+
+        Args:
+            tasks: The task ids.
+            select_all: Switch the selection from *tasks* to *filters*.
+            filters: The same body :meth:`search_tasks` takes.
+            exclude: Task ids to drop from a select-all.
+            status: ``pending``, ``in_progress``, ``completed`` or
+                ``cancelled``.
+            priority: ``low``, ``medium``, ``high`` or ``urgent``.
+        """
+        return await self._patch(
+            "/crm/tasks",
+            cast_to=CrmBulkTasksResult,
+            body={
+                **_task_selection(
+                    tasks=tasks, select_all=select_all, filters=filters, exclude=exclude
+                ),
+                **drop_not_given({"status": status, "priority": priority}),
+            },
+            options=options,
+        )
+
+    async def bulk_delete_tasks(
+        self,
+        task_ids: Sequence[str] | None = None,
+        *,
+        select_all: NotGivenOr[bool] = NOT_GIVEN,
+        filters: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        exclude: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> CrmBulkTasksResult:
+        """Delete a whole selection of tasks.
+
+        Name the tasks by id (sent as a plain array), or by a search with
+        *select_all* (up to 50000). The response carries the count.
+        Permissions: ``WRITE_CRM``.
+
+        Args:
+            task_ids: The task ids.
+            select_all: Switch the selection from ids to *filters*.
+            filters: The same body :meth:`search_tasks` takes.
+            exclude: Task ids to drop from a select-all.
+        """
+        body: Any
+        if isinstance(select_all, NotGiven) and isinstance(filters, NotGiven):
+            body = list(task_ids or [])
+        else:
+            body = _task_selection(
+                tasks=list(task_ids or []),
+                select_all=select_all,
+                filters=filters,
+                exclude=exclude,
+            )
+        return await self._delete(
+            "/crm/tasks", cast_to=CrmBulkTasksResult, body=body, options=options
         )

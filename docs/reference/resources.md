@@ -58,9 +58,25 @@ for campaign in client.campaigns.list():
 
 ::: warmbly.resources.forms.Forms
 
+## Apollo
+
+::: warmbly.resources.apollo.Apollo
+
+## Salesforce
+
+::: warmbly.resources.salesforce.Salesforce
+
 ## Suppressions
 
 ::: warmbly.resources.suppressions.Suppressions
+
+## Leads
+
+::: warmbly.resources.leads.Leads
+
+## Email images
+
+::: warmbly.resources.email_images.EmailImages
 
 ## Unibox
 
@@ -144,6 +160,22 @@ bound to three route prefixes.
 ## Audit logs
 
 ::: warmbly.resources.audit_logs.AuditLogs
+
+## Client reports
+
+::: warmbly.resources.reports.Reports
+
+## Migrations
+
+::: warmbly.resources.migrations.Migrations
+
+## Agency
+
+::: warmbly.resources.agency.Agency
+
+## Placement tests
+
+::: warmbly.resources.placement.Placement
 
 ## Plans
 

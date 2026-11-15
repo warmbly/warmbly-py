@@ -7,15 +7,20 @@ configuration, warmup control (start/pause/resume/stop, ban status, appeals),
 deliverability auth checks, address verification, bulk tagging, and sending a
 one-off email from an account.
 
-Connecting a *new* mailbox is a session-only onboarding flow
-(``/v1/emails/onboarding/*``) that writes user-encrypted secrets, so it is not
-reachable with an API key or OAuth token and is deliberately absent here.
+Connecting a *new* mailbox through the dashboard's onboarding flow
+(``/v1/emails/onboarding/*``) is session-only and absent here. Partnership plan
+workspaces can instead connect mailboxes with the connect API
+(:meth:`Emails.connect_smtp_imap`, :meth:`Emails.connect_oauth`, sign-in links
+and their own OAuth apps), which needs the ``CONNECT_EMAILS`` permission. Client
+connect links let a client connect mailboxes without an account.
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from typing import Any
+from collections.abc import Mapping, Sequence
+from typing import Any, cast
+
+from pydantic import Field
 
 from .._models import BaseModel
 from .._pagination import AsyncPaginator, SyncCursorPage
@@ -25,23 +30,48 @@ from .._utils import drop_not_given
 
 __all__ = [
     "AsyncEmails",
+    "BulkMailboxResponse",
+    "BulkMailboxResult",
     "BulkTagResult",
+    "ClientConnectLink",
+    "ClientConnectLinkCreated",
+    "ClientConnectLinkUse",
+    "ClientConnectLinkUses",
     "EmailAccount",
     "EmailAccountDeleted",
     "EmailAuthCheck",
+    "EmailDirectTracking",
     "EmailSendResult",
     "EmailVerification",
     "Emails",
+    "MailCertificate",
     "MailboxAllowance",
+    "MailboxCertificates",
+    "MailboxConnectBulkResult",
+    "MailboxConnectLink",
+    "MailboxConnectRow",
+    "MailboxConnectSummary",
+    "MailboxConnectWarmup",
+    "MailboxConnected",
+    "MailboxOAuthApp",
+    "MailboxOAuthApps",
+    "MailboxServerCertificate",
     "MailboxSync",
+    "MailboxSyncFolder",
     "MailboxSyncPolicy",
+    "MailboxSyncSettings",
     "MailboxSyncState",
+    "SendAsIdentity",
+    "SendIdentity",
     "SendLifecycleState",
+    "SendPauseInfo",
+    "SendPauseRelease",
     "SendingBehavior",
     "SendingBehaviorPlan",
     "TrackingDomainStatus",
     "WarmupAppeal",
     "WarmupBanStatus",
+    "WarmupFilterTag",
 ]
 
 
@@ -50,6 +80,18 @@ class EmailAccount(BaseModel):
 
     ``warmup`` is the timestamp warmup was started at, or ``None`` when warmup
     is off — not a boolean.
+
+    ``provider`` is ``gmail``, ``outlook`` or ``smtp_imap``; ``mail_host``
+    names who hosts the mailbox (``google_workspace``, ``microsoft365``, ...)
+    and ``auth_method`` how it signs in (``password``, ``app_password``,
+    ``oauth`` or ``delegated``), both empty until known. ``send_as_email`` is
+    the verified provider alias the mailbox sends from, empty for its own
+    address. ``test_mode`` is ``legacy``, ``diagnostic`` or ``off``.
+    ``warmup_placement`` is ``folder``, ``inbox`` or ``archive``; a
+    ``warmup_retention_days`` of ``0`` means the instance setting. When
+    ``relay_folder_moves`` is on, filing a conversation in the unibox moves it
+    in the mailbox too. ``track_direct_mail`` opts hand-written unibox sends
+    into open and click tracking.
     """
 
     id: str
@@ -64,12 +106,26 @@ class EmailAccount(BaseModel):
     signature_html: str | None = None
     signature_sync: bool | None = None
     signature_code: bool | None = None
+    send_as_email: str | None = None
+    mail_host: str | None = None
+    auth_method: str | None = None
+    domain_grant_id: str | None = None
+    vendor_connection_id: str | None = None
+    vendor: str | None = None
+    avatar_url: str | None = None
+    last_id: int | None = None
     campaign_limit: int | None = None
+    test_mode: str | None = None
+    test_send_enabled: bool | None = None
+    test_receive_enabled: bool | None = None
+    shared_daily_limit: int | None = None
+    rolling_recipient_limit: int | None = None
     min_wait_time: int | None = None
     reply_to: str | None = None
     tracking_domain: str | None = None
     tracking_domain_verified: bool | None = None
     tracking_domain_verified_at: str | None = None
+    track_direct_mail: bool | None = None
     auth_state: str | None = None
     auth_spf: bool | None = None
     auth_dkim: bool | None = None
@@ -90,7 +146,11 @@ class EmailAccount(BaseModel):
     warmup_start_time: str | None = None
     warmup_end_time: str | None = None
     warmup_days: int | None = None
+    warmup_placement: str | None = None
+    warmup_folder: str | None = None
+    warmup_retention_days: int | None = None
     timezone: str | None = None
+    relay_folder_moves: bool | None = None
     tags: Sequence[str] = []
     last_synced_at: str | None = None
     created_at: str | None = None
@@ -109,10 +169,11 @@ class TrackingDomainStatus(BaseModel):
 
     ``cname_target`` is the host this install expects the CNAME to point at.
     ``status`` is stable and machine-readable — ``verified``, ``unset``,
-    ``no_target``, ``not_found``, ``wrong_target``, ``lookup_error``, or
-    ``pending`` when the value is stored state rather than a fresh lookup —
+    ``no_target``, ``not_found``, ``wrong_target``, ``proof_missing``,
+    ``lookup_error``, or ``pending`` when the value is stored state rather than a fresh lookup —
     and ``observed`` is what DNS actually returned, so a customer can spot
-    their own typo. ``tracking_host_unresolvable`` means the record is right
+    their own typo. ``txt_name`` and ``txt_value`` are the ownership record a
+    new verification needs beside the CNAME. ``tracking_host_unresolvable`` means the record is right
     but this install's own tracking host does not resolve, which is an
     operator problem rather than a customer one.
     """
@@ -121,6 +182,8 @@ class TrackingDomainStatus(BaseModel):
     tracking_domain_verified: bool | None = None
     tracking_domain_verified_at: str | None = None
     cname_target: str | None = None
+    txt_name: str | None = None
+    txt_value: str | None = None
     status: str | None = None
     message: str | None = None
     observed: str | None = None
@@ -243,6 +306,9 @@ class MailboxSyncState(BaseModel):
     throttled_until: str | None = None
     throttle_reason: str | None = None
     deferred: int | None = None
+    folders_skipped_cap: int | None = None
+    folders_skipped_conflict: int | None = None
+    folder_coverage_observed_at: str | None = None
     last_synced_at: str | None = None
 
 
@@ -257,16 +323,175 @@ class MailboxSyncPolicy(BaseModel):
     backfill_messages: int | None = None
     daily_messages: int | None = None
     org_daily_messages: int | None = None
+    skip_folders: Sequence[str] = []
+
+
+class MailboxSyncFolder(BaseModel):
+    """One folder the sync has seen on the server.
+
+    ``name`` is what to use in ``skip_folders``; ``folder`` is the canonical
+    folder it files under, which tells the special ones (that cannot be
+    skipped) apart.
+    """
+
+    name: str | None = None
+    folder: str | None = None
 
 
 class MailboxSync(BaseModel):
     """Where a mailbox's import stands, and the budget it runs under.
 
-    ``state`` is ``None`` until the worker has reported once.
+    ``state`` is ``None`` until the worker has reported once. ``skip_folders``
+    is the stored list of folders the sync leaves alone, and ``folders`` is
+    what the worker last listed on the server, INBOX first (empty for Gmail
+    and Outlook, which have no IMAP folder list).
     """
 
     state: MailboxSyncState | None = None
     policy: MailboxSyncPolicy | None = None
+    skip_folders: Sequence[str] = []
+    folders: Sequence[MailboxSyncFolder] = []
+
+
+class MailboxSyncSettings(BaseModel):
+    """The folder skip list as stored after :meth:`Emails.update_sync`."""
+
+    skip_folders: Sequence[str] = []
+
+
+class MailCertificate(BaseModel):
+    """The certificate a mail server presented.
+
+    ``fingerprint`` is the SHA-256 of the leaf's public key, lowercase hex.
+    ``not_after`` is the expiry (RFC 3339). ``trusted`` is set when the chain
+    also passes CA and host name verification.
+    """
+
+    fingerprint: str | None = None
+    subject: str | None = None
+    issuer: str | None = None
+    not_after: str | None = None
+    self_signed: bool | None = None
+    trusted: bool | None = None
+
+
+class MailboxServerCertificate(BaseModel):
+    """One server's certificate policy on a mailbox.
+
+    ``tls_unverified`` means the server is trusted on its own certificate,
+    pinned by ``tls_pin``, rather than through a certificate authority.
+    ``observed`` is what the server presented on a check, absent on a read.
+    """
+
+    host: str | None = None
+    port: int | None = None
+    tls_unverified: bool | None = None
+    tls_pin: str | None = None
+    observed: MailCertificate | None = None
+
+
+class MailboxCertificates(BaseModel):
+    """An SMTP/IMAP mailbox's certificate policy, per server."""
+
+    smtp: MailboxServerCertificate | None = None
+    imap: MailboxServerCertificate | None = None
+
+
+class SendAsIdentity(BaseModel):
+    """One address the provider has verified a mailbox to send as.
+
+    ``is_primary`` marks the mailbox's own address, ``is_default`` the one the
+    provider composes from by default. Sending as an unverified alias is
+    refused by the provider, so those are offered but never selectable.
+    """
+
+    email: str | None = None
+    name: str | None = None
+    is_primary: bool | None = None
+    is_default: bool | None = None
+    verified: bool | None = None
+
+
+class SendIdentity(BaseModel):
+    """A mailbox's sending identity.
+
+    ``supported`` is ``False`` for providers that cannot be asked (only Gmail
+    exposes send-as identities and a stored signature), with an empty
+    ``identities`` list. ``send_as_email`` is empty when the mailbox sends as
+    ``mailbox_email``. ``signature_source`` is ``manual`` (written in Warmbly)
+    or ``provider`` (imported).
+    """
+
+    supported: bool | None = None
+    provider: str | None = None
+    mailbox_email: str | None = None
+    send_as_email: str | None = None
+    identities: Sequence[SendAsIdentity] = []
+    synced_at: str | None = None
+    signature_source: str | None = None
+    signature_imported_at: str | None = None
+
+
+class SendPauseInfo(BaseModel):
+    """Why a provider stopped a mailbox sending, and when it starts again.
+
+    ``reason`` is ``rate_limited``, ``daily_limit``, ``sender_blocked`` or
+    ``retry`` for a timed pause that ends at ``until``, or ``domain_auth``,
+    ``permanent`` or ``authentication`` for a hold (``held`` is ``True``) that
+    Warmbly retries at ``retry_at``; it is empty for a timed pause an earlier
+    release recorded. ``resumable`` says :meth:`Emails.resume_sending` can lift
+    it (an ``authentication`` hold needs a reconnect instead).
+    ``provider_message`` is the refusal as the worker reported it.
+
+    Reported as ``send_pause`` on the mailbox's analytics status.
+    """
+
+    reason: str | None = None
+    held: bool | None = None
+    until: str | None = None
+    retry_at: str | None = None
+    provider_message: str | None = None
+    resumable: bool | None = None
+
+
+class SendPauseRelease(BaseModel):
+    """What :meth:`Emails.resume_sending` lifted.
+
+    Both are ``False`` when nothing was paused.
+    """
+
+    hold_released: bool | None = None
+    cooldown_cleared: bool | None = None
+
+
+class EmailDirectTracking(BaseModel):
+    """Whether hand-written unibox sends from a mailbox are tracked."""
+
+    track_direct_mail: bool | None = None
+
+
+class BulkMailboxResult(BaseModel):
+    """One mailbox's outcome in a bulk call.
+
+    ``code`` and ``message`` are what the single-mailbox route would have
+    answered; they are empty when ``ok`` is ``True``.
+    """
+
+    id: str | None = None
+    ok: bool | None = None
+    code: str | None = None
+    message: str | None = None
+
+
+class BulkMailboxResponse(BaseModel):
+    """The outcome of a bulk mailbox call: a result per mailbox.
+
+    One failure does not stop the rest, so check ``failed`` and ``results``.
+    """
+
+    succeeded: int | None = None
+    failed: int | None = None
+    results: Sequence[BulkMailboxResult] = []
 
 
 class SendingBehavior(BaseModel):
@@ -328,6 +553,208 @@ class SendingBehaviorPlan(BaseModel):
     remaining_today: int | None = None
     behavior: SendingBehavior | None = None
     created_at: str | None = None
+
+
+class MailboxConnectWarmup(BaseModel):
+    """The warmup a mailbox starts with as it connects.
+
+    ``start``, ``max``, ``increase`` and ``reply_rate`` are ``None`` when the
+    mailbox keeps its default for that setting.
+    """
+
+    enabled: bool | None = None
+    start: int | None = None
+    max: int | None = None
+    increase: int | None = None
+    reply_rate: int | None = None
+
+
+class MailboxConnected(BaseModel):
+    """A mailbox connected through the connect API.
+
+    ``warmup_note`` says what of the requested warmup did not apply, empty
+    when it all did. ``renewed`` is only sent by :meth:`Emails.connect_oauth`:
+    ``True`` when the sign-in renewed a mailbox the workspace already had (its
+    warmup is then left as it was).
+    """
+
+    mailbox: EmailAccount | None = None
+    warmup_note: str | None = None
+    renewed: bool | None = None
+
+
+class MailboxConnectRow(BaseModel):
+    """One row's outcome in a bulk connect.
+
+    ``row`` is the 1-based position in the request. ``status`` is
+    ``connected``, ``skipped`` (already connected), ``renewed`` (an OAuth
+    sign-in that renewed an existing mailbox) or ``failed``, in which case
+    ``code`` and ``message`` say why. On a connected row ``message`` may carry
+    a warmup note. ``id`` is the mailbox id, absent on a failed row.
+    """
+
+    row: int | None = None
+    email: str | None = None
+    status: str | None = None
+    code: str | None = None
+    message: str | None = None
+    id: str | None = None
+
+
+class MailboxConnectSummary(BaseModel):
+    """The counts of a bulk connect.
+
+    The SMTP/IMAP batch counts ``skipped`` and the OAuth batch ``renewed``;
+    the other one is ``None``.
+    """
+
+    total: int | None = None
+    connected: int | None = None
+    skipped: int | None = None
+    renewed: int | None = None
+    failed: int | None = None
+
+
+class MailboxConnectBulkResult(BaseModel):
+    """The outcome of a bulk connect: a row per mailbox and the counts.
+
+    The call answers ``200`` even when rows fail, so check ``summary`` and
+    each row's ``status``. ``allowance`` is the workspace's mailbox allowance
+    after the batch, when the server reports it.
+    """
+
+    data: Sequence[MailboxConnectRow] = []
+    summary: MailboxConnectSummary | None = None
+    allowance: MailboxAllowance | None = None
+
+
+class MailboxConnectLink(BaseModel):
+    """A single-use sign-in link a mailbox owner opens to connect one mailbox.
+
+    ``provider`` is ``gmail`` or ``outlook`` and ``email`` the address the
+    sign-in must belong to, empty for any. ``status`` is ``pending``,
+    ``connecting``, ``connected``, ``failed``, ``revoked`` or ``expired``;
+    ``error_code`` says why a link failed and ``email_account_id`` names the
+    mailbox it connected. ``url`` is returned once, by
+    :meth:`Emails.create_connect_link`, and is hidden from ``repr`` because
+    anyone holding it can connect a mailbox.
+    """
+
+    id: str
+    organization_id: str | None = None
+    created_by: str | None = None
+    provider: str | None = None
+    email: str | None = None
+    warmup: MailboxConnectWarmup | None = None
+    return_url: str | None = None
+    status: str | None = None
+    error_code: str | None = None
+    email_account_id: str | None = None
+    expires_at: str | None = None
+    created_at: str | None = None
+    completed_at: str | None = None
+    url: str | None = Field(default=None, repr=False)
+
+
+class MailboxOAuthApp(BaseModel):
+    """A workspace's own OAuth client for one mailbox provider.
+
+    The client secret is never returned; ``has_secret`` is ``False`` when it
+    needs saving again (after an import that carried no secrets).
+    ``redirect_url`` is the callback the client must register, and
+    ``custom_redirect`` says the workspace chose it. ``mailboxes`` counts the
+    mailboxes whose grant this client issued.
+    """
+
+    id: str
+    organization_id: str | None = None
+    provider: str | None = None
+    client_id: str | None = None
+    has_secret: bool | None = None
+    app_name: str | None = None
+    redirect_url: str | None = None
+    custom_redirect: bool | None = None
+    created_by: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+    mailboxes: int | None = None
+
+
+class MailboxOAuthApps(BaseModel):
+    """The workspace's own OAuth clients and the default callbacks.
+
+    ``callbacks`` maps a provider (``gmail``, ``outlook``) to the redirect URL
+    a client registers when it does not choose its own.
+    """
+
+    data: Sequence[MailboxOAuthApp] = []
+    callbacks: Mapping[str, str] = {}
+
+
+class ClientConnectLink(BaseModel):
+    """A link a client opens to connect mailboxes into the workspace.
+
+    ``allowed_providers`` are among ``gmail``, ``outlook``, ``smtp_imap`` and
+    ``vendor``. ``status`` is ``active``, ``expired``, ``revoked`` or
+    ``exhausted`` (``mailboxes_connected`` reached ``max_mailboxes``).
+    ``tag_ids`` are applied to each connected mailbox, and ``warmup`` starts
+    warmup on it.
+    """
+
+    id: str
+    organization_id: str | None = None
+    created_by: str | None = None
+    label: str | None = None
+    allowed_providers: Sequence[str] = []
+    max_mailboxes: int | None = None
+    mailboxes_connected: int | None = None
+    tag_ids: Sequence[str] = []
+    warmup: bool | None = None
+    expires_at: str | None = None
+    revoked_at: str | None = None
+    created_at: str | None = None
+    last_used_at: str | None = None
+    status: str | None = None
+
+
+class ClientConnectLinkCreated(BaseModel):
+    """A new client connect link and its URL.
+
+    ``url`` is shown once and never again, and is hidden from ``repr``
+    because anyone holding it can connect mailboxes to the workspace.
+    """
+
+    link: ClientConnectLink | None = None
+    url: str | None = Field(default=None, repr=False)
+
+
+class ClientConnectLinkUse(BaseModel):
+    """One mailbox a client connected through a link.
+
+    ``email_account_id`` is ``None`` once that mailbox has been removed.
+    """
+
+    id: str
+    link_id: str | None = None
+    email_account_id: str | None = None
+    email: str | None = None
+    provider: str | None = None
+    connected_at: str | None = None
+
+
+class ClientConnectLinkUses(BaseModel):
+    """The mailboxes a client connect link connected."""
+
+    data: Sequence[ClientConnectLinkUse] = []
+
+
+class WarmupFilterTag(BaseModel):
+    """The code appended to warmup mail a mailbox receives.
+
+    ``tag`` is ``None`` when the filter tag is off.
+    """
+
+    tag: str | None = None
 
 
 def _behavior_body(
@@ -397,6 +824,17 @@ def _update_body(
     warmup_start_time: NotGivenOr[str],
     warmup_end_time: NotGivenOr[str],
     warmup_days: NotGivenOr[int],
+    send_as_email: NotGivenOr[str],
+    test_mode: NotGivenOr[str],
+    test_send_enabled: NotGivenOr[bool],
+    test_receive_enabled: NotGivenOr[bool],
+    shared_daily_limit: NotGivenOr[int],
+    rolling_recipient_limit: NotGivenOr[int],
+    send_recovery_resolution: NotGivenOr[Mapping[str, Any]],
+    warmup_placement: NotGivenOr[str],
+    warmup_folder: NotGivenOr[str],
+    warmup_retention_days: NotGivenOr[int],
+    relay_folder_moves: NotGivenOr[bool],
 ) -> dict[str, Any]:
     return drop_not_given(
         {
@@ -421,6 +859,17 @@ def _update_body(
             "warmup_start_time": warmup_start_time,
             "warmup_end_time": warmup_end_time,
             "warmup_days": warmup_days,
+            "send_as_email": send_as_email,
+            "test_mode": test_mode,
+            "test_send_enabled": test_send_enabled,
+            "test_receive_enabled": test_receive_enabled,
+            "shared_daily_limit": shared_daily_limit,
+            "rolling_recipient_limit": rolling_recipient_limit,
+            "send_recovery_resolution": send_recovery_resolution,
+            "warmup_placement": warmup_placement,
+            "warmup_folder": warmup_folder,
+            "warmup_retention_days": warmup_retention_days,
+            "relay_folder_moves": relay_folder_moves,
         }
     )
 
@@ -452,6 +901,121 @@ def _send_body(
             "scheduled_at": scheduled_at,
         }
     )
+
+
+def _connect_smtp_body(
+    *,
+    email: str,
+    smtp: Mapping[str, Any],
+    imap: Mapping[str, Any],
+    name: NotGivenOr[str],
+    warmup: NotGivenOr[Mapping[str, Any]],
+) -> dict[str, Any]:
+    return drop_not_given(
+        {
+            "email": email,
+            "name": name,
+            "smtp": dict(smtp),
+            "imap": dict(imap),
+            "warmup": warmup,
+        }
+    )
+
+
+def _connect_oauth_body(
+    *,
+    provider: str,
+    refresh_token: NotGivenOr[str],
+    code: NotGivenOr[str],
+    redirect_uri: NotGivenOr[str],
+    code_verifier: NotGivenOr[str],
+    email: NotGivenOr[str],
+    warmup: NotGivenOr[Mapping[str, Any]],
+) -> dict[str, Any]:
+    return drop_not_given(
+        {
+            "provider": provider,
+            "refresh_token": refresh_token,
+            "code": code,
+            "redirect_uri": redirect_uri,
+            "code_verifier": code_verifier,
+            "email": email,
+            "warmup": warmup,
+        }
+    )
+
+
+def _connect_link_body(
+    *,
+    provider: str,
+    email: NotGivenOr[str],
+    warmup: NotGivenOr[Mapping[str, Any]],
+    return_url: NotGivenOr[str],
+    expires_in_hours: NotGivenOr[int],
+) -> dict[str, Any]:
+    return drop_not_given(
+        {
+            "provider": provider,
+            "email": email,
+            "warmup": warmup,
+            "return_url": return_url,
+            "expires_in_hours": expires_in_hours,
+        }
+    )
+
+
+def _oauth_app_body(
+    *,
+    client_id: str,
+    client_secret: NotGivenOr[str],
+    app_name: NotGivenOr[str],
+    redirect_url: NotGivenOr[str],
+) -> dict[str, Any]:
+    return drop_not_given(
+        {
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "app_name": app_name,
+            "redirect_url": redirect_url,
+        }
+    )
+
+
+def _client_link_body(
+    *,
+    providers: Sequence[str],
+    max_mailboxes: int,
+    label: NotGivenOr[str],
+    expires_in_days: NotGivenOr[int],
+    tag_ids: NotGivenOr[Sequence[str]],
+    warmup: NotGivenOr[bool],
+) -> dict[str, Any]:
+    return drop_not_given(
+        {
+            "label": label,
+            "providers": list(providers),
+            "max_mailboxes": max_mailboxes,
+            "expires_in_days": expires_in_days,
+            "tag_ids": tag_ids,
+            "warmup": warmup,
+        }
+    )
+
+
+def _put_idempotency(options: RequestOptions | None) -> RequestOptions | None:
+    """Send ``options["idempotency_key"]`` on a ``PUT`` as well.
+
+    The client only adds an ``Idempotency-Key`` to a ``POST`` on its own, so a
+    ``PUT`` that the server replays by key carries it as a header here.
+    """
+    if not options or not options.get("idempotency_key"):
+        return options
+    merged = cast(RequestOptions, dict(options))
+    headers: dict[str, Any] = dict(merged.get("headers") or {})
+    if not any(key.lower() == "idempotency-key" for key in headers):
+        headers["Idempotency-Key"] = merged["idempotency_key"]
+    merged["headers"] = headers
+    return merged
 
 
 class Emails(SyncAPIResource):
@@ -513,6 +1077,17 @@ class Emails(SyncAPIResource):
         warmup_start_time: NotGivenOr[str] = NOT_GIVEN,
         warmup_end_time: NotGivenOr[str] = NOT_GIVEN,
         warmup_days: NotGivenOr[int] = NOT_GIVEN,
+        send_as_email: NotGivenOr[str] = NOT_GIVEN,
+        test_mode: NotGivenOr[str] = NOT_GIVEN,
+        test_send_enabled: NotGivenOr[bool] = NOT_GIVEN,
+        test_receive_enabled: NotGivenOr[bool] = NOT_GIVEN,
+        shared_daily_limit: NotGivenOr[int] = NOT_GIVEN,
+        rolling_recipient_limit: NotGivenOr[int] = NOT_GIVEN,
+        send_recovery_resolution: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        warmup_placement: NotGivenOr[str] = NOT_GIVEN,
+        warmup_folder: NotGivenOr[str] = NOT_GIVEN,
+        warmup_retention_days: NotGivenOr[int] = NOT_GIVEN,
+        relay_folder_moves: NotGivenOr[bool] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> EmailAccount:
         """Update an account's settings.
@@ -540,6 +1115,26 @@ class Emails(SyncAPIResource):
             warmup_start_time: Daily warmup window start (``"HH:MM"``).
             warmup_end_time: Daily warmup window end (``"HH:MM"``).
             warmup_days: Number of days in the warmup week.
+            send_as_email: The verified provider alias to send from (see
+                :meth:`identity`). An empty string clears it back to the
+                mailbox's own address.
+            test_mode: ``"legacy"``, ``"diagnostic"`` or ``"off"``.
+            test_send_enabled: Allow this mailbox to send test mail.
+            test_receive_enabled: Allow this mailbox to receive test mail.
+            shared_daily_limit: A daily cap shared across campaigns.
+            rolling_recipient_limit: A rolling cap on distinct recipients.
+            send_recovery_resolution: Resolves a send safety hold with
+                evidence: ``{"held_task_id", "held_reason", "evidence_type"}``
+                plus optional ``message_id``, ``provider_msg_id``,
+                ``thread_id``, ``evidence_task_id`` and
+                ``confirmation_reference``.
+            warmup_placement: Where warmup mail lands: ``"folder"``,
+                ``"inbox"`` or ``"archive"``.
+            warmup_folder: The destination for ``"folder"`` placement. An
+                empty string goes back to the instance default.
+            warmup_retention_days: How long warmup mail is kept in the
+                mailbox; ``0`` goes back to the instance setting.
+            relay_folder_moves: Move filed conversations in the mailbox too.
             options: Per-request overrides.
         """
         return self._patch(
@@ -567,6 +1162,17 @@ class Emails(SyncAPIResource):
                 warmup_start_time=warmup_start_time,
                 warmup_end_time=warmup_end_time,
                 warmup_days=warmup_days,
+                send_as_email=send_as_email,
+                test_mode=test_mode,
+                test_send_enabled=test_send_enabled,
+                test_receive_enabled=test_receive_enabled,
+                shared_daily_limit=shared_daily_limit,
+                rolling_recipient_limit=rolling_recipient_limit,
+                send_recovery_resolution=send_recovery_resolution,
+                warmup_placement=warmup_placement,
+                warmup_folder=warmup_folder,
+                warmup_retention_days=warmup_retention_days,
+                relay_folder_moves=relay_folder_moves,
             ),
             options=options,
         )
@@ -771,6 +1377,205 @@ class Emails(SyncAPIResource):
             f"/emails/{email_id}/sync", cast_to=MailboxSync, options=options
         )
 
+    def update_sync(
+        self,
+        email_id: str,
+        *,
+        skip_folders: Sequence[str],
+        options: RequestOptions | None = None,
+    ) -> MailboxSyncSettings:
+        """Replace the folders the mailbox's sync leaves alone (IMAP only).
+
+        The list is the desired state, so a retry converges. Mail already
+        stored from a newly skipped folder is removed and the mailbox is
+        re-shipped to its worker, so the change applies on the next pass.
+
+        Requires the ``WRITE_EMAILS`` permission.
+
+        Args:
+            email_id: The account id.
+            skip_folders: Folder names as :meth:`sync` lists them (at most
+                50), matched without regard to case; each also covers its
+                subfolders. ``INBOX`` and the sent, drafts, spam, trash and
+                archive folders are refused with ``invalid_sync_folder``.
+        """
+        return self._put(
+            f"/emails/{email_id}/sync",
+            cast_to=MailboxSyncSettings,
+            body={"skip_folders": list(skip_folders)},
+            options=options,
+        )
+
+    def certificates(
+        self, email_id: str, *, options: RequestOptions | None = None
+    ) -> MailboxCertificates:
+        """Read an SMTP/IMAP mailbox's certificate policy for each server.
+
+        Contacts no server. A Gmail or Outlook mailbox answers ``400``, since
+        it has no certificate choice.
+
+        Requires the ``READ_EMAILS`` permission.
+        """
+        return self._get(
+            f"/emails/{email_id}/certificates",
+            cast_to=MailboxCertificates,
+            options=options,
+        )
+
+    def identity(
+        self, email_id: str, *, options: RequestOptions | None = None
+    ) -> SendIdentity:
+        """Read which addresses the mailbox may send as and which it uses.
+
+        Stored state only: the provider is not called. Also says where the
+        stored signature came from.
+
+        Requires the ``READ_EMAILS`` permission.
+        """
+        return self._get(
+            f"/emails/{email_id}/identity", cast_to=SendIdentity, options=options
+        )
+
+    def refresh_identity(
+        self,
+        email_id: str,
+        *,
+        import_signature: NotGivenOr[bool] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> SendIdentity:
+        """Re-read the send-as list from the provider and store it (Gmail only).
+
+        Storing the list is what a ``send_as_email`` choice is validated
+        against, so this needs a write permission. It writes exactly what the
+        provider currently says, so a retry converges.
+
+        Requires the ``WRITE_EMAILS`` permission.
+
+        Args:
+            email_id: The account id.
+            import_signature: Also replace the stored signature with the one
+                configured at the provider.
+        """
+        return self._post(
+            f"/emails/{email_id}/identity/refresh",
+            cast_to=SendIdentity,
+            body=drop_not_given({"import_signature": import_signature}),
+            options=options,
+        )
+
+    def resume_sending(
+        self, email_id: str, *, options: RequestOptions | None = None
+    ) -> SendPauseRelease:
+        """Lift a provider pause on the mailbox's campaign sending.
+
+        Ends a timed pause (``rate_limited``, ``daily_limit``,
+        ``sender_blocked``, ``retry``) and releases a ``permanent`` or
+        ``domain_auth`` hold. An ``authentication`` hold is cleared by
+        reconnecting the mailbox, and an unconfirmed or ``conflict`` hold keeps
+        its own recovery. If the provider still refuses, the next send pauses
+        the mailbox again. Bodyless and idempotent.
+
+        Requires the ``WRITE_EMAILS`` permission.
+        """
+        return self._post(
+            f"/emails/{email_id}/resume-sending",
+            cast_to=SendPauseRelease,
+            options=options,
+        )
+
+    def update_direct_tracking(
+        self,
+        email_id: str,
+        *,
+        enabled: bool,
+        options: RequestOptions | None = None,
+    ) -> EmailDirectTracking:
+        """Switch open and click tracking on hand-written unibox sends.
+
+        Off by default, and per mailbox: a pixel belongs in a cold sequence
+        more comfortably than in a one-to-one reply.
+
+        Requires the ``WRITE_EMAILS`` permission.
+        """
+        return self._patch(
+            f"/emails/{email_id}/direct-tracking",
+            cast_to=EmailDirectTracking,
+            body={"enabled": enabled},
+            options=options,
+        )
+
+    def bulk_delete(
+        self,
+        *,
+        email_ids: Sequence[str],
+        options: RequestOptions | None = None,
+    ) -> BulkMailboxResponse:
+        """Delete many mailboxes through the single delete path.
+
+        Answers a result per mailbox, so one failure does not stop the rest.
+        Retrying is safe: a mailbox already removed answers ``not_found`` in
+        its row.
+
+        Requires the ``WRITE_EMAILS`` permission.
+
+        Args:
+            email_ids: The mailboxes to delete (1 to 500).
+        """
+        return self._post(
+            "/emails/bulk/delete",
+            cast_to=BulkMailboxResponse,
+            body={"email_ids": list(email_ids)},
+            options=options,
+        )
+
+    def bulk_status(
+        self,
+        *,
+        email_ids: Sequence[str],
+        status: str,
+        options: RequestOptions | None = None,
+    ) -> BulkMailboxResponse:
+        """Switch many mailboxes on or off.
+
+        Sets a state, so a retry converges on the same result.
+
+        Requires the ``WRITE_EMAILS`` permission.
+
+        Args:
+            email_ids: The mailboxes to update (1 to 500).
+            status: ``"active"`` or ``"inactive"``.
+        """
+        return self._post(
+            "/emails/bulk/status",
+            cast_to=BulkMailboxResponse,
+            body={"email_ids": list(email_ids), "status": status},
+            options=options,
+        )
+
+    def bulk_warmup(
+        self,
+        *,
+        email_ids: Sequence[str],
+        action: str,
+        options: RequestOptions | None = None,
+    ) -> BulkMailboxResponse:
+        """Start, pause, resume or stop warmup on many mailboxes.
+
+        Each action sets a state, so a retry converges on the same result.
+
+        Requires the ``WRITE_EMAILS`` permission.
+
+        Args:
+            email_ids: The mailboxes to act on (1 to 500).
+            action: ``"start"``, ``"pause"``, ``"resume"`` or ``"stop"``.
+        """
+        return self._post(
+            "/emails/bulk/warmup",
+            cast_to=BulkMailboxResponse,
+            body={"email_ids": list(email_ids), "action": action},
+            options=options,
+        )
+
     def allowance(self, *, options: RequestOptions | None = None) -> MailboxAllowance:
         """Report how many mailboxes the workspace holds and may hold."""
         return self._get("/emails/allowance", cast_to=MailboxAllowance, options=options)
@@ -938,6 +1743,457 @@ class Emails(SyncAPIResource):
             options=options,
         )
 
+    # -- connect API (Partnership plan) ------------------------------------
+
+    def connect_smtp_imap(
+        self,
+        *,
+        email: str,
+        smtp: Mapping[str, Any],
+        imap: Mapping[str, Any],
+        name: NotGivenOr[str] = NOT_GIVEN,
+        warmup: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> MailboxConnected:
+        """Connect one SMTP/IMAP mailbox with its credentials.
+
+        The servers are checked before the mailbox is saved. Requires the
+        ``CONNECT_EMAILS`` permission, which only Partnership plan workspaces
+        can use and OAuth apps can never be granted.
+
+        Args:
+            email: The mailbox address.
+            smtp: The outgoing server: ``{"username", "password", "host",
+                "port"}`` plus optional ``security``, ``tls_unverified`` and
+                ``tls_pin``.
+            imap: The incoming server, shaped like *smtp*.
+            name: The sender display name.
+            warmup: Starts warmup as the mailbox connects: ``{"enabled": True}``
+                plus optional ``start``, ``max``, ``increase`` and
+                ``reply_rate`` (1-100); an omitted setting keeps the default.
+            options: Per-request overrides.
+        """
+        return self._post(
+            "/emails/connect/smtp-imap",
+            cast_to=MailboxConnected,
+            body=_connect_smtp_body(
+                email=email, smtp=smtp, imap=imap, name=name, warmup=warmup
+            ),
+            options=options,
+        )
+
+    def connect_smtp_imap_bulk(
+        self,
+        *,
+        accounts: Sequence[Mapping[str, Any]],
+        warmup: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> MailboxConnectBulkResult:
+        """Connect up to 50 SMTP/IMAP mailboxes with one warmup setting.
+
+        Answers with a row per account; one failure does not stop the rest,
+        and an account that is already connected is ``skipped``. Requires the
+        ``CONNECT_EMAILS`` permission (Partnership plan only; OAuth apps can
+        never be granted it).
+
+        Args:
+            accounts: The mailboxes, each ``{"email", "smtp", "imap"}`` plus
+                an optional ``name``, shaped like :meth:`connect_smtp_imap`.
+            warmup: The warmup every connected mailbox starts with, shaped
+                like :meth:`connect_smtp_imap`'s *warmup*.
+            options: Per-request overrides.
+        """
+        return self._post(
+            "/emails/connect/smtp-imap/bulk",
+            cast_to=MailboxConnectBulkResult,
+            body=drop_not_given(
+                {"accounts": [dict(a) for a in accounts], "warmup": warmup}
+            ),
+            options=options,
+        )
+
+    def connect_oauth(
+        self,
+        *,
+        provider: str,
+        refresh_token: NotGivenOr[str] = NOT_GIVEN,
+        code: NotGivenOr[str] = NOT_GIVEN,
+        redirect_uri: NotGivenOr[str] = NOT_GIVEN,
+        code_verifier: NotGivenOr[str] = NOT_GIVEN,
+        email: NotGivenOr[str] = NOT_GIVEN,
+        warmup: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> MailboxConnected:
+        """Connect the mailbox a sign-in through the workspace's own OAuth app completed.
+
+        Hand over a *refresh_token*, or an authorization *code* with the
+        *redirect_uri* (and PKCE *code_verifier*) it was issued for. A mailbox
+        the workspace already has gets its token renewed (``renewed`` is
+        ``True`` and its warmup is left as it is). Requires the
+        ``CONNECT_EMAILS`` permission (Partnership plan only; OAuth apps can
+        never be granted it).
+
+        Args:
+            provider: ``"gmail"`` or ``"outlook"``.
+            refresh_token: A refresh token the app obtained.
+            code: An authorization code, instead of a refresh token.
+            redirect_uri: The redirect URI *code* was issued for.
+            code_verifier: The PKCE verifier *code* was issued with.
+            email: When set, the address the sign-in must belong to.
+            warmup: Shaped like :meth:`connect_smtp_imap`'s *warmup*.
+            options: Per-request overrides.
+        """
+        return self._post(
+            "/emails/connect/oauth",
+            cast_to=MailboxConnected,
+            body=_connect_oauth_body(
+                provider=provider,
+                refresh_token=refresh_token,
+                code=code,
+                redirect_uri=redirect_uri,
+                code_verifier=code_verifier,
+                email=email,
+                warmup=warmup,
+            ),
+            options=options,
+        )
+
+    def connect_oauth_bulk(
+        self,
+        *,
+        grants: Sequence[Mapping[str, Any]],
+        warmup: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> MailboxConnectBulkResult:
+        """Hand over up to 50 completed OAuth sign-ins with one warmup setting.
+
+        Answers with a row per sign-in (``connected``, ``renewed`` or
+        ``failed``). Requires the ``CONNECT_EMAILS`` permission (Partnership
+        plan only; OAuth apps can never be granted it).
+
+        Args:
+            grants: The sign-ins, each shaped like :meth:`connect_oauth`'s
+                arguments: ``{"provider", "refresh_token"}`` or
+                ``{"provider", "code", "redirect_uri", "code_verifier"}``,
+                plus an optional ``email``.
+            warmup: Shaped like :meth:`connect_smtp_imap`'s *warmup*.
+            options: Per-request overrides.
+        """
+        return self._post(
+            "/emails/connect/oauth/bulk",
+            cast_to=MailboxConnectBulkResult,
+            body=drop_not_given(
+                {"grants": [dict(g) for g in grants], "warmup": warmup}
+            ),
+            options=options,
+        )
+
+    def create_connect_link(
+        self,
+        *,
+        provider: str,
+        email: NotGivenOr[str] = NOT_GIVEN,
+        warmup: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        return_url: NotGivenOr[str] = NOT_GIVEN,
+        expires_in_hours: NotGivenOr[int] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> MailboxConnectLink:
+        """Create a single-use sign-in link that connects one mailbox.
+
+        The link's ``url`` is in this response only. Requires the
+        ``CONNECT_EMAILS`` permission (Partnership plan only; OAuth apps can
+        never be granted it).
+
+        Args:
+            provider: ``"gmail"`` or ``"outlook"``.
+            email: The address the sign-in must belong to.
+            warmup: Shaped like :meth:`connect_smtp_imap`'s *warmup*.
+            return_url: An ``https`` URL the owner is sent back to afterwards.
+            expires_in_hours: How long the link stays open, 1 to 168
+                (default 72).
+            options: Per-request overrides.
+        """
+        return self._post(
+            "/emails/connect/links",
+            cast_to=MailboxConnectLink,
+            body=_connect_link_body(
+                provider=provider,
+                email=email,
+                warmup=warmup,
+                return_url=return_url,
+                expires_in_hours=expires_in_hours,
+            ),
+            options=options,
+        )
+
+    def list_connect_links(
+        self,
+        *,
+        limit: NotGivenOr[int] = NOT_GIVEN,
+        cursor: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> SyncCursorPage[MailboxConnectLink]:
+        """List the workspace's sign-in links, newest first (auto-paginating).
+
+        Requires the ``CONNECT_EMAILS`` permission (Partnership plan only).
+
+        Args:
+            limit: Links per page, 1 to 100 (default 25).
+            cursor: Opaque pagination cursor from a previous page.
+            options: Per-request overrides.
+        """
+        return self._get_api_list(
+            "/emails/connect/links",
+            model=MailboxConnectLink,
+            query={"limit": limit, "cursor": cursor},
+            options=options,
+        )
+
+    def retrieve_connect_link(
+        self, link_id: str, *, options: RequestOptions | None = None
+    ) -> MailboxConnectLink:
+        """Retrieve one sign-in link (without its URL).
+
+        Requires the ``CONNECT_EMAILS`` permission (Partnership plan only).
+        """
+        return self._get(
+            f"/emails/connect/links/{link_id}",
+            cast_to=MailboxConnectLink,
+            options=options,
+        )
+
+    def revoke_connect_link(
+        self, link_id: str, *, options: RequestOptions | None = None
+    ) -> MailboxConnectLink:
+        """Revoke a sign-in link and return it as it now stands.
+
+        A link that already connected its mailbox is left as it is. Requires
+        the ``CONNECT_EMAILS`` permission (Partnership plan only).
+        """
+        return self._delete(
+            f"/emails/connect/links/{link_id}",
+            cast_to=MailboxConnectLink,
+            options=options,
+        )
+
+    def list_oauth_apps(
+        self, *, options: RequestOptions | None = None
+    ) -> MailboxOAuthApps:
+        """List the workspace's own Google and Microsoft OAuth clients.
+
+        Secrets are never included. Requires the ``CONNECT_EMAILS``
+        permission (OAuth apps can never be granted it).
+        """
+        return self._get(
+            "/emails/oauth-apps", cast_to=MailboxOAuthApps, options=options
+        )
+
+    def put_oauth_app(
+        self,
+        provider: str,
+        *,
+        client_id: str,
+        client_secret: NotGivenOr[str] = NOT_GIVEN,
+        app_name: NotGivenOr[str] = NOT_GIVEN,
+        redirect_url: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> MailboxOAuthApp:
+        """Save the workspace's own OAuth client for a mailbox provider.
+
+        Mailboxes then sign in through this client instead of Warmbly's.
+        Requires the ``CONNECT_EMAILS`` permission (Partnership plan only;
+        OAuth apps can never be granted it).
+
+        Args:
+            provider: ``"gmail"`` or ``"outlook"``.
+            client_id: The OAuth client id.
+            client_secret: The client secret; omitted or empty keeps the
+                stored one.
+            app_name: A display name for the client.
+            redirect_url: A custom callback the client registered; omitted
+                uses the default from :meth:`list_oauth_apps`.
+            options: Per-request overrides.
+        """
+        return self._put(
+            f"/emails/oauth-apps/{provider}",
+            cast_to=MailboxOAuthApp,
+            body=_oauth_app_body(
+                client_id=client_id,
+                client_secret=client_secret,
+                app_name=app_name,
+                redirect_url=redirect_url,
+            ),
+            options=options,
+        )
+
+    def delete_oauth_app(
+        self, provider: str, *, options: RequestOptions | None = None
+    ) -> None:
+        """Remove the workspace's own OAuth client for a provider (``204``).
+
+        Refused while mailboxes still hold grants it issued. Requires the
+        ``CONNECT_EMAILS`` permission (OAuth apps can never be granted it).
+
+        Args:
+            provider: ``"gmail"`` or ``"outlook"``.
+            options: Per-request overrides.
+        """
+        return self._delete(
+            f"/emails/oauth-apps/{provider}", cast_to=type(None), options=options
+        )
+
+    # -- client connect links ----------------------------------------------
+
+    def create_client_link(
+        self,
+        *,
+        providers: Sequence[str],
+        max_mailboxes: int,
+        label: NotGivenOr[str] = NOT_GIVEN,
+        expires_in_days: NotGivenOr[int] = NOT_GIVEN,
+        tag_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        warmup: NotGivenOr[bool] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> ClientConnectLinkCreated:
+        """Create a link a client uses to connect mailboxes without an account.
+
+        The ``url`` is in this response only. A retry with the same
+        ``Idempotency-Key`` (sent automatically, or pass
+        ``options={"idempotency_key": ...}``) replays the same link. Requires
+        the ``WRITE_EMAILS`` permission.
+
+        Args:
+            providers: Ways the client may connect: ``"gmail"``,
+                ``"outlook"``, ``"smtp_imap"`` and/or ``"vendor"``.
+            max_mailboxes: How many mailboxes the link may connect, 1 to 500.
+            label: A name for the link.
+            expires_in_days: How long the link stays open, 1 to 90
+                (default 7).
+            tag_ids: Tag ids applied to each connected mailbox (at most 20).
+            warmup: Start warmup on each connected mailbox.
+            options: Per-request overrides.
+        """
+        return self._post(
+            "/emails/client-links",
+            cast_to=ClientConnectLinkCreated,
+            body=_client_link_body(
+                providers=providers,
+                max_mailboxes=max_mailboxes,
+                label=label,
+                expires_in_days=expires_in_days,
+                tag_ids=tag_ids,
+                warmup=warmup,
+            ),
+            options=options,
+        )
+
+    def list_client_links(
+        self,
+        *,
+        limit: NotGivenOr[int] = NOT_GIVEN,
+        cursor: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> SyncCursorPage[ClientConnectLink]:
+        """List the workspace's client connect links (auto-paginating).
+
+        Requires the ``READ_EMAILS`` permission.
+
+        Args:
+            limit: Links per page, 1 to 100 (default 50).
+            cursor: Opaque pagination cursor from a previous page.
+            options: Per-request overrides.
+        """
+        return self._get_api_list(
+            "/emails/client-links",
+            model=ClientConnectLink,
+            query={"limit": limit, "cursor": cursor},
+            options=options,
+        )
+
+    def list_client_link_uses(
+        self, link_id: str, *, options: RequestOptions | None = None
+    ) -> ClientConnectLinkUses:
+        """List the mailboxes a client connect link connected.
+
+        Requires the ``READ_EMAILS`` permission.
+        """
+        return self._get(
+            f"/emails/client-links/{link_id}/uses",
+            cast_to=ClientConnectLinkUses,
+            options=options,
+        )
+
+    def revoke_client_link(
+        self, link_id: str, *, options: RequestOptions | None = None
+    ) -> ClientConnectLink:
+        """Revoke a client connect link.
+
+        A repeat returns the already revoked link, so a retry is safe.
+        Requires the ``WRITE_EMAILS`` permission.
+        """
+        return self._post(
+            f"/emails/client-links/{link_id}/revoke",
+            cast_to=ClientConnectLink,
+            options=options,
+        )
+
+    # -- warmup filter tag -------------------------------------------------
+
+    def warmup_filter_tag(
+        self, email_id: str, *, options: RequestOptions | None = None
+    ) -> WarmupFilterTag:
+        """Read the code appended to warmup mail this mailbox receives.
+
+        ``tag`` is ``None`` when the filter tag is off. Requires the
+        ``READ_EMAILS`` permission.
+        """
+        return self._get(
+            f"/emails/{email_id}/warmup-filter-tag",
+            cast_to=WarmupFilterTag,
+            options=options,
+        )
+
+    def set_warmup_filter_tag(
+        self,
+        email_id: str,
+        *,
+        tag: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> WarmupFilterTag:
+        """Turn the warmup filter tag on, with a chosen or a new random code.
+
+        Without *tag* each call issues a new random code; pass
+        ``options={"idempotency_key": ...}`` so a retry returns the first one
+        (it is sent as the ``Idempotency-Key`` header on this ``PUT``).
+        Requires the ``WRITE_EMAILS`` permission.
+
+        Args:
+            email_id: The account id.
+            tag: The code to use: 6 to 40 letters, digits, spaces, hyphens or
+                underscores, and not a word that describes the mail as
+                warmup, automated or a test (``invalid_filter_tag``).
+            options: Per-request overrides.
+        """
+        return self._put(
+            f"/emails/{email_id}/warmup-filter-tag",
+            cast_to=WarmupFilterTag,
+            body=drop_not_given({"tag": tag}),
+            options=_put_idempotency(options),
+        )
+
+    def clear_warmup_filter_tag(
+        self, email_id: str, *, options: RequestOptions | None = None
+    ) -> WarmupFilterTag:
+        """Turn the warmup filter tag off (``tag`` reads ``None``).
+
+        Requires the ``WRITE_EMAILS`` permission.
+        """
+        return self._delete(
+            f"/emails/{email_id}/warmup-filter-tag",
+            cast_to=WarmupFilterTag,
+            options=options,
+        )
+
 
 class AsyncEmails(AsyncAPIResource):
     """Asynchronous ``emails`` resource."""
@@ -1000,6 +2256,17 @@ class AsyncEmails(AsyncAPIResource):
         warmup_start_time: NotGivenOr[str] = NOT_GIVEN,
         warmup_end_time: NotGivenOr[str] = NOT_GIVEN,
         warmup_days: NotGivenOr[int] = NOT_GIVEN,
+        send_as_email: NotGivenOr[str] = NOT_GIVEN,
+        test_mode: NotGivenOr[str] = NOT_GIVEN,
+        test_send_enabled: NotGivenOr[bool] = NOT_GIVEN,
+        test_receive_enabled: NotGivenOr[bool] = NOT_GIVEN,
+        shared_daily_limit: NotGivenOr[int] = NOT_GIVEN,
+        rolling_recipient_limit: NotGivenOr[int] = NOT_GIVEN,
+        send_recovery_resolution: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        warmup_placement: NotGivenOr[str] = NOT_GIVEN,
+        warmup_folder: NotGivenOr[str] = NOT_GIVEN,
+        warmup_retention_days: NotGivenOr[int] = NOT_GIVEN,
+        relay_folder_moves: NotGivenOr[bool] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> EmailAccount:
         """Update an account's settings.
@@ -1027,6 +2294,26 @@ class AsyncEmails(AsyncAPIResource):
             warmup_start_time: Daily warmup window start (``"HH:MM"``).
             warmup_end_time: Daily warmup window end (``"HH:MM"``).
             warmup_days: Number of days in the warmup week.
+            send_as_email: The verified provider alias to send from (see
+                :meth:`identity`). An empty string clears it back to the
+                mailbox's own address.
+            test_mode: ``"legacy"``, ``"diagnostic"`` or ``"off"``.
+            test_send_enabled: Allow this mailbox to send test mail.
+            test_receive_enabled: Allow this mailbox to receive test mail.
+            shared_daily_limit: A daily cap shared across campaigns.
+            rolling_recipient_limit: A rolling cap on distinct recipients.
+            send_recovery_resolution: Resolves a send safety hold with
+                evidence: ``{"held_task_id", "held_reason", "evidence_type"}``
+                plus optional ``message_id``, ``provider_msg_id``,
+                ``thread_id``, ``evidence_task_id`` and
+                ``confirmation_reference``.
+            warmup_placement: Where warmup mail lands: ``"folder"``,
+                ``"inbox"`` or ``"archive"``.
+            warmup_folder: The destination for ``"folder"`` placement. An
+                empty string goes back to the instance default.
+            warmup_retention_days: How long warmup mail is kept in the
+                mailbox; ``0`` goes back to the instance setting.
+            relay_folder_moves: Move filed conversations in the mailbox too.
             options: Per-request overrides.
         """
         return await self._patch(
@@ -1054,6 +2341,17 @@ class AsyncEmails(AsyncAPIResource):
                 warmup_start_time=warmup_start_time,
                 warmup_end_time=warmup_end_time,
                 warmup_days=warmup_days,
+                send_as_email=send_as_email,
+                test_mode=test_mode,
+                test_send_enabled=test_send_enabled,
+                test_receive_enabled=test_receive_enabled,
+                shared_daily_limit=shared_daily_limit,
+                rolling_recipient_limit=rolling_recipient_limit,
+                send_recovery_resolution=send_recovery_resolution,
+                warmup_placement=warmup_placement,
+                warmup_folder=warmup_folder,
+                warmup_retention_days=warmup_retention_days,
+                relay_folder_moves=relay_folder_moves,
             ),
             options=options,
         )
@@ -1258,6 +2556,205 @@ class AsyncEmails(AsyncAPIResource):
             f"/emails/{email_id}/sync", cast_to=MailboxSync, options=options
         )
 
+    async def update_sync(
+        self,
+        email_id: str,
+        *,
+        skip_folders: Sequence[str],
+        options: RequestOptions | None = None,
+    ) -> MailboxSyncSettings:
+        """Replace the folders the mailbox's sync leaves alone (IMAP only).
+
+        The list is the desired state, so a retry converges. Mail already
+        stored from a newly skipped folder is removed and the mailbox is
+        re-shipped to its worker, so the change applies on the next pass.
+
+        Requires the ``WRITE_EMAILS`` permission.
+
+        Args:
+            email_id: The account id.
+            skip_folders: Folder names as :meth:`sync` lists them (at most
+                50), matched without regard to case; each also covers its
+                subfolders. ``INBOX`` and the sent, drafts, spam, trash and
+                archive folders are refused with ``invalid_sync_folder``.
+        """
+        return await self._put(
+            f"/emails/{email_id}/sync",
+            cast_to=MailboxSyncSettings,
+            body={"skip_folders": list(skip_folders)},
+            options=options,
+        )
+
+    async def certificates(
+        self, email_id: str, *, options: RequestOptions | None = None
+    ) -> MailboxCertificates:
+        """Read an SMTP/IMAP mailbox's certificate policy for each server.
+
+        Contacts no server. A Gmail or Outlook mailbox answers ``400``, since
+        it has no certificate choice.
+
+        Requires the ``READ_EMAILS`` permission.
+        """
+        return await self._get(
+            f"/emails/{email_id}/certificates",
+            cast_to=MailboxCertificates,
+            options=options,
+        )
+
+    async def identity(
+        self, email_id: str, *, options: RequestOptions | None = None
+    ) -> SendIdentity:
+        """Read which addresses the mailbox may send as and which it uses.
+
+        Stored state only: the provider is not called. Also says where the
+        stored signature came from.
+
+        Requires the ``READ_EMAILS`` permission.
+        """
+        return await self._get(
+            f"/emails/{email_id}/identity", cast_to=SendIdentity, options=options
+        )
+
+    async def refresh_identity(
+        self,
+        email_id: str,
+        *,
+        import_signature: NotGivenOr[bool] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> SendIdentity:
+        """Re-read the send-as list from the provider and store it (Gmail only).
+
+        Storing the list is what a ``send_as_email`` choice is validated
+        against, so this needs a write permission. It writes exactly what the
+        provider currently says, so a retry converges.
+
+        Requires the ``WRITE_EMAILS`` permission.
+
+        Args:
+            email_id: The account id.
+            import_signature: Also replace the stored signature with the one
+                configured at the provider.
+        """
+        return await self._post(
+            f"/emails/{email_id}/identity/refresh",
+            cast_to=SendIdentity,
+            body=drop_not_given({"import_signature": import_signature}),
+            options=options,
+        )
+
+    async def resume_sending(
+        self, email_id: str, *, options: RequestOptions | None = None
+    ) -> SendPauseRelease:
+        """Lift a provider pause on the mailbox's campaign sending.
+
+        Ends a timed pause (``rate_limited``, ``daily_limit``,
+        ``sender_blocked``, ``retry``) and releases a ``permanent`` or
+        ``domain_auth`` hold. An ``authentication`` hold is cleared by
+        reconnecting the mailbox, and an unconfirmed or ``conflict`` hold keeps
+        its own recovery. If the provider still refuses, the next send pauses
+        the mailbox again. Bodyless and idempotent.
+
+        Requires the ``WRITE_EMAILS`` permission.
+        """
+        return await self._post(
+            f"/emails/{email_id}/resume-sending",
+            cast_to=SendPauseRelease,
+            options=options,
+        )
+
+    async def update_direct_tracking(
+        self,
+        email_id: str,
+        *,
+        enabled: bool,
+        options: RequestOptions | None = None,
+    ) -> EmailDirectTracking:
+        """Switch open and click tracking on hand-written unibox sends.
+
+        Off by default, and per mailbox: a pixel belongs in a cold sequence
+        more comfortably than in a one-to-one reply.
+
+        Requires the ``WRITE_EMAILS`` permission.
+        """
+        return await self._patch(
+            f"/emails/{email_id}/direct-tracking",
+            cast_to=EmailDirectTracking,
+            body={"enabled": enabled},
+            options=options,
+        )
+
+    async def bulk_delete(
+        self,
+        *,
+        email_ids: Sequence[str],
+        options: RequestOptions | None = None,
+    ) -> BulkMailboxResponse:
+        """Delete many mailboxes through the single delete path.
+
+        Answers a result per mailbox, so one failure does not stop the rest.
+        Retrying is safe: a mailbox already removed answers ``not_found`` in
+        its row.
+
+        Requires the ``WRITE_EMAILS`` permission.
+
+        Args:
+            email_ids: The mailboxes to delete (1 to 500).
+        """
+        return await self._post(
+            "/emails/bulk/delete",
+            cast_to=BulkMailboxResponse,
+            body={"email_ids": list(email_ids)},
+            options=options,
+        )
+
+    async def bulk_status(
+        self,
+        *,
+        email_ids: Sequence[str],
+        status: str,
+        options: RequestOptions | None = None,
+    ) -> BulkMailboxResponse:
+        """Switch many mailboxes on or off.
+
+        Sets a state, so a retry converges on the same result.
+
+        Requires the ``WRITE_EMAILS`` permission.
+
+        Args:
+            email_ids: The mailboxes to update (1 to 500).
+            status: ``"active"`` or ``"inactive"``.
+        """
+        return await self._post(
+            "/emails/bulk/status",
+            cast_to=BulkMailboxResponse,
+            body={"email_ids": list(email_ids), "status": status},
+            options=options,
+        )
+
+    async def bulk_warmup(
+        self,
+        *,
+        email_ids: Sequence[str],
+        action: str,
+        options: RequestOptions | None = None,
+    ) -> BulkMailboxResponse:
+        """Start, pause, resume or stop warmup on many mailboxes.
+
+        Each action sets a state, so a retry converges on the same result.
+
+        Requires the ``WRITE_EMAILS`` permission.
+
+        Args:
+            email_ids: The mailboxes to act on (1 to 500).
+            action: ``"start"``, ``"pause"``, ``"resume"`` or ``"stop"``.
+        """
+        return await self._post(
+            "/emails/bulk/warmup",
+            cast_to=BulkMailboxResponse,
+            body={"email_ids": list(email_ids), "action": action},
+            options=options,
+        )
+
     async def allowance(
         self, *, options: RequestOptions | None = None
     ) -> MailboxAllowance:
@@ -1426,5 +2923,456 @@ class AsyncEmails(AsyncAPIResource):
                 send_mode=send_mode,
                 scheduled_at=scheduled_at,
             ),
+            options=options,
+        )
+
+    # -- connect API (Partnership plan) ------------------------------------
+
+    async def connect_smtp_imap(
+        self,
+        *,
+        email: str,
+        smtp: Mapping[str, Any],
+        imap: Mapping[str, Any],
+        name: NotGivenOr[str] = NOT_GIVEN,
+        warmup: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> MailboxConnected:
+        """Connect one SMTP/IMAP mailbox with its credentials.
+
+        The servers are checked before the mailbox is saved. Requires the
+        ``CONNECT_EMAILS`` permission, which only Partnership plan workspaces
+        can use and OAuth apps can never be granted.
+
+        Args:
+            email: The mailbox address.
+            smtp: The outgoing server: ``{"username", "password", "host",
+                "port"}`` plus optional ``security``, ``tls_unverified`` and
+                ``tls_pin``.
+            imap: The incoming server, shaped like *smtp*.
+            name: The sender display name.
+            warmup: Starts warmup as the mailbox connects: ``{"enabled": True}``
+                plus optional ``start``, ``max``, ``increase`` and
+                ``reply_rate`` (1-100); an omitted setting keeps the default.
+            options: Per-request overrides.
+        """
+        return await self._post(
+            "/emails/connect/smtp-imap",
+            cast_to=MailboxConnected,
+            body=_connect_smtp_body(
+                email=email, smtp=smtp, imap=imap, name=name, warmup=warmup
+            ),
+            options=options,
+        )
+
+    async def connect_smtp_imap_bulk(
+        self,
+        *,
+        accounts: Sequence[Mapping[str, Any]],
+        warmup: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> MailboxConnectBulkResult:
+        """Connect up to 50 SMTP/IMAP mailboxes with one warmup setting.
+
+        Answers with a row per account; one failure does not stop the rest,
+        and an account that is already connected is ``skipped``. Requires the
+        ``CONNECT_EMAILS`` permission (Partnership plan only; OAuth apps can
+        never be granted it).
+
+        Args:
+            accounts: The mailboxes, each ``{"email", "smtp", "imap"}`` plus
+                an optional ``name``, shaped like :meth:`connect_smtp_imap`.
+            warmup: The warmup every connected mailbox starts with, shaped
+                like :meth:`connect_smtp_imap`'s *warmup*.
+            options: Per-request overrides.
+        """
+        return await self._post(
+            "/emails/connect/smtp-imap/bulk",
+            cast_to=MailboxConnectBulkResult,
+            body=drop_not_given(
+                {"accounts": [dict(a) for a in accounts], "warmup": warmup}
+            ),
+            options=options,
+        )
+
+    async def connect_oauth(
+        self,
+        *,
+        provider: str,
+        refresh_token: NotGivenOr[str] = NOT_GIVEN,
+        code: NotGivenOr[str] = NOT_GIVEN,
+        redirect_uri: NotGivenOr[str] = NOT_GIVEN,
+        code_verifier: NotGivenOr[str] = NOT_GIVEN,
+        email: NotGivenOr[str] = NOT_GIVEN,
+        warmup: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> MailboxConnected:
+        """Connect the mailbox a sign-in through the workspace's own OAuth app completed.
+
+        Hand over a *refresh_token*, or an authorization *code* with the
+        *redirect_uri* (and PKCE *code_verifier*) it was issued for. A mailbox
+        the workspace already has gets its token renewed (``renewed`` is
+        ``True`` and its warmup is left as it is). Requires the
+        ``CONNECT_EMAILS`` permission (Partnership plan only; OAuth apps can
+        never be granted it).
+
+        Args:
+            provider: ``"gmail"`` or ``"outlook"``.
+            refresh_token: A refresh token the app obtained.
+            code: An authorization code, instead of a refresh token.
+            redirect_uri: The redirect URI *code* was issued for.
+            code_verifier: The PKCE verifier *code* was issued with.
+            email: When set, the address the sign-in must belong to.
+            warmup: Shaped like :meth:`connect_smtp_imap`'s *warmup*.
+            options: Per-request overrides.
+        """
+        return await self._post(
+            "/emails/connect/oauth",
+            cast_to=MailboxConnected,
+            body=_connect_oauth_body(
+                provider=provider,
+                refresh_token=refresh_token,
+                code=code,
+                redirect_uri=redirect_uri,
+                code_verifier=code_verifier,
+                email=email,
+                warmup=warmup,
+            ),
+            options=options,
+        )
+
+    async def connect_oauth_bulk(
+        self,
+        *,
+        grants: Sequence[Mapping[str, Any]],
+        warmup: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> MailboxConnectBulkResult:
+        """Hand over up to 50 completed OAuth sign-ins with one warmup setting.
+
+        Answers with a row per sign-in (``connected``, ``renewed`` or
+        ``failed``). Requires the ``CONNECT_EMAILS`` permission (Partnership
+        plan only; OAuth apps can never be granted it).
+
+        Args:
+            grants: The sign-ins, each shaped like :meth:`connect_oauth`'s
+                arguments: ``{"provider", "refresh_token"}`` or
+                ``{"provider", "code", "redirect_uri", "code_verifier"}``,
+                plus an optional ``email``.
+            warmup: Shaped like :meth:`connect_smtp_imap`'s *warmup*.
+            options: Per-request overrides.
+        """
+        return await self._post(
+            "/emails/connect/oauth/bulk",
+            cast_to=MailboxConnectBulkResult,
+            body=drop_not_given(
+                {"grants": [dict(g) for g in grants], "warmup": warmup}
+            ),
+            options=options,
+        )
+
+    async def create_connect_link(
+        self,
+        *,
+        provider: str,
+        email: NotGivenOr[str] = NOT_GIVEN,
+        warmup: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        return_url: NotGivenOr[str] = NOT_GIVEN,
+        expires_in_hours: NotGivenOr[int] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> MailboxConnectLink:
+        """Create a single-use sign-in link that connects one mailbox.
+
+        The link's ``url`` is in this response only. Requires the
+        ``CONNECT_EMAILS`` permission (Partnership plan only; OAuth apps can
+        never be granted it).
+
+        Args:
+            provider: ``"gmail"`` or ``"outlook"``.
+            email: The address the sign-in must belong to.
+            warmup: Shaped like :meth:`connect_smtp_imap`'s *warmup*.
+            return_url: An ``https`` URL the owner is sent back to afterwards.
+            expires_in_hours: How long the link stays open, 1 to 168
+                (default 72).
+            options: Per-request overrides.
+        """
+        return await self._post(
+            "/emails/connect/links",
+            cast_to=MailboxConnectLink,
+            body=_connect_link_body(
+                provider=provider,
+                email=email,
+                warmup=warmup,
+                return_url=return_url,
+                expires_in_hours=expires_in_hours,
+            ),
+            options=options,
+        )
+
+    def list_connect_links(
+        self,
+        *,
+        limit: NotGivenOr[int] = NOT_GIVEN,
+        cursor: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> AsyncPaginator[MailboxConnectLink]:
+        """List the workspace's sign-in links, newest first (auto-paginating).
+
+        Requires the ``CONNECT_EMAILS`` permission (Partnership plan only).
+
+        Args:
+            limit: Links per page, 1 to 100 (default 25).
+            cursor: Opaque pagination cursor from a previous page.
+            options: Per-request overrides.
+        """
+        return self._get_api_list(
+            "/emails/connect/links",
+            model=MailboxConnectLink,
+            query={"limit": limit, "cursor": cursor},
+            options=options,
+        )
+
+    async def retrieve_connect_link(
+        self, link_id: str, *, options: RequestOptions | None = None
+    ) -> MailboxConnectLink:
+        """Retrieve one sign-in link (without its URL).
+
+        Requires the ``CONNECT_EMAILS`` permission (Partnership plan only).
+        """
+        return await self._get(
+            f"/emails/connect/links/{link_id}",
+            cast_to=MailboxConnectLink,
+            options=options,
+        )
+
+    async def revoke_connect_link(
+        self, link_id: str, *, options: RequestOptions | None = None
+    ) -> MailboxConnectLink:
+        """Revoke a sign-in link and return it as it now stands.
+
+        A link that already connected its mailbox is left as it is. Requires
+        the ``CONNECT_EMAILS`` permission (Partnership plan only).
+        """
+        return await self._delete(
+            f"/emails/connect/links/{link_id}",
+            cast_to=MailboxConnectLink,
+            options=options,
+        )
+
+    async def list_oauth_apps(
+        self, *, options: RequestOptions | None = None
+    ) -> MailboxOAuthApps:
+        """List the workspace's own Google and Microsoft OAuth clients.
+
+        Secrets are never included. Requires the ``CONNECT_EMAILS``
+        permission (OAuth apps can never be granted it).
+        """
+        return await self._get(
+            "/emails/oauth-apps", cast_to=MailboxOAuthApps, options=options
+        )
+
+    async def put_oauth_app(
+        self,
+        provider: str,
+        *,
+        client_id: str,
+        client_secret: NotGivenOr[str] = NOT_GIVEN,
+        app_name: NotGivenOr[str] = NOT_GIVEN,
+        redirect_url: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> MailboxOAuthApp:
+        """Save the workspace's own OAuth client for a mailbox provider.
+
+        Mailboxes then sign in through this client instead of Warmbly's.
+        Requires the ``CONNECT_EMAILS`` permission (Partnership plan only;
+        OAuth apps can never be granted it).
+
+        Args:
+            provider: ``"gmail"`` or ``"outlook"``.
+            client_id: The OAuth client id.
+            client_secret: The client secret; omitted or empty keeps the
+                stored one.
+            app_name: A display name for the client.
+            redirect_url: A custom callback the client registered; omitted
+                uses the default from :meth:`list_oauth_apps`.
+            options: Per-request overrides.
+        """
+        return await self._put(
+            f"/emails/oauth-apps/{provider}",
+            cast_to=MailboxOAuthApp,
+            body=_oauth_app_body(
+                client_id=client_id,
+                client_secret=client_secret,
+                app_name=app_name,
+                redirect_url=redirect_url,
+            ),
+            options=options,
+        )
+
+    async def delete_oauth_app(
+        self, provider: str, *, options: RequestOptions | None = None
+    ) -> None:
+        """Remove the workspace's own OAuth client for a provider (``204``).
+
+        Refused while mailboxes still hold grants it issued. Requires the
+        ``CONNECT_EMAILS`` permission (OAuth apps can never be granted it).
+
+        Args:
+            provider: ``"gmail"`` or ``"outlook"``.
+            options: Per-request overrides.
+        """
+        return await self._delete(
+            f"/emails/oauth-apps/{provider}", cast_to=type(None), options=options
+        )
+
+    # -- client connect links ----------------------------------------------
+
+    async def create_client_link(
+        self,
+        *,
+        providers: Sequence[str],
+        max_mailboxes: int,
+        label: NotGivenOr[str] = NOT_GIVEN,
+        expires_in_days: NotGivenOr[int] = NOT_GIVEN,
+        tag_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        warmup: NotGivenOr[bool] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> ClientConnectLinkCreated:
+        """Create a link a client uses to connect mailboxes without an account.
+
+        The ``url`` is in this response only. A retry with the same
+        ``Idempotency-Key`` (sent automatically, or pass
+        ``options={"idempotency_key": ...}``) replays the same link. Requires
+        the ``WRITE_EMAILS`` permission.
+
+        Args:
+            providers: Ways the client may connect: ``"gmail"``,
+                ``"outlook"``, ``"smtp_imap"`` and/or ``"vendor"``.
+            max_mailboxes: How many mailboxes the link may connect, 1 to 500.
+            label: A name for the link.
+            expires_in_days: How long the link stays open, 1 to 90
+                (default 7).
+            tag_ids: Tag ids applied to each connected mailbox (at most 20).
+            warmup: Start warmup on each connected mailbox.
+            options: Per-request overrides.
+        """
+        return await self._post(
+            "/emails/client-links",
+            cast_to=ClientConnectLinkCreated,
+            body=_client_link_body(
+                providers=providers,
+                max_mailboxes=max_mailboxes,
+                label=label,
+                expires_in_days=expires_in_days,
+                tag_ids=tag_ids,
+                warmup=warmup,
+            ),
+            options=options,
+        )
+
+    def list_client_links(
+        self,
+        *,
+        limit: NotGivenOr[int] = NOT_GIVEN,
+        cursor: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> AsyncPaginator[ClientConnectLink]:
+        """List the workspace's client connect links (auto-paginating).
+
+        Requires the ``READ_EMAILS`` permission.
+
+        Args:
+            limit: Links per page, 1 to 100 (default 50).
+            cursor: Opaque pagination cursor from a previous page.
+            options: Per-request overrides.
+        """
+        return self._get_api_list(
+            "/emails/client-links",
+            model=ClientConnectLink,
+            query={"limit": limit, "cursor": cursor},
+            options=options,
+        )
+
+    async def list_client_link_uses(
+        self, link_id: str, *, options: RequestOptions | None = None
+    ) -> ClientConnectLinkUses:
+        """List the mailboxes a client connect link connected.
+
+        Requires the ``READ_EMAILS`` permission.
+        """
+        return await self._get(
+            f"/emails/client-links/{link_id}/uses",
+            cast_to=ClientConnectLinkUses,
+            options=options,
+        )
+
+    async def revoke_client_link(
+        self, link_id: str, *, options: RequestOptions | None = None
+    ) -> ClientConnectLink:
+        """Revoke a client connect link.
+
+        A repeat returns the already revoked link, so a retry is safe.
+        Requires the ``WRITE_EMAILS`` permission.
+        """
+        return await self._post(
+            f"/emails/client-links/{link_id}/revoke",
+            cast_to=ClientConnectLink,
+            options=options,
+        )
+
+    # -- warmup filter tag -------------------------------------------------
+
+    async def warmup_filter_tag(
+        self, email_id: str, *, options: RequestOptions | None = None
+    ) -> WarmupFilterTag:
+        """Read the code appended to warmup mail this mailbox receives.
+
+        ``tag`` is ``None`` when the filter tag is off. Requires the
+        ``READ_EMAILS`` permission.
+        """
+        return await self._get(
+            f"/emails/{email_id}/warmup-filter-tag",
+            cast_to=WarmupFilterTag,
+            options=options,
+        )
+
+    async def set_warmup_filter_tag(
+        self,
+        email_id: str,
+        *,
+        tag: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> WarmupFilterTag:
+        """Turn the warmup filter tag on, with a chosen or a new random code.
+
+        Without *tag* each call issues a new random code; pass
+        ``options={"idempotency_key": ...}`` so a retry returns the first one
+        (it is sent as the ``Idempotency-Key`` header on this ``PUT``).
+        Requires the ``WRITE_EMAILS`` permission.
+
+        Args:
+            email_id: The account id.
+            tag: The code to use: 6 to 40 letters, digits, spaces, hyphens or
+                underscores, and not a word that describes the mail as
+                warmup, automated or a test (``invalid_filter_tag``).
+            options: Per-request overrides.
+        """
+        return await self._put(
+            f"/emails/{email_id}/warmup-filter-tag",
+            cast_to=WarmupFilterTag,
+            body=drop_not_given({"tag": tag}),
+            options=_put_idempotency(options),
+        )
+
+    async def clear_warmup_filter_tag(
+        self, email_id: str, *, options: RequestOptions | None = None
+    ) -> WarmupFilterTag:
+        """Turn the warmup filter tag off (``tag`` reads ``None``).
+
+        Requires the ``WRITE_EMAILS`` permission.
+        """
+        return await self._delete(
+            f"/emails/{email_id}/warmup-filter-tag",
+            cast_to=WarmupFilterTag,
             options=options,
         )

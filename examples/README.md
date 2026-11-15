@@ -30,6 +30,8 @@ python examples/quickstart.py
 | [`realtime_gateway_async.py`](./realtime_gateway_async.py) | Subscribe to live events (asyncio) |
 | [`realtime_gateway_sync.py`](./realtime_gateway_sync.py) | The same, with the blocking sync client |
 | [`webhooks.py`](./webhooks.py) | Verify inbound webhook signatures and manage endpoints |
+| [`client_reports.py`](./client_reports.py) | Share results with a client: a report, a public link, a schedule |
+| [`agency.py`](./agency.py) | Agency API keys: clients, usage, and acting inside a client workspace |
 
 > These call the real API. Run them against a test organization, and note that
 > `campaigns.start(...)`, `emails.send(...)`, and `unibox.reply(...)` actually

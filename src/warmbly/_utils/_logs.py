@@ -42,12 +42,16 @@ _SENSITIVE_FIELDS = frozenset(
         "access_token",
         "secret",
         "password",
+        "api_key",
+        "signing_key",
+        "auth_token",
+        "webhook_url",
         "token",
     }
 )
 
 # Any value that looks like a prefixed Warmbly credential.
-_TOKEN_RE = re.compile(r"\bwm(?:bly|at|rt|ac|cid|cs)_[A-Za-z0-9_\-]+")
+_TOKEN_RE = re.compile(r"\bwm(?:bly|agency|at|rt|ac|cid|cs)_[A-Za-z0-9_\-]+")
 
 _REDACTED = "[redacted]"
 

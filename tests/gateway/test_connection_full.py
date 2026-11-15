@@ -221,12 +221,12 @@ def test_transient_disconnect_default_message() -> None:
 
 def test_build_url_quotes_token_and_appends_vsn() -> None:
     client = AsyncGatewayClient(
-        token="wmbly/with spaces&x", base_url="wss://rt.example.com/"
+        token="jwt/with spaces&x", base_url="wss://rt.example.com/"
     )
     url = client._build_url()
     # The base_url trailing slash is stripped in __init__.
     assert url.startswith("wss://rt.example.com/socket/websocket?token=")
-    assert "wmbly%2Fwith%20spaces%26x" in url
+    assert "jwt%2Fwith%20spaces%26x" in url
     assert url.endswith("&vsn=2.0.0")
     # No raw special characters leaked from the token.
     assert "with spaces" not in url

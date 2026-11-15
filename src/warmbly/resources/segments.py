@@ -75,7 +75,10 @@ class SegmentField(BaseModel):
 
     ``kind`` is one of ``text``, ``enum``, ``bool``, ``date``, ``number``,
     ``category``, ``campaign`` or ``segment``; ``options`` lists the accepted
-    values of an enum field.
+    values of an enum field, and ``option_labels`` names the ones whose value
+    alone is not readable (a value missing from it shows as itself). The
+    ``Location`` group holds ``world_region``, ``country``, ``timezone`` and
+    ``location_known``.
     """
 
     field: str | None = None
@@ -83,6 +86,7 @@ class SegmentField(BaseModel):
     group: str | None = None
     kind: str | None = None
     options: Sequence[str] = []
+    option_labels: dict[str, str] | None = None
 
 
 class SegmentPreview(BaseModel):
