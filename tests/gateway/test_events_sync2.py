@@ -49,6 +49,7 @@ _TIMEOUT = 5.0
         "CRM_SYNCED",
         "DIRECT_EMAIL_OPENED",
         "DIRECT_EMAIL_CLICKED",
+        "EMAIL_BOUNCED",
     ],
 )
 def test_new_event_constants_match_server_names(name: str) -> None:
@@ -60,6 +61,13 @@ def test_event_permissions_use_server_permission_names() -> None:
     assert EVENT_PERMISSIONS[GatewayEvent.MAILBOX_IMPORT_PROGRESS] == "manage_emails"
     assert EVENT_PERMISSIONS[GatewayEvent.CONTACT_IMPORT_PROGRESS] == "view_contacts"
     assert EVENT_PERMISSIONS[GatewayEvent.AI_DRAFT_READY] == "access_unibox"
+    assert EVENT_PERMISSIONS[GatewayEvent.EMAIL_BOUNCED] == "view_campaigns"
+
+
+def test_email_bounced_rides_the_email_and_campaign_free_intents() -> None:
+    assert intent_matches(GatewayEvent.EMAIL_BOUNCED, ["EMAIL"])
+    assert intent_matches(GatewayEvent.EMAIL_BOUNCED, ["bounced"])
+    assert not intent_matches(GatewayEvent.EMAIL_BOUNCED, ["CAMPAIGN"])
 
 
 # -- intent helpers ----------------------------------------------------------

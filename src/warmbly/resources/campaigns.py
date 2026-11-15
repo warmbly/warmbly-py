@@ -21,7 +21,7 @@ from pydantic import Field
 from .._models import BaseModel
 from .._pagination import AsyncPaginator, SyncCursorPage
 from .._resource import AsyncAPIResource, SyncAPIResource
-from .._types import NOT_GIVEN, NotGivenOr, RequestOptions
+from .._types import NOT_GIVEN, NotGiven, NotGivenOr, RequestOptions
 from .._utils import drop_not_given
 from .forms import CampaignFormStats
 from .placement import (
@@ -29,6 +29,7 @@ from .placement import (
     PlacementMonitorEnvelope,
     _monitor_body,
 )
+from .templates import WorkspaceCopyResponse
 
 __all__ = [
     "AsyncCampaigns",
@@ -51,6 +52,8 @@ __all__ = [
     "CampaignLeadCCSuggestion",
     "CampaignLeadHold",
     "CampaignLeadSupply",
+    "CampaignLeadTimezones",
+    "CampaignLeadZone",
     "CampaignLog",
     "CampaignMailboxPlan",
     "CampaignOrgAllowance",
@@ -91,7 +94,11 @@ class Campaign(BaseModel):
     finishing, with ``idle_since`` set while it waits.
 
     ``timezone`` is empty when the campaign follows the workspace timezone;
-    ``effective_timezone`` is the zone in use either way.
+    ``effective_timezone`` is the zone in use either way. ``timezone_mode`` is
+    whose clock the sending windows are read on: ``campaign`` (the campaign's
+    timezone) or ``recipient`` (each lead's own, falling back to the
+    campaign's). ``warmup_graduation`` holds mailboxes whose warmup is running
+    to the reply-earned ceiling in this campaign.
     ``follow_up_sender`` is which mailbox a lead's follow-ups leave from:
     ``same`` (the mailbox that sent the first email), ``same_domain`` (rotate
     among mailboxes on that domain) or ``rotate`` (place each step through the
@@ -121,6 +128,7 @@ class Campaign(BaseModel):
     end_date: str | None = None
     timezone: str | None = None
     effective_timezone: str | None = None
+    timezone_mode: str | None = None
     days: int | None = None
     start_time: str | None = None
     end_time: str | None = None
@@ -140,6 +148,7 @@ class Campaign(BaseModel):
     ramp_ceiling: int | None = None
     ramp_level: int | None = None
     ramp_level_date: str | None = None
+    warmup_graduation: bool | None = None
     esp_match_mode: str | None = None
     max_new_leads_per_day: int | None = None
     prioritize_new_leads: bool | None = None
@@ -450,8 +459,11 @@ class CampaignEstimate(BaseModel):
     contact receives and ``total_sends`` is recipients times steps.
     ``steady_capacity`` is the capacity once every mailbox has graduated from
     warmup and ``full_capacity_at`` the first day it gets there. ``bottleneck``
-    names the clamp costing the most sends on the first sending day, empty
-    when the mailboxes' own caps are the limit.
+    names the clamp costing the most sends on the first sending day
+    (``campaign_limit``, ``campaign_ramp``, ``warmup_graduation``,
+    ``spacing``, ``other_campaigns``, ``health``, ``held``, ``workspace_risk``,
+    ``org_daily_limit`` or ``sending_behavior``), empty when the mailboxes' own
+    caps are the limit.
     """
 
     recipients: int | None = None
@@ -723,6 +735,36 @@ class CampaignWarmupPlacement(BaseModel):
     days: int | None = None
 
 
+class CampaignLeadZone(BaseModel):
+    """One timezone and how many of the campaign's leads are in it.
+
+    ``country`` is the zone's country code, empty for UTC and fixed offsets.
+    """
+
+    timezone: str | None = None
+    country: str | None = None
+    leads: int | None = None
+
+
+class CampaignLeadTimezones(BaseModel):
+    """Where a campaign's leads are, by the timezone their records resolve to.
+
+    ``timezone`` is the campaign's own clock, the one a lead with no known
+    timezone is sent on. ``unknown`` counts the leads nothing on the record
+    places; ``resolving`` counts leads whose record changed and has not been
+    read again yet (they are counted under their previous answer meanwhile).
+    ``zones`` is ordered by lead count, largest first.
+    """
+
+    campaign_id: str
+    timezone_mode: str | None = None
+    timezone: str | None = None
+    total: int | None = None
+    unknown: int | None = None
+    resolving: int | None = None
+    zones: Sequence[CampaignLeadZone] = []
+
+
 def _campaign_body(
     *,
     for_create: bool = False,
@@ -744,6 +786,7 @@ def _campaign_body(
     start_date: NotGivenOr[str] = NOT_GIVEN,
     end_date: NotGivenOr[str] = NOT_GIVEN,
     timezone: NotGivenOr[str] = NOT_GIVEN,
+    timezone_mode: NotGivenOr[str] = NOT_GIVEN,
     days: NotGivenOr[int] = NOT_GIVEN,
     start_time: NotGivenOr[str] = NOT_GIVEN,
     end_time: NotGivenOr[str] = NOT_GIVEN,
@@ -760,6 +803,7 @@ def _campaign_body(
     ramp_start: NotGivenOr[int] = NOT_GIVEN,
     ramp_increment: NotGivenOr[int] = NOT_GIVEN,
     ramp_ceiling: NotGivenOr[int] = NOT_GIVEN,
+    warmup_graduation: NotGivenOr[bool] = NOT_GIVEN,
     esp_match_mode: NotGivenOr[str] = NOT_GIVEN,
     max_new_leads_per_day: NotGivenOr[int] = NOT_GIVEN,
     prioritize_new_leads: NotGivenOr[bool] = NOT_GIVEN,
@@ -807,6 +851,7 @@ def _campaign_body(
             "start_date": start_date,
             "end_date": end_date,
             "timezone": timezone,
+            "timezone_mode": timezone_mode,
             "days": days,
             "start_time": start_time,
             "end_time": end_time,
@@ -823,6 +868,7 @@ def _campaign_body(
             "ramp_start": ramp_start,
             "ramp_increment": ramp_increment,
             "ramp_ceiling": ramp_ceiling,
+            "warmup_graduation": warmup_graduation,
             "esp_match_mode": esp_match_mode,
             "max_new_leads_per_day": max_new_leads_per_day,
             "prioritize_new_leads": prioritize_new_leads,
@@ -927,6 +973,7 @@ class Campaigns(SyncAPIResource):
         start_date: NotGivenOr[str] = NOT_GIVEN,
         end_date: NotGivenOr[str] = NOT_GIVEN,
         timezone: NotGivenOr[str] = NOT_GIVEN,
+        timezone_mode: NotGivenOr[str] = NOT_GIVEN,
         days: NotGivenOr[int] = NOT_GIVEN,
         start_time: NotGivenOr[str] = NOT_GIVEN,
         end_time: NotGivenOr[str] = NOT_GIVEN,
@@ -943,6 +990,7 @@ class Campaigns(SyncAPIResource):
         ramp_start: NotGivenOr[int] = NOT_GIVEN,
         ramp_increment: NotGivenOr[int] = NOT_GIVEN,
         ramp_ceiling: NotGivenOr[int] = NOT_GIVEN,
+        warmup_graduation: NotGivenOr[bool] = NOT_GIVEN,
         esp_match_mode: NotGivenOr[str] = NOT_GIVEN,
         max_new_leads_per_day: NotGivenOr[int] = NOT_GIVEN,
         prioritize_new_leads: NotGivenOr[bool] = NOT_GIVEN,
@@ -991,6 +1039,11 @@ class Campaigns(SyncAPIResource):
             start_date: RFC 3339 date the campaign may start sending.
             end_date: RFC 3339 date the campaign stops sending.
             timezone: IANA timezone the schedule is interpreted in.
+            timezone_mode: Whose clock the sending windows are read on:
+                ``campaign`` (default) or ``recipient`` (each lead's own
+                timezone, worked out from their record; a lead nothing places
+                uses the campaign's). Check the split first with
+                :meth:`lead_timezones`.
             days: Weekday bitmask for the sending window.
             start_time: Daily window start (``"HH:MM"``).
             end_time: Daily window end (``"HH:MM"``).
@@ -1013,6 +1066,11 @@ class Campaigns(SyncAPIResource):
             ramp_start: The first day's ramp ceiling.
             ramp_increment: How much the ramp ceiling rises each day.
             ramp_ceiling: Where the ramp stops rising.
+            warmup_graduation: Hold mailboxes whose warmup is running or paused
+                to the reply-earned ceiling in this campaign (5 a day plus one
+                for each lead who replied in the last seven days). Defaults to
+                ``True``; ``False`` leaves the mailbox caps, ``daily_limit`` and
+                the ramp in charge.
             esp_match_mode: ESP matching: ``off``, ``prefer`` or ``strict``.
             max_new_leads_per_day: New-lead throttle; ``0`` is unlimited.
             prioritize_new_leads: Send to new leads before continuing older ones.
@@ -1064,6 +1122,7 @@ class Campaigns(SyncAPIResource):
                 start_date=start_date,
                 end_date=end_date,
                 timezone=timezone,
+                timezone_mode=timezone_mode,
                 days=days,
                 start_time=start_time,
                 end_time=end_time,
@@ -1080,6 +1139,7 @@ class Campaigns(SyncAPIResource):
                 ramp_start=ramp_start,
                 ramp_increment=ramp_increment,
                 ramp_ceiling=ramp_ceiling,
+                warmup_graduation=warmup_graduation,
                 esp_match_mode=esp_match_mode,
                 max_new_leads_per_day=max_new_leads_per_day,
                 prioritize_new_leads=prioritize_new_leads,
@@ -1152,6 +1212,11 @@ class Campaigns(SyncAPIResource):
         start_time: NotGivenOr[str] = NOT_GIVEN,
         end_time: NotGivenOr[str] = NOT_GIVEN,
         step_waits: NotGivenOr[Sequence[int]] = NOT_GIVEN,
+        warmup_graduation: NotGivenOr[bool] = NOT_GIVEN,
+        ramp_enabled: NotGivenOr[bool] = NOT_GIVEN,
+        ramp_start: NotGivenOr[int] = NOT_GIVEN,
+        ramp_increment: NotGivenOr[int] = NOT_GIVEN,
+        ramp_ceiling: NotGivenOr[int] = NOT_GIVEN,
         campaign_id: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> CampaignEstimate:
@@ -1174,6 +1239,13 @@ class Campaigns(SyncAPIResource):
             end_time: Daily sending window end (``"HH:MM"``).
             step_waits: Each follow-up's ``wait_after`` in days, in order, at
                 most 30. Empty is a single email.
+            warmup_graduation: Project under the warmup graduation ceiling, as
+                on create. Defaults to the saved campaign's, else ``True``.
+            ramp_enabled: Project a ramp schedule, as on create.
+            ramp_start: The ramp's first-day volume, as on create.
+            ramp_increment: The ramp's daily increase, as on create.
+            ramp_ceiling: The ramp's ceiling, as on create. Unsent ramp fields
+                come from the saved campaign, else a new campaign's defaults.
             campaign_id: Project a saved campaign, filling anything not sent
                 from it.
         """
@@ -1191,6 +1263,11 @@ class Campaigns(SyncAPIResource):
                     "start_time": start_time,
                     "end_time": end_time,
                     "step_waits": step_waits,
+                    "warmup_graduation": warmup_graduation,
+                    "ramp_enabled": ramp_enabled,
+                    "ramp_start": ramp_start,
+                    "ramp_increment": ramp_increment,
+                    "ramp_ceiling": ramp_ceiling,
                     "campaign_id": campaign_id,
                 }
             ),
@@ -1274,6 +1351,7 @@ class Campaigns(SyncAPIResource):
         start_date: NotGivenOr[str] = NOT_GIVEN,
         end_date: NotGivenOr[str] = NOT_GIVEN,
         timezone: NotGivenOr[str] = NOT_GIVEN,
+        timezone_mode: NotGivenOr[str] = NOT_GIVEN,
         days: NotGivenOr[int] = NOT_GIVEN,
         start_time: NotGivenOr[str] = NOT_GIVEN,
         end_time: NotGivenOr[str] = NOT_GIVEN,
@@ -1290,6 +1368,7 @@ class Campaigns(SyncAPIResource):
         ramp_start: NotGivenOr[int] = NOT_GIVEN,
         ramp_increment: NotGivenOr[int] = NOT_GIVEN,
         ramp_ceiling: NotGivenOr[int] = NOT_GIVEN,
+        warmup_graduation: NotGivenOr[bool] = NOT_GIVEN,
         esp_match_mode: NotGivenOr[str] = NOT_GIVEN,
         max_new_leads_per_day: NotGivenOr[int] = NOT_GIVEN,
         prioritize_new_leads: NotGivenOr[bool] = NOT_GIVEN,
@@ -1334,6 +1413,11 @@ class Campaigns(SyncAPIResource):
             start_date: RFC 3339 date the campaign may start sending.
             end_date: RFC 3339 date the campaign stops sending.
             timezone: IANA timezone the schedule is interpreted in.
+            timezone_mode: Whose clock the sending windows are read on:
+                ``campaign`` (default) or ``recipient`` (each lead's own
+                timezone, worked out from their record; a lead nothing places
+                uses the campaign's). Check the split first with
+                :meth:`lead_timezones`.
             days: Weekday bitmask for the sending window.
             start_time: Daily window start (``"HH:MM"``).
             end_time: Daily window end (``"HH:MM"``).
@@ -1356,6 +1440,11 @@ class Campaigns(SyncAPIResource):
             ramp_start: The first day's ramp ceiling.
             ramp_increment: How much the ramp ceiling rises each day.
             ramp_ceiling: Where the ramp stops rising.
+            warmup_graduation: Hold mailboxes whose warmup is running or paused
+                to the reply-earned ceiling in this campaign (5 a day plus one
+                for each lead who replied in the last seven days). Defaults to
+                ``True``; ``False`` leaves the mailbox caps, ``daily_limit`` and
+                the ramp in charge.
             esp_match_mode: ESP matching: ``off``, ``prefer`` or ``strict``.
             max_new_leads_per_day: New-lead throttle; ``0`` is unlimited.
             prioritize_new_leads: Send to new leads before continuing older ones.
@@ -1400,6 +1489,7 @@ class Campaigns(SyncAPIResource):
                 start_date=start_date,
                 end_date=end_date,
                 timezone=timezone,
+                timezone_mode=timezone_mode,
                 days=days,
                 start_time=start_time,
                 end_time=end_time,
@@ -1416,6 +1506,7 @@ class Campaigns(SyncAPIResource):
                 ramp_start=ramp_start,
                 ramp_increment=ramp_increment,
                 ramp_ceiling=ramp_ceiling,
+                warmup_graduation=warmup_graduation,
                 esp_match_mode=esp_match_mode,
                 max_new_leads_per_day=max_new_leads_per_day,
                 prioritize_new_leads=prioritize_new_leads,
@@ -1464,6 +1555,70 @@ class Campaigns(SyncAPIResource):
             f"/campaigns/{campaign_id}/duplicate",
             cast_to=Campaign,
             body=drop_not_given({"name": name}),
+            options=options,
+        )
+
+    def copy_to(
+        self,
+        campaign_id: str,
+        *,
+        organization_ids: Sequence[str],
+        template_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> WorkspaceCopyResponse:
+        """Copy a campaign into other workspaces you belong to, as drafts.
+
+        The copy carries the configuration and sequence, not the leads or the
+        sending history. Each destination is copied on its own: one refused
+        or failed workspace does not stop the others, and its entry in the
+        response says why. A destination is written only where you are an
+        accepted, unrestricted member allowed to manage campaigns.
+
+        Requires the ``READ_CAMPAIGNS`` permission on the source campaign.
+        With an API key or OAuth token the key also needs
+        ``WRITE_CAMPAIGNS`` (plus ``READ_TEMPLATES`` and ``WRITE_TEMPLATES``
+        when ``template_ids`` is sent), and it reaches only its own
+        workspace: ``organization_ids`` may then name only that workspace
+        (the server answers ``403`` with
+        ``cross_workspace_copy_requires_session`` otherwise). Copying across
+        workspaces needs a signed-in dashboard session.
+
+        Args:
+            campaign_id: The campaign to copy.
+            organization_ids: The destination workspaces, 1 to 10.
+            template_ids: Reply templates of the source workspace to copy
+                along with the campaign, up to 50.
+        """
+        return self._post(
+            f"/campaigns/{campaign_id}/copy-to",
+            cast_to=WorkspaceCopyResponse,
+            body=drop_not_given(
+                {
+                    "organization_ids": list(organization_ids),
+                    "template_ids": (
+                        NOT_GIVEN
+                        if isinstance(template_ids, NotGiven)
+                        else list(template_ids)
+                    ),
+                }
+            ),
+            options=options,
+        )
+
+    def lead_timezones(
+        self, campaign_id: str, *, options: RequestOptions | None = None
+    ) -> CampaignLeadTimezones:
+        """Count a campaign's leads by the timezone their records resolve to.
+
+        Use it to check the schedule against where the leads are before
+        launch. Requires the ``READ_CAMPAIGNS`` permission.
+
+        Args:
+            campaign_id: The campaign to inspect.
+        """
+        return self._get(
+            f"/campaigns/{campaign_id}/lead-timezones",
+            cast_to=CampaignLeadTimezones,
             options=options,
         )
 
@@ -2178,6 +2333,7 @@ class AsyncCampaigns(AsyncAPIResource):
         start_date: NotGivenOr[str] = NOT_GIVEN,
         end_date: NotGivenOr[str] = NOT_GIVEN,
         timezone: NotGivenOr[str] = NOT_GIVEN,
+        timezone_mode: NotGivenOr[str] = NOT_GIVEN,
         days: NotGivenOr[int] = NOT_GIVEN,
         start_time: NotGivenOr[str] = NOT_GIVEN,
         end_time: NotGivenOr[str] = NOT_GIVEN,
@@ -2194,6 +2350,7 @@ class AsyncCampaigns(AsyncAPIResource):
         ramp_start: NotGivenOr[int] = NOT_GIVEN,
         ramp_increment: NotGivenOr[int] = NOT_GIVEN,
         ramp_ceiling: NotGivenOr[int] = NOT_GIVEN,
+        warmup_graduation: NotGivenOr[bool] = NOT_GIVEN,
         esp_match_mode: NotGivenOr[str] = NOT_GIVEN,
         max_new_leads_per_day: NotGivenOr[int] = NOT_GIVEN,
         prioritize_new_leads: NotGivenOr[bool] = NOT_GIVEN,
@@ -2242,6 +2399,11 @@ class AsyncCampaigns(AsyncAPIResource):
             start_date: RFC 3339 date the campaign may start sending.
             end_date: RFC 3339 date the campaign stops sending.
             timezone: IANA timezone the schedule is interpreted in.
+            timezone_mode: Whose clock the sending windows are read on:
+                ``campaign`` (default) or ``recipient`` (each lead's own
+                timezone, worked out from their record; a lead nothing places
+                uses the campaign's). Check the split first with
+                :meth:`lead_timezones`.
             days: Weekday bitmask for the sending window.
             start_time: Daily window start (``"HH:MM"``).
             end_time: Daily window end (``"HH:MM"``).
@@ -2264,6 +2426,11 @@ class AsyncCampaigns(AsyncAPIResource):
             ramp_start: The first day's ramp ceiling.
             ramp_increment: How much the ramp ceiling rises each day.
             ramp_ceiling: Where the ramp stops rising.
+            warmup_graduation: Hold mailboxes whose warmup is running or paused
+                to the reply-earned ceiling in this campaign (5 a day plus one
+                for each lead who replied in the last seven days). Defaults to
+                ``True``; ``False`` leaves the mailbox caps, ``daily_limit`` and
+                the ramp in charge.
             esp_match_mode: ESP matching: ``off``, ``prefer`` or ``strict``.
             max_new_leads_per_day: New-lead throttle; ``0`` is unlimited.
             prioritize_new_leads: Send to new leads before continuing older ones.
@@ -2315,6 +2482,7 @@ class AsyncCampaigns(AsyncAPIResource):
                 start_date=start_date,
                 end_date=end_date,
                 timezone=timezone,
+                timezone_mode=timezone_mode,
                 days=days,
                 start_time=start_time,
                 end_time=end_time,
@@ -2331,6 +2499,7 @@ class AsyncCampaigns(AsyncAPIResource):
                 ramp_start=ramp_start,
                 ramp_increment=ramp_increment,
                 ramp_ceiling=ramp_ceiling,
+                warmup_graduation=warmup_graduation,
                 esp_match_mode=esp_match_mode,
                 max_new_leads_per_day=max_new_leads_per_day,
                 prioritize_new_leads=prioritize_new_leads,
@@ -2405,6 +2574,11 @@ class AsyncCampaigns(AsyncAPIResource):
         start_time: NotGivenOr[str] = NOT_GIVEN,
         end_time: NotGivenOr[str] = NOT_GIVEN,
         step_waits: NotGivenOr[Sequence[int]] = NOT_GIVEN,
+        warmup_graduation: NotGivenOr[bool] = NOT_GIVEN,
+        ramp_enabled: NotGivenOr[bool] = NOT_GIVEN,
+        ramp_start: NotGivenOr[int] = NOT_GIVEN,
+        ramp_increment: NotGivenOr[int] = NOT_GIVEN,
+        ramp_ceiling: NotGivenOr[int] = NOT_GIVEN,
         campaign_id: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> CampaignEstimate:
@@ -2427,6 +2601,13 @@ class AsyncCampaigns(AsyncAPIResource):
             end_time: Daily sending window end (``"HH:MM"``).
             step_waits: Each follow-up's ``wait_after`` in days, in order, at
                 most 30. Empty is a single email.
+            warmup_graduation: Project under the warmup graduation ceiling, as
+                on create. Defaults to the saved campaign's, else ``True``.
+            ramp_enabled: Project a ramp schedule, as on create.
+            ramp_start: The ramp's first-day volume, as on create.
+            ramp_increment: The ramp's daily increase, as on create.
+            ramp_ceiling: The ramp's ceiling, as on create. Unsent ramp fields
+                come from the saved campaign, else a new campaign's defaults.
             campaign_id: Project a saved campaign, filling anything not sent
                 from it.
         """
@@ -2444,6 +2625,11 @@ class AsyncCampaigns(AsyncAPIResource):
                     "start_time": start_time,
                     "end_time": end_time,
                     "step_waits": step_waits,
+                    "warmup_graduation": warmup_graduation,
+                    "ramp_enabled": ramp_enabled,
+                    "ramp_start": ramp_start,
+                    "ramp_increment": ramp_increment,
+                    "ramp_ceiling": ramp_ceiling,
                     "campaign_id": campaign_id,
                 }
             ),
@@ -2529,6 +2715,7 @@ class AsyncCampaigns(AsyncAPIResource):
         start_date: NotGivenOr[str] = NOT_GIVEN,
         end_date: NotGivenOr[str] = NOT_GIVEN,
         timezone: NotGivenOr[str] = NOT_GIVEN,
+        timezone_mode: NotGivenOr[str] = NOT_GIVEN,
         days: NotGivenOr[int] = NOT_GIVEN,
         start_time: NotGivenOr[str] = NOT_GIVEN,
         end_time: NotGivenOr[str] = NOT_GIVEN,
@@ -2545,6 +2732,7 @@ class AsyncCampaigns(AsyncAPIResource):
         ramp_start: NotGivenOr[int] = NOT_GIVEN,
         ramp_increment: NotGivenOr[int] = NOT_GIVEN,
         ramp_ceiling: NotGivenOr[int] = NOT_GIVEN,
+        warmup_graduation: NotGivenOr[bool] = NOT_GIVEN,
         esp_match_mode: NotGivenOr[str] = NOT_GIVEN,
         max_new_leads_per_day: NotGivenOr[int] = NOT_GIVEN,
         prioritize_new_leads: NotGivenOr[bool] = NOT_GIVEN,
@@ -2589,6 +2777,11 @@ class AsyncCampaigns(AsyncAPIResource):
             start_date: RFC 3339 date the campaign may start sending.
             end_date: RFC 3339 date the campaign stops sending.
             timezone: IANA timezone the schedule is interpreted in.
+            timezone_mode: Whose clock the sending windows are read on:
+                ``campaign`` (default) or ``recipient`` (each lead's own
+                timezone, worked out from their record; a lead nothing places
+                uses the campaign's). Check the split first with
+                :meth:`lead_timezones`.
             days: Weekday bitmask for the sending window.
             start_time: Daily window start (``"HH:MM"``).
             end_time: Daily window end (``"HH:MM"``).
@@ -2611,6 +2804,11 @@ class AsyncCampaigns(AsyncAPIResource):
             ramp_start: The first day's ramp ceiling.
             ramp_increment: How much the ramp ceiling rises each day.
             ramp_ceiling: Where the ramp stops rising.
+            warmup_graduation: Hold mailboxes whose warmup is running or paused
+                to the reply-earned ceiling in this campaign (5 a day plus one
+                for each lead who replied in the last seven days). Defaults to
+                ``True``; ``False`` leaves the mailbox caps, ``daily_limit`` and
+                the ramp in charge.
             esp_match_mode: ESP matching: ``off``, ``prefer`` or ``strict``.
             max_new_leads_per_day: New-lead throttle; ``0`` is unlimited.
             prioritize_new_leads: Send to new leads before continuing older ones.
@@ -2655,6 +2853,7 @@ class AsyncCampaigns(AsyncAPIResource):
                 start_date=start_date,
                 end_date=end_date,
                 timezone=timezone,
+                timezone_mode=timezone_mode,
                 days=days,
                 start_time=start_time,
                 end_time=end_time,
@@ -2671,6 +2870,7 @@ class AsyncCampaigns(AsyncAPIResource):
                 ramp_start=ramp_start,
                 ramp_increment=ramp_increment,
                 ramp_ceiling=ramp_ceiling,
+                warmup_graduation=warmup_graduation,
                 esp_match_mode=esp_match_mode,
                 max_new_leads_per_day=max_new_leads_per_day,
                 prioritize_new_leads=prioritize_new_leads,
@@ -2719,6 +2919,70 @@ class AsyncCampaigns(AsyncAPIResource):
             f"/campaigns/{campaign_id}/duplicate",
             cast_to=Campaign,
             body=drop_not_given({"name": name}),
+            options=options,
+        )
+
+    async def copy_to(
+        self,
+        campaign_id: str,
+        *,
+        organization_ids: Sequence[str],
+        template_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> WorkspaceCopyResponse:
+        """Copy a campaign into other workspaces you belong to, as drafts.
+
+        The copy carries the configuration and sequence, not the leads or the
+        sending history. Each destination is copied on its own: one refused
+        or failed workspace does not stop the others, and its entry in the
+        response says why. A destination is written only where you are an
+        accepted, unrestricted member allowed to manage campaigns.
+
+        Requires the ``READ_CAMPAIGNS`` permission on the source campaign.
+        With an API key or OAuth token the key also needs
+        ``WRITE_CAMPAIGNS`` (plus ``READ_TEMPLATES`` and ``WRITE_TEMPLATES``
+        when ``template_ids`` is sent), and it reaches only its own
+        workspace: ``organization_ids`` may then name only that workspace
+        (the server answers ``403`` with
+        ``cross_workspace_copy_requires_session`` otherwise). Copying across
+        workspaces needs a signed-in dashboard session.
+
+        Args:
+            campaign_id: The campaign to copy.
+            organization_ids: The destination workspaces, 1 to 10.
+            template_ids: Reply templates of the source workspace to copy
+                along with the campaign, up to 50.
+        """
+        return await self._post(
+            f"/campaigns/{campaign_id}/copy-to",
+            cast_to=WorkspaceCopyResponse,
+            body=drop_not_given(
+                {
+                    "organization_ids": list(organization_ids),
+                    "template_ids": (
+                        NOT_GIVEN
+                        if isinstance(template_ids, NotGiven)
+                        else list(template_ids)
+                    ),
+                }
+            ),
+            options=options,
+        )
+
+    async def lead_timezones(
+        self, campaign_id: str, *, options: RequestOptions | None = None
+    ) -> CampaignLeadTimezones:
+        """Count a campaign's leads by the timezone their records resolve to.
+
+        Use it to check the schedule against where the leads are before
+        launch. Requires the ``READ_CAMPAIGNS`` permission.
+
+        Args:
+            campaign_id: The campaign to inspect.
+        """
+        return await self._get(
+            f"/campaigns/{campaign_id}/lead-timezones",
+            cast_to=CampaignLeadTimezones,
             options=options,
         )
 

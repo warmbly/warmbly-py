@@ -127,6 +127,21 @@ def _resolve_api_key(api_key: str | None) -> str:
     return api_key
 
 
+#: The header an agency API key names its client workspace in.
+ORGANIZATION_HEADER = "Warmbly-Organization"
+
+
+def _resolve_organization(organization: str | None) -> str | None:
+    return organization or os.environ.get("WARMBLY_ORGANIZATION") or None
+
+
+def _auth_headers(api_key: str, organization: str | None) -> dict[str, str]:
+    headers = {"Authorization": f"Bearer {api_key}"}
+    if organization:
+        headers[ORGANIZATION_HEADER] = organization
+    return headers
+
+
 def _resolve_base_url(base_url: str | None) -> str:
     return base_url or os.environ.get("WARMBLY_BASE_URL", PRODUCTION_BASE_URL)
 
@@ -135,8 +150,16 @@ class Warmbly(SyncAPIClient):
     """Synchronous Warmbly API client.
 
     Args:
-        api_key: A Warmbly API key (``wmbly_...``) or OAuth2 access token
-            (``wmat_...``). Falls back to the ``WARMBLY_API_KEY`` env var.
+        api_key: A Warmbly API key (``wmbly_...``), an agency API key
+            (``wmagency_...``) or an OAuth2 access token (``wmat_...``). Falls
+            back to the ``WARMBLY_API_KEY`` env var.
+        organization: The client workspace an agency API key acts in, sent as
+            the ``Warmbly-Organization`` header on every request. Workspace
+            routes refuse an agency key without it
+            (``agency_key_organization_required``); the ``agency`` resource
+            does not need it. Falls back to the ``WARMBLY_ORGANIZATION`` env
+            var. Leave unset for workspace keys and OAuth tokens. Override per
+            call with ``options={"headers": {"Warmbly-Organization": ...}}``.
         base_url: API base URL. Falls back to ``WARMBLY_BASE_URL`` then the
             production endpoint.
         timeout: Per-request timeout in seconds or an :class:`httpx.Timeout`.
@@ -145,17 +168,20 @@ class Warmbly(SyncAPIClient):
     """
 
     api_key: str
+    organization: str | None
 
     def __init__(
         self,
         *,
         api_key: str | None = None,
+        organization: str | None = None,
         base_url: str | None = None,
         timeout: float | Timeout | None = DEFAULT_TIMEOUT,
         max_retries: int = DEFAULT_MAX_RETRIES,
         http_client: httpx.Client | None = None,
     ) -> None:
         self.api_key = _resolve_api_key(api_key)
+        self.organization = _resolve_organization(organization)
         super().__init__(
             base_url=_resolve_base_url(base_url),
             timeout=timeout,
@@ -165,7 +191,7 @@ class Warmbly(SyncAPIClient):
 
     @property
     def auth_headers(self) -> dict[str, str]:
-        return {"Authorization": f"Bearer {self.api_key}"}
+        return _auth_headers(self.api_key, self.organization)
 
     @cached_property
     def me(self) -> Me:
@@ -340,17 +366,20 @@ class AsyncWarmbly(AsyncAPIClient):
     """
 
     api_key: str
+    organization: str | None
 
     def __init__(
         self,
         *,
         api_key: str | None = None,
+        organization: str | None = None,
         base_url: str | None = None,
         timeout: float | Timeout | None = DEFAULT_TIMEOUT,
         max_retries: int = DEFAULT_MAX_RETRIES,
         http_client: httpx.AsyncClient | None = None,
     ) -> None:
         self.api_key = _resolve_api_key(api_key)
+        self.organization = _resolve_organization(organization)
         super().__init__(
             base_url=_resolve_base_url(base_url),
             timeout=timeout,
@@ -360,7 +389,7 @@ class AsyncWarmbly(AsyncAPIClient):
 
     @property
     def auth_headers(self) -> dict[str, str]:
-        return {"Authorization": f"Bearer {self.api_key}"}
+        return _auth_headers(self.api_key, self.organization)
 
     @cached_property
     def me(self) -> AsyncMe:

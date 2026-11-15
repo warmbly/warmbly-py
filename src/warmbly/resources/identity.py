@@ -26,7 +26,9 @@ __all__ = [
 class Identity(BaseModel):
     """The caller's identity and what its credential may do.
 
-    ``auth_type`` is ``"api_key"``, ``"oauth"``, or ``"jwt"``.
+    ``auth_type`` is ``"api_key"``, ``"oauth"``, or ``"jwt"``. ``agency_id``
+    is set when the credential is an agency API key acting on one of its
+    client workspaces (``auth_type`` is then ``"api_key"``).
     """
 
     user_id: str | None = None
@@ -37,6 +39,7 @@ class Identity(BaseModel):
     organization_id: str | None = None
     organization_name: str | None = None
     auth_type: str | None = None
+    agency_id: str | None = None
     scopes: Sequence[str] = []
 
 

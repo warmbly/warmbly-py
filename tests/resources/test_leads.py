@@ -106,6 +106,7 @@ LEAD: dict[str, Any] = {
         "https": True,
         "title": "Acme Bakery",
         "signals": ["wordpress"],
+        "read_via": "jina",
         "phones": [],
         "pages": 4,
         "email_pattern": "first.last",
@@ -155,6 +156,7 @@ RUN: dict[str, Any] = {
     "requested_by_user_id": None,
     "verify": True,
     "people": True,
+    "web_search": True,
     "status": "running",
     "total": 10,
     "processed": 4,
@@ -182,6 +184,7 @@ def _check_lead(lead: Any) -> None:
     assert lead.price_level is None
     assert lead.site is not None
     assert lead.site.email_pattern == "first.last"
+    assert lead.site.read_via == "jina"
     assert lead.enrichment_status == "done"
     assert lead.people[0].seniority == "owner"
     assert lead.people[0].contact_id is None
@@ -681,11 +684,18 @@ def test_enrichment_sync(client: Warmbly) -> None:
         lead_ids=[LEAD_ID],
         verify=False,
         people=True,
+        web_search=False,
         options={"idempotency_key": "enrich-1"},
     )
     assert _last(enrich).headers["Idempotency-Key"] == "enrich-1"
-    assert _body(enrich) == {"lead_ids": [LEAD_ID], "verify": False, "people": True}
+    assert _body(enrich) == {
+        "lead_ids": [LEAD_ID],
+        "verify": False,
+        "people": True,
+        "web_search": False,
+    }
     assert run.id == RUN_ID
+    assert run.web_search is True
     assert run.status == "running"
     assert run.processed == 4
     assert run.emails_found == 3
@@ -711,8 +721,15 @@ async def test_enrichment_async(aclient: AsyncWarmbly) -> None:
     enrich = respx.post(f"{BASE_URL}/leads/enrich").mock(
         return_value=httpx.Response(202, json=RUN)
     )
-    run = await aclient.leads.enrich(all_=True, filter={"has_website": True})
-    assert _body(enrich) == {"all": True, "filter": {"has_website": True}}
+    run = await aclient.leads.enrich(
+        all_=True, filter={"has_website": True}, web_search=True
+    )
+    assert _body(enrich) == {
+        "all": True,
+        "filter": {"has_website": True},
+        "web_search": True,
+    }
+    assert run.web_search is True
     assert run.total == 10
 
     respx.get(f"{BASE_URL}/leads/enrichments").mock(

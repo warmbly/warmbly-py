@@ -15,7 +15,7 @@ import email.utils
 import random
 import time
 import uuid
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 from importlib.metadata import PackageNotFoundError, version
 from typing import TYPE_CHECKING, Any, TypeVar
@@ -451,12 +451,16 @@ class SyncAPIClient(BaseClient):
         query: Mapping[str, object] | None = None,
         options: RequestOptions | None = None,
         data_key: str = "data",
+        cursor_replaces: Collection[str] = (),
     ) -> SyncCursorPage[ModelT]:
         base_query = dict(query or {})
 
         def fetch(cursor: str | None) -> SyncCursorPage[ModelT]:
             merged = dict(base_query)
             if cursor is not None:
+                # A page position the cursor supersedes goes on the first page only.
+                for key in cursor_replaces:
+                    merged.pop(key, None)
                 merged["cursor"] = cursor
             prepared = self._prepare("GET", path, query=merged, options=options)
             response = self._send(prepared)
@@ -603,12 +607,16 @@ class AsyncAPIClient(BaseClient):
         query: Mapping[str, object] | None = None,
         options: RequestOptions | None = None,
         data_key: str = "data",
+        cursor_replaces: Collection[str] = (),
     ) -> AsyncPaginator[ModelT]:
         base_query = dict(query or {})
 
         async def fetch(cursor: str | None) -> AsyncCursorPage[ModelT]:
             merged = dict(base_query)
             if cursor is not None:
+                # A page position the cursor supersedes goes on the first page only.
+                for key in cursor_replaces:
+                    merged.pop(key, None)
                 merged["cursor"] = cursor
             prepared = self._prepare("GET", path, query=merged, options=options)
             response = await self._send(prepared)

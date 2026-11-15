@@ -54,12 +54,21 @@ class Plan(BaseModel):
         stripe_product_id: The Stripe product behind both.
         referral_reward_percent: Percentage of this plan's first-month-equivalent
             price a referrer earns when an invitee converts to it.
+        price_yearly: The yearly price, where the plan has one.
+        monthly_allowance_usd: The AI allowance in USD the plan refills each
+            month.
+        monthly_send_pool: Set on an agency plan: the sends all of the
+            agency's client workspaces share each period (``0`` means no pool
+            cap). ``None`` on a workspace plan.
+        agency_ai_allowance_usd: What an agency plan refills the agency's
+            shared AI balance to each period.
     """
 
     id: str
     name: str | None = None
     price: float | None = None
     discounted_price: float | None = None
+    price_yearly: float | None = None
     duration: str | None = None
     savings: int | None = None
     public: bool | None = None
@@ -68,6 +77,7 @@ class Plan(BaseModel):
     account_limit: int | None = None
     ai_generation: bool | None = None
     monthly_credits: int | None = None
+    monthly_allowance_usd: float | None = None
     dedicated_workers: int | None = None
     daily_campaign_limit: int | None = None
     max_campaigns: int | None = None
@@ -78,6 +88,8 @@ class Plan(BaseModel):
     stripe_price_id_yearly: str | None = None
     stripe_product_id: str | None = None
     referral_reward_percent: int | None = None
+    monthly_send_pool: int | None = None
+    agency_ai_allowance_usd: float | None = None
     created_at: str | None = None
     updated_at: str | None = None
 

@@ -6,7 +6,8 @@ Bodies may contain ``{{.Key}}`` placeholders, which :meth:`Templates.render`
 expands against a caller-supplied variable map.
 
 Templates are ordered within the organization; :meth:`Templates.reorder`
-rewrites that order in one call.
+rewrites that order in one call. :meth:`Templates.copy_to` copies templates
+into other workspaces the caller belongs to.
 """
 
 from __future__ import annotations
@@ -33,6 +34,11 @@ __all__ = [
     "TemplateRules",
     "TemplateScore",
     "Templates",
+    "WorkspaceCopyFailure",
+    "WorkspaceCopyRef",
+    "WorkspaceCopyResponse",
+    "WorkspaceCopyResult",
+    "WorkspaceCopyReview",
 ]
 
 
@@ -57,6 +63,60 @@ class TemplateDeleted(BaseModel):
     id: str | None = None
     deleted: bool | None = None
     status: str | None = None
+
+
+class WorkspaceCopyRef(BaseModel):
+    """One campaign or template a copy created in a destination workspace."""
+
+    id: str
+    name: str | None = None
+
+
+class WorkspaceCopyReview(BaseModel):
+    """A copied campaign step whose settings pointed at something only the
+    source workspace has (a tag, segment, pipeline, automation, teammate or
+    form).
+
+    ``fields`` names those settings. The copy clears every one of them except
+    a form link, which resolves to nothing in the destination until it is
+    replaced.
+    """
+
+    step_id: str | None = None
+    step_name: str | None = None
+    fields: Sequence[str] = []
+
+
+class WorkspaceCopyFailure(BaseModel):
+    """Why a destination workspace received nothing: a stable ``code`` (for
+    example ``copy_destination_forbidden``) and a readable ``message``."""
+
+    code: str | None = None
+    message: str | None = None
+
+
+class WorkspaceCopyResult(BaseModel):
+    """What one destination workspace received from a copy.
+
+    ``status`` is ``copied``, ``partial`` or ``failed``. ``campaign`` is set
+    for a campaign copy that landed, ``error`` for a destination that failed.
+    """
+
+    organization_id: str
+    organization_name: str | None = None
+    status: str | None = None
+    campaign: WorkspaceCopyRef | None = None
+    templates: Sequence[WorkspaceCopyRef] = []
+    review: Sequence[WorkspaceCopyReview] = []
+    warnings: Sequence[str] = []
+    error: WorkspaceCopyFailure | None = None
+
+
+class WorkspaceCopyResponse(BaseModel):
+    """The outcome of a copy into other workspaces, one entry per destination
+    in the order they were asked for."""
+
+    data: Sequence[WorkspaceCopyResult] = []
 
 
 class RenderedTemplate(BaseModel):
@@ -276,6 +336,41 @@ class Templates(SyncAPIResource):
             f"/templates/{template_id}/duplicate", cast_to=Template, options=options
         )
 
+    def copy_to(
+        self,
+        *,
+        template_ids: Sequence[str],
+        organization_ids: Sequence[str],
+        options: RequestOptions | None = None,
+    ) -> WorkspaceCopyResponse:
+        """Copy reply templates into other workspaces you belong to.
+
+        Each destination is copied on its own: one refused or failed
+        workspace does not stop the others, and its entry in the response
+        says why. A destination is written only where you are an accepted,
+        unrestricted member allowed to manage campaigns.
+
+        Requires the ``READ_TEMPLATES`` permission, and ``WRITE_TEMPLATES``
+        when called with an API key or OAuth token. An API key or OAuth token
+        reaches only its own workspace, so with one ``organization_ids`` may
+        name only that workspace (the server answers ``403`` with
+        ``cross_workspace_copy_requires_session`` otherwise); copying across
+        workspaces needs a signed-in dashboard session.
+
+        Args:
+            template_ids: The templates to copy, 1 to 50.
+            organization_ids: The destination workspaces, 1 to 10.
+        """
+        return self._post(
+            "/templates/copy-to",
+            cast_to=WorkspaceCopyResponse,
+            body={
+                "template_ids": list(template_ids),
+                "organization_ids": list(organization_ids),
+            },
+            options=options,
+        )
+
     def render(
         self,
         template_id: str,
@@ -473,6 +568,41 @@ class AsyncTemplates(AsyncAPIResource):
         """Copy a template, returning the new copy."""
         return await self._post(
             f"/templates/{template_id}/duplicate", cast_to=Template, options=options
+        )
+
+    async def copy_to(
+        self,
+        *,
+        template_ids: Sequence[str],
+        organization_ids: Sequence[str],
+        options: RequestOptions | None = None,
+    ) -> WorkspaceCopyResponse:
+        """Copy reply templates into other workspaces you belong to.
+
+        Each destination is copied on its own: one refused or failed
+        workspace does not stop the others, and its entry in the response
+        says why. A destination is written only where you are an accepted,
+        unrestricted member allowed to manage campaigns.
+
+        Requires the ``READ_TEMPLATES`` permission, and ``WRITE_TEMPLATES``
+        when called with an API key or OAuth token. An API key or OAuth token
+        reaches only its own workspace, so with one ``organization_ids`` may
+        name only that workspace (the server answers ``403`` with
+        ``cross_workspace_copy_requires_session`` otherwise); copying across
+        workspaces needs a signed-in dashboard session.
+
+        Args:
+            template_ids: The templates to copy, 1 to 50.
+            organization_ids: The destination workspaces, 1 to 10.
+        """
+        return await self._post(
+            "/templates/copy-to",
+            cast_to=WorkspaceCopyResponse,
+            body={
+                "template_ids": list(template_ids),
+                "organization_ids": list(organization_ids),
+            },
+            options=options,
         )
 
     async def render(

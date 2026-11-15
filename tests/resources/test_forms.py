@@ -328,3 +328,144 @@ async def test_forms_async(aclient: AsyncWarmbly) -> None:
     )
     assert (await aclient.forms.verify_domain()).status == "wrong_target"
     assert _last(verify).method == "POST"
+
+
+# -- submissions paging ------------------------------------------------------
+
+
+def _submission(sub_id: str) -> dict:
+    return {"id": sub_id, "form_id": "frm_1", "data": {"email": f"{sub_id}@x.io"}}
+
+
+@respx.mock
+def test_list_submissions_follows_the_cursor_and_drops_before(
+    client: Warmbly,
+) -> None:
+    route = respx.get(f"{BASE_URL}/forms/frm_1/submissions").mock(
+        side_effect=[
+            httpx.Response(
+                200,
+                json={
+                    "data": [_submission("sub_1")],
+                    "has_more": True,
+                    "pagination": {"next_cursor": "c2", "has_more": True},
+                },
+            ),
+            httpx.Response(
+                200,
+                json={
+                    "data": [_submission("sub_2")],
+                    "has_more": False,
+                    "pagination": {"has_more": False},
+                },
+            ),
+        ]
+    )
+    ids = [
+        s.id
+        for s in client.forms.list_submissions(
+            "frm_1", limit=1, before="2026-11-01T00:00:00Z"
+        )
+    ]
+    assert ids == ["sub_1", "sub_2"]
+    first, second = (call.request.url.params for call in route.calls)
+    assert first.get("before") == "2026-11-01T00:00:00Z"
+    assert "cursor" not in first
+    assert second.get("cursor") == "c2"
+    assert "before" not in second
+    assert second.get("limit") == "1"
+
+
+@pytest.mark.anyio
+@respx.mock
+async def test_list_submissions_async_follows_the_cursor(
+    aclient: AsyncWarmbly,
+) -> None:
+    route = respx.get(f"{BASE_URL}/forms/frm_1/submissions").mock(
+        side_effect=[
+            httpx.Response(
+                200,
+                json={
+                    "data": [_submission("sub_1")],
+                    "pagination": {"next_cursor": "c2", "has_more": True},
+                },
+            ),
+            httpx.Response(
+                200, json={"data": [_submission("sub_2")], "pagination": {}}
+            ),
+        ]
+    )
+    ids = [
+        s.id
+        async for s in aclient.forms.list_submissions(
+            "frm_1", cursor="c1", before="2026-11-01T00:00:00Z"
+        )
+    ]
+    assert ids == ["sub_1", "sub_2"]
+    second = route.calls[1].request.url.params
+    assert second.get("cursor") == "c2"
+    assert "before" not in second
+
+
+@respx.mock
+def test_forms_domain_reports_the_ownership_and_edge_records(client: Warmbly) -> None:
+    respx.get(f"{BASE_URL}/forms/domain").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "forms_domain": "forms.acme.io",
+                "forms_domain_verified": False,
+                "forms_domain_verified_at": None,
+                "cname_target": "forms.warmbly.com",
+                "txt_name": "_warmbly.forms.acme.io",
+                "txt_value": "wb-verify=abc",
+                "status": "proof_missing",
+                "message": "Add the TXT record",
+                "forms_host_unresolvable": False,
+                "edge_records": [
+                    {
+                        "purpose": "certificate",
+                        "type": "TXT",
+                        "name": "_acme-challenge.forms.acme.io",
+                        "value": "tok",
+                        "ok": False,
+                    }
+                ],
+            },
+        )
+    )
+    status = client.forms.domain()
+    assert status.status == "proof_missing"
+    assert status.txt_name == "_warmbly.forms.acme.io"
+    assert status.txt_value == "wb-verify=abc"
+    assert status.edge_records[0].type == "TXT"
+    assert status.edge_records[0].ok is False
+    assert status.edge_records[0].optional is None
+
+
+@pytest.mark.anyio
+@respx.mock
+async def test_identity_and_outreach_new_fields(aclient: AsyncWarmbly) -> None:
+    respx.get(f"{BASE_URL}/me").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "user_id": "u_1",
+                "organization_id": "org_1",
+                "auth_type": "api_key",
+                "agency_id": "agc_1",
+                "scopes": ["read_campaigns"],
+            },
+        )
+    )
+    me = await aclient.me.retrieve()
+    assert me.agency_id == "agc_1"
+
+    respx.get(f"{BASE_URL}/outreach/settings").mock(
+        return_value=httpx.Response(
+            200,
+            json={"external_warmup": {"hide_warmbly_marked": True, "tags": ["wrm"]}},
+        )
+    )
+    settings = await aclient.outreach.settings()
+    assert settings.external_warmup == {"hide_warmbly_marked": True, "tags": ["wrm"]}

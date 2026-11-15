@@ -161,6 +161,18 @@ bound to three route prefixes.
 
 ::: warmbly.resources.audit_logs.AuditLogs
 
+## Client reports
+
+::: warmbly.resources.reports.Reports
+
+## Migrations
+
+::: warmbly.resources.migrations.Migrations
+
+## Agency
+
+::: warmbly.resources.agency.Agency
+
 ## Placement tests
 
 ::: warmbly.resources.placement.Placement

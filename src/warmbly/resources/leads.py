@@ -100,8 +100,9 @@ class LeadArea(BaseModel):
 class LeadEmail(BaseModel):
     """One address found for a lead and what checking it said.
 
-    ``source`` is ``"website"`` when read off the business's own site, else the
-    provider that listed it.
+    ``source`` is ``"website"`` when read off the business's own site,
+    ``"search"`` when a web search showed it on a page about the business, else
+    the provider that listed it.
     """
 
     email: str | None = None
@@ -119,7 +120,10 @@ class LeadSite(BaseModel):
     (``"first.last"``). ``accepts_all`` is set when the domain's mail server
     accepts any address, so a guessed address cannot be confirmed.
     ``found_website`` is set when the listing had no website and the finder
-    confirmed one worked out from the business's name.
+    confirmed one worked out from the business's name. ``read_via`` names the
+    reader service that fetched a site after a direct visit was turned away
+    (empty when read directly), and ``unread`` says why a site could not be
+    read: ``blocked``, ``robots`` or ``unreachable``.
     """
 
     reachable: bool | None = None
@@ -134,6 +138,8 @@ class LeadSite(BaseModel):
     email_pattern: str | None = None
     accepts_all: bool | None = None
     found_website: bool | None = None
+    read_via: str | None = None
+    unread: str | None = None
     error: str | None = None
     checked_at: str | None = None
 
@@ -268,12 +274,15 @@ class LeadEnrichmentRun(BaseModel):
 
     ``status`` is the run's lifecycle state; ``processed`` counts toward
     ``total``. ``charged_usd`` is what the run has cost so far, net of refunds.
+    ``web_search`` is set when the run may search the web for a missing site or
+    for the addresses an unreadable site publishes elsewhere.
     """
 
     id: str
     requested_by_user_id: str | None = None
     verify: bool | None = None
     people: bool | None = None
+    web_search: bool | None = None
     status: str | None = None
     total: int | None = None
     processed: int | None = None
@@ -922,6 +931,7 @@ class Leads(SyncAPIResource):
         filter: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
         verify: NotGivenOr[bool] = NOT_GIVEN,
         people: NotGivenOr[bool] = NOT_GIVEN,
+        web_search: NotGivenOr[bool] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> LeadEnrichmentRun:
         """Start a background run reading the selected leads' websites.
@@ -940,13 +950,19 @@ class Leads(SyncAPIResource):
             verify: Check the addresses found (default ``True``).
             people: Also find the people each site names and work out their
                 addresses (default ``True``).
+            web_search: Search the web for a missing site, or for the addresses
+                a site that turned the reader away publishes elsewhere, when
+                the workspace has a search integration set up (default
+                ``True``).
         """
         return self._post(
             "/leads/enrich",
             cast_to=LeadEnrichmentRun,
             body={
                 **_selection(lead_ids=lead_ids, all_=all_, filter=filter),
-                **drop_not_given({"verify": verify, "people": people}),
+                **drop_not_given(
+                    {"verify": verify, "people": people, "web_search": web_search}
+                ),
             },
             options=options,
         )
@@ -1528,6 +1544,7 @@ class AsyncLeads(AsyncAPIResource):
         filter: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
         verify: NotGivenOr[bool] = NOT_GIVEN,
         people: NotGivenOr[bool] = NOT_GIVEN,
+        web_search: NotGivenOr[bool] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> LeadEnrichmentRun:
         """Start a background run reading the selected leads' websites.
@@ -1546,13 +1563,19 @@ class AsyncLeads(AsyncAPIResource):
             verify: Check the addresses found (default ``True``).
             people: Also find the people each site names and work out their
                 addresses (default ``True``).
+            web_search: Search the web for a missing site, or for the addresses
+                a site that turned the reader away publishes elsewhere, when
+                the workspace has a search integration set up (default
+                ``True``).
         """
         return await self._post(
             "/leads/enrich",
             cast_to=LeadEnrichmentRun,
             body={
                 **_selection(lead_ids=lead_ids, all_=all_, filter=filter),
-                **drop_not_given({"verify": verify, "people": people}),
+                **drop_not_given(
+                    {"verify": verify, "people": people, "web_search": web_search}
+                ),
             },
             options=options,
         )

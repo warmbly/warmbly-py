@@ -88,14 +88,19 @@ def test_error_reason_defaults_to_none() -> None:
 # -- scopes ------------------------------------------------------------------
 
 
-def test_app_grantable_scopes_exclude_only_api_keys() -> None:
+_WORKSPACE_SCOPES = {name for name in SCOPES if not name.startswith("agency_")}
+
+
+def test_app_grantable_scopes_exclude_key_management_and_credentials() -> None:
     granted = set(mask_to_scopes(APP_GRANTABLE_SCOPES))
-    assert granted == set(SCOPES) - {"api_keys"}
+    assert granted == _WORKSPACE_SCOPES - {"api_keys", "connect_emails"}
     assert not APP_GRANTABLE_SCOPES & SCOPES["api_keys"]
+    assert not APP_GRANTABLE_SCOPES & SCOPES["connect_emails"]
 
 
-def test_role_permissions_cover_every_scope() -> None:
-    assert set(ROLE_PERMISSIONS) == set(SCOPES)
+def test_role_permissions_cover_every_workspace_scope() -> None:
+    assert set(ROLE_PERMISSIONS) == _WORKSPACE_SCOPES
+    assert ROLE_PERMISSIONS["manage_reports"] == ("view_analytics", "manage_campaigns")
     assert ROLE_PERMISSIONS["ai_research"] == ("view_contacts", "use_ai")
     assert ROLE_PERMISSIONS["realtime_subscribe"] == ()
     assert ROLE_PERMISSIONS["send_campaigns"] == ("send_campaigns",)

@@ -38,6 +38,7 @@ __all__ = [
     "FormSubmissionDeleted",
     "Forms",
     "FormsConfig",
+    "FormsDNSRecord",
     "FormsDomainStatus",
 ]
 
@@ -98,23 +99,44 @@ class FormsConfig(BaseModel):
     captcha_available: bool | None = None
 
 
+class FormsDNSRecord(BaseModel):
+    """One DNS record the forms domain needs, and whether DNS shows it yet.
+
+    ``optional`` records improve the result but are not needed to verify.
+    """
+
+    purpose: str | None = None
+    type: str | None = None
+    name: str | None = None
+    value: str | None = None
+    ok: bool | None = None
+    optional: bool | None = None
+
+
 class FormsDomainStatus(BaseModel):
     """The organization's custom forms domain and its DNS verdict.
 
-    ``cname_target`` is the value to point the CNAME at. ``status`` is stable
-    and machine-readable: ``verified``, ``unset``, ``no_target``,
-    ``not_found``, ``wrong_target`` or ``lookup_error``; ``observed`` is what
-    DNS actually returned. Only a verified domain is used to build form URLs.
+    ``cname_target`` is the value to point the CNAME at, and ``txt_name`` /
+    ``txt_value`` the ownership record a new verification needs beside it.
+    ``status`` is stable and machine-readable: ``verified``, ``unset``,
+    ``no_target``, ``not_found``, ``wrong_target``, ``proof_missing`` or
+    ``lookup_error``; ``observed`` is what DNS actually returned. Only a
+    verified domain is used to build form URLs. ``edge_records`` are the TXT
+    records the edge in front of the forms service still needs before it
+    serves the domain over HTTPS.
     """
 
     forms_domain: str | None = None
     forms_domain_verified: bool | None = None
     forms_domain_verified_at: str | None = None
     cname_target: str | None = None
+    txt_name: str | None = None
+    txt_value: str | None = None
     status: str | None = None
     message: str | None = None
     observed: str | None = None
     forms_host_unresolvable: bool | None = None
+    edge_records: Sequence[FormsDNSRecord] = []
 
 
 class FormSubmission(BaseModel):
@@ -313,19 +335,27 @@ class Forms(SyncAPIResource):
         form_id: str,
         *,
         limit: NotGivenOr[int] = NOT_GIVEN,
+        cursor: NotGivenOr[str] = NOT_GIVEN,
         before: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> SyncCursorPage[FormSubmission]:
-        """List a form's submissions, newest first.
+        """List a form's submissions, newest first, auto-paginating.
 
-        Paged with a ``before`` timestamp (RFC 3339 nano); ``limit`` caps at
-        100.
+        Requires the ``READ_CONTACTS`` permission.
+
+        Args:
+            limit: Page size, at most 100.
+            cursor: An opaque cursor from a previous page.
+            before: Start below this RFC 3339 timestamp instead of at the
+                newest. Applies to the first page only; later pages follow the
+                cursor. Do not combine with ``cursor``.
         """
         return self._get_api_list(
             f"/forms/{form_id}/submissions",
             model=FormSubmission,
-            query={"limit": limit, "before": before},
+            query={"limit": limit, "cursor": cursor, "before": before},
             options=options,
+            cursor_replaces=("before",),
         )
 
     def delete_submission(
@@ -535,19 +565,27 @@ class AsyncForms(AsyncAPIResource):
         form_id: str,
         *,
         limit: NotGivenOr[int] = NOT_GIVEN,
+        cursor: NotGivenOr[str] = NOT_GIVEN,
         before: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
     ) -> AsyncPaginator[FormSubmission]:
-        """List a form's submissions, newest first.
+        """List a form's submissions, newest first, auto-paginating.
 
-        Paged with a ``before`` timestamp (RFC 3339 nano); ``limit`` caps at
-        100.
+        Requires the ``READ_CONTACTS`` permission.
+
+        Args:
+            limit: Page size, at most 100.
+            cursor: An opaque cursor from a previous page.
+            before: Start below this RFC 3339 timestamp instead of at the
+                newest. Applies to the first page only; later pages follow the
+                cursor. Do not combine with ``cursor``.
         """
         return self._get_api_list(
             f"/forms/{form_id}/submissions",
             model=FormSubmission,
-            query={"limit": limit, "before": before},
+            query={"limit": limit, "cursor": cursor, "before": before},
             options=options,
+            cursor_replaces=("before",),
         )
 
     async def delete_submission(

@@ -31,8 +31,11 @@ class OutreachSettings(BaseModel):
 
     Each attribute is one branch of the settings tree: bounce handling, task
     reliability, A/B defaults, reply-intent keywords, send-time optimization,
-    preflight checks, the workspace opt-out footer, and which dashboard panels
-    are shown.
+    preflight checks, the workspace opt-out footer, which dashboard panels
+    are shown, and ``external_warmup``: warmup that another service sends
+    through the workspace's mailboxes, kept out of the inbox when
+    ``hide_warmbly_marked`` is set (mail with a Warmbly warmup marker this
+    workspace did not send) or a message carries one of ``tags``.
     """
 
     bounce_pipeline: dict[str, Any] | None = None
@@ -43,6 +46,7 @@ class OutreachSettings(BaseModel):
     preflight: dict[str, Any] | None = None
     unsubscribe: dict[str, Any] | None = None
     dashboard: dict[str, Any] | None = None
+    external_warmup: dict[str, Any] | None = None
     custom: dict[str, Any] | None = None
 
 

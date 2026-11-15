@@ -72,6 +72,10 @@ class GatewayEvent:
     EMAIL_OPENED = "EMAIL_OPENED"
     EMAIL_CLICKED = "EMAIL_CLICKED"
     EMAIL_REPLIED = "EMAIL_REPLIED"
+    #: A bounce or complaint was recorded against a campaign send after it went
+    #: out. Carries ``org_id``, ``campaign_id``, ``contact_id``,
+    #: ``contact_email`` and ``step_id``. Needs ``view_campaigns``.
+    EMAIL_BOUNCED = "EMAIL_BOUNCED"
     EMAIL_RECEIVED = "EMAIL_RECEIVED"
     EMAIL_UPDATED = "EMAIL_UPDATED"
     EMAIL_DELETED = "EMAIL_DELETED"
@@ -181,6 +185,7 @@ EVENT_PERMISSIONS: dict[str, str] = {
     GatewayEvent.WARMUP_PLACEMENT: "manage_emails",
     GatewayEvent.WARMUP_ACTIVITY: "manage_emails",
     GatewayEvent.CONTACT_IMPORT_PROGRESS: "view_contacts",
+    GatewayEvent.EMAIL_BOUNCED: "view_campaigns",
 }
 
 _INTENT_SEPARATORS = re.compile(r"[.:\s-]+")

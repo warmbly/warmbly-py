@@ -67,6 +67,7 @@ def test_list_and_fields(client: Warmbly) -> None:
                         "label": "Email provider",
                         "kind": "enum",
                         "options": ["gmail", "outlook", "other"],
+                        "option_labels": {"gmail": "Google Workspace"},
                     }
                 ]
             ),
@@ -75,6 +76,7 @@ def test_list_and_fields(client: Warmbly) -> None:
     catalog = list(client.segments.fields())
     assert catalog[0].kind == "enum"
     assert list(catalog[0].options) == ["gmail", "outlook", "other"]
+    assert catalog[0].option_labels == {"gmail": "Google Workspace"}
     assert _last(fields).url.path == "/v1/segments/fields"
 
 
