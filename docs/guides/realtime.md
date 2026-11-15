@@ -27,7 +27,10 @@ access token, or a short-lived connection JWT. **The credential must carry the
 (`wmat_...`) are sent in the `X-Warmbly-Token` handshake header, because the
 server refuses them in the URL with code 4003. A connection JWT is sent in the
 `token` query parameter; it opens one socket and then expires, so mint a fresh
-one for every connection attempt. The SDK picks the right place from the
+one for every connection attempt. The client reconnects with the credential it
+was built with, so a connection JWT cannot carry `run_forever()` across a
+disconnect: use an API key or OAuth token for a long-running subscription, or
+build a new client with a fresh JWT after each disconnect. The SDK picks the right place from the
 credential prefix, and the credential is never logged.
 
 A key or token only reaches the workspace it was created in, and only the

@@ -139,7 +139,9 @@ If the first request with a key reached the operation and then failed with a
 so it refuses to run that key again and answers `409` with
 `ErrorCode.IDEMPOTENCY_OUTCOME_UNKNOWN`. Because the SDK retries a write with
 the same key, this is what a retried `5xx` can turn into. It is raised as a
-[`ConflictError`][warmbly.ConflictError] and never retried:
+[`ConflictError`][warmbly.ConflictError] straight away: the SDK retries other
+`409` responses while attempts remain, but not this one, since the same key
+would only get the same answer:
 
 ```python
 from warmbly import ConflictError, ErrorCode

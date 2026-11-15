@@ -6,7 +6,7 @@ import httpx
 import pytest
 import respx
 
-from warmbly import AsyncWarmbly, ErrorCode, Warmbly
+from warmbly import AsyncWarmbly, ConflictError, ErrorCode, Warmbly
 from warmbly.gateway import EVENT_PERMISSIONS, GatewayEvent
 
 BASE_URL = "https://api.warmbly.com/v1"
@@ -88,3 +88,94 @@ def test_new_error_codes_use_server_names() -> None:
 def test_email_bounced_is_a_campaign_event() -> None:
     assert GatewayEvent.EMAIL_BOUNCED == "EMAIL_BOUNCED"
     assert EVENT_PERMISSIONS[GatewayEvent.EMAIL_BOUNCED] == "view_campaigns"
+
+
+@respx.mock
+def test_outcome_unknown_conflict_is_not_retried() -> None:
+    route = respx.post(f"{BASE_URL}/suppressions").mock(
+        side_effect=[
+            httpx.Response(500, json={"code": "internal_error"}),
+            httpx.Response(
+                409,
+                json={"code": "idempotency_outcome_unknown", "message": "unknown"},
+            ),
+            httpx.Response(200, json={"added": 1}),
+        ]
+    )
+    with Warmbly(api_key="wmbly_test", base_url=BASE_URL, max_retries=3) as client:
+        client._retry_delay = lambda attempt, headers: 0.0  # type: ignore[method-assign]
+        with pytest.raises(ConflictError) as info:
+            client.suppressions.add(entries=["a@example.com"])
+    assert info.value.code == ErrorCode.IDEMPOTENCY_OUTCOME_UNKNOWN
+    assert route.call_count == 2
+    keys = {call.request.headers["Idempotency-Key"] for call in route.calls}
+    assert len(keys) == 1
+
+
+@pytest.mark.anyio
+@respx.mock
+async def test_async_outcome_unknown_conflict_is_not_retried_but_others_are() -> None:
+    route = respx.post(f"{BASE_URL}/suppressions").mock(
+        side_effect=[
+            httpx.Response(409, json={"code": "conflict"}),
+            httpx.Response(409, json={"code": "idempotency_outcome_unknown"}),
+        ]
+    )
+    async with AsyncWarmbly(
+        api_key="wmbly_test", base_url=BASE_URL, max_retries=3
+    ) as client:
+        client._retry_delay = lambda attempt, headers: 0.0  # type: ignore[method-assign]
+        with pytest.raises(ConflictError):
+            await client.suppressions.add(entries=["a@example.com"])
+    assert route.call_count == 2
+
+
+@respx.mock
+def test_cursor_replaces_also_drops_the_option_query() -> None:
+    route = respx.get(f"{BASE_URL}/forms/frm_1/submissions").mock(
+        side_effect=[
+            httpx.Response(
+                200,
+                json={
+                    "data": [{"id": "s1"}],
+                    "pagination": {"next_cursor": "c2", "has_more": True},
+                },
+            ),
+            httpx.Response(200, json={"data": [{"id": "s2"}], "pagination": {}}),
+        ]
+    )
+    with Warmbly(api_key="wmbly_test", base_url=BASE_URL, max_retries=0) as client:
+        pages = client.forms.list_submissions(
+            "frm_1", options={"query": {"before": "2026-11-01T00:00:00Z", "x": "1"}}
+        )
+        assert [s.id for s in pages] == ["s1", "s2"]
+    first, second = (call.request.url.params for call in route.calls)
+    assert first.get("before") == "2026-11-01T00:00:00Z"
+    assert "before" not in second
+    assert second.get("cursor") == "c2"
+    assert second.get("x") == "1"
+
+
+@pytest.mark.anyio
+@respx.mock
+async def test_async_cursor_replaces_also_drops_the_option_query() -> None:
+    route = respx.get(f"{BASE_URL}/forms/frm_1/submissions").mock(
+        side_effect=[
+            httpx.Response(
+                200,
+                json={
+                    "data": [{"id": "s1"}],
+                    "pagination": {"next_cursor": "c2", "has_more": True},
+                },
+            ),
+            httpx.Response(200, json={"data": [{"id": "s2"}], "pagination": {}}),
+        ]
+    )
+    async with AsyncWarmbly(
+        api_key="wmbly_test", base_url=BASE_URL, max_retries=0
+    ) as client:
+        pages = client.forms.list_submissions(
+            "frm_1", options={"query": {"before": "2026-11-01T00:00:00Z"}}
+        )
+        assert [s.id async for s in pages] == ["s1", "s2"]
+    assert "before" not in route.calls[1].request.url.params

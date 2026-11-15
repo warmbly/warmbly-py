@@ -42,8 +42,10 @@ def main() -> None:
         row.id
         for row in client.salesforce.list_activity(connection_id, status="failed")
     ]
-    if failed:
-        print("requeued:", client.salesforce.retry_activity(connection_id, ids=failed))
+    # retry_activity takes at most 500 ids per call.
+    for start in range(0, len(failed), 500):
+        batch = failed[start : start + 500]
+        print("requeued:", client.salesforce.retry_activity(connection_id, ids=batch))
 
     # A contact's panel: linked records, opportunities and recent tasks.
     contact_id = os.environ.get("WARMBLY_CONTACT_ID")

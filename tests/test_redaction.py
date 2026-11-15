@@ -18,6 +18,7 @@ _REDACTED = "[redacted]"
     "token",
     [
         "wmbly_secretvalue123",
+        "wmagency_AgencyKey-123",
         "wmat_AccessToken-456",
         "wmrt_RefreshToken_789",
         "wmac_authcode0",
@@ -167,3 +168,8 @@ def test_redact_headers_masks_signature_and_passes_others() -> None:
     assert out["Authorization"] == _REDACTED
     assert out["X-Warmbly-Signature"] == _REDACTED
     assert out["Content-Type"] == "application/json"
+
+
+def test_redact_scrubs_an_agency_key_inside_a_message() -> None:
+    out = redact({"message": "Invalid credential wmagency_AbC123"})
+    assert out == {"message": f"Invalid credential {_REDACTED}"}

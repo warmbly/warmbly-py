@@ -53,10 +53,12 @@ assembled from news fragments in `changelog/` by
 
 ### Fixed
 
+- A `409 idempotency_outcome_unknown` is raised at once instead of being retried with the same key, which could only get the same answer.
 - Gateway `retry_after_ms` hints that are not positive finite numbers are ignored in favour of normal backoff, and `contacts.bulk_delete` now forwards `exclude` even without `select_all` or `filters`.
 
 ### Security
 
+- Agency API keys (`wmagency_`) are scrubbed from debug logs like other Warmbly credentials.
 - Debug request logs now redact `api_key`, `signing_key`, `auth_token` and `webhook_url` request fields.
 - The inbound webhook URL on integration connections and the signing secret returned by `connection_webhook_secret` are now left out of the model `repr`, so printing or logging a response no longer exposes them.
 

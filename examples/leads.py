@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import time
+from itertools import islice
 from pathlib import Path
 
 from warmbly import Warmbly
@@ -43,10 +44,12 @@ def main() -> None:
 
     # Read the leads back, with a filter. Iterating walks every page.
     wanted = {"has_website": True, "enrichment": ["none"]}
-    ids = [lead.id for lead in client.leads.query(filter=wanted, sort="score")]
+    # Take the top 500 without fetching the pages past them.
+    leads = client.leads.query(filter=wanted, sort="score")
+    ids = [lead.id for lead in islice(leads, 500)]
 
     # Read each website for addresses and the people it names.
-    run = client.leads.enrich(lead_ids=ids[:500], verify=True, people=True)
+    run = client.leads.enrich(lead_ids=ids, verify=True, people=True)
     while run.status in {"queued", "running"}:
         time.sleep(5)
         run = client.leads.retrieve_enrichment(run.id)

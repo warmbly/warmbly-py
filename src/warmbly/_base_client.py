@@ -18,7 +18,7 @@ import uuid
 from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 from importlib.metadata import PackageNotFoundError, version
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import httpx
 
@@ -301,6 +301,14 @@ class BaseClient:
         )
 
 
+def _outcome_unknown(response: httpx.Response) -> bool:
+    """A ``409 idempotency_outcome_unknown``: retrying the same key answers the same."""
+    if response.status_code != 409:
+        return False
+    body = _safe_json(response)
+    return isinstance(body, dict) and body.get("code") == "idempotency_outcome_unknown"
+
+
 def _safe_json(response: httpx.Response) -> Any:
     try:
         return response.json()
@@ -394,10 +402,14 @@ class SyncAPIClient(BaseClient):
 
             if response.is_success:
                 return response
-            if remaining > 0 and self._should_retry(
-                prepared.method,
-                response.status_code,
-                has_idempotency_key=prepared.has_idempotency_key,
+            if (
+                remaining > 0
+                and self._should_retry(
+                    prepared.method,
+                    response.status_code,
+                    has_idempotency_key=prepared.has_idempotency_key,
+                )
+                and not _outcome_unknown(response)
             ):
                 remaining, attempt = remaining - 1, attempt + 1
                 time.sleep(self._retry_delay(attempt, response.headers))
@@ -462,7 +474,14 @@ class SyncAPIClient(BaseClient):
                 for key in cursor_replaces:
                     merged.pop(key, None)
                 merged["cursor"] = cursor
-            prepared = self._prepare("GET", path, query=merged, options=options)
+            page_options = options
+            extra = (options or {}).get("query")
+            if cursor is not None and cursor_replaces and extra:
+                page_options = cast(RequestOptions, dict(options or {}))
+                page_options["query"] = {
+                    k: v for k, v in extra.items() if k not in cursor_replaces
+                }
+            prepared = self._prepare("GET", path, query=merged, options=page_options)
             response = self._send(prepared)
             data, next_cursor, has_more, total, request_id = self._page_fields(
                 response, data_key
@@ -550,10 +569,14 @@ class AsyncAPIClient(BaseClient):
 
             if response.is_success:
                 return response
-            if remaining > 0 and self._should_retry(
-                prepared.method,
-                response.status_code,
-                has_idempotency_key=prepared.has_idempotency_key,
+            if (
+                remaining > 0
+                and self._should_retry(
+                    prepared.method,
+                    response.status_code,
+                    has_idempotency_key=prepared.has_idempotency_key,
+                )
+                and not _outcome_unknown(response)
             ):
                 remaining, attempt = remaining - 1, attempt + 1
                 await asyncio.sleep(self._retry_delay(attempt, response.headers))
@@ -618,7 +641,14 @@ class AsyncAPIClient(BaseClient):
                 for key in cursor_replaces:
                     merged.pop(key, None)
                 merged["cursor"] = cursor
-            prepared = self._prepare("GET", path, query=merged, options=options)
+            page_options = options
+            extra = (options or {}).get("query")
+            if cursor is not None and cursor_replaces and extra:
+                page_options = cast(RequestOptions, dict(options or {}))
+                page_options["query"] = {
+                    k: v for k, v in extra.items() if k not in cursor_replaces
+                }
+            prepared = self._prepare("GET", path, query=merged, options=page_options)
             response = await self._send(prepared)
             data, next_cursor, has_more, total, request_id = self._page_fields(
                 response, data_key
