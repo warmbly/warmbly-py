@@ -52,7 +52,10 @@ def main() -> None:
     for line in quote.lines:
         print(f"  {line.type} {line.domain}: {(line.amount_micros or 0) / 1e6}")
     print(f"due now: {due_now / 1e6} {status.currency}")
+    print(f"mailbox: ana@{offer.domain}")
     print(f"then {(quote.recurring_monthly_micros or 0) / 1e6} a month for mailboxes")
+    renewal = (quote.yearly_domain_renewal_micros or 0) / 1e6
+    print(f"and {renewal} a year to renew the domain")
     if input("Place this order? Type 'yes' to confirm: ").strip().lower() != "yes":
         raise SystemExit("not ordered")
 
