@@ -23,11 +23,14 @@ def main() -> None:
     if not status.plan_active:
         raise SystemExit("buying needs an active paid plan")
 
+    def money(micros: int | None) -> str:
+        return "unknown" if micros is None else f"{micros / 1e6:.2f} {status.currency}"
+
     results = client.store.search_domains(q="acmeoutreach", tlds=["com"])
     offer = next((o for o in results.data if o.available), None)
     if offer is None or offer.domain is None:
         raise SystemExit("nothing available; try another name")
-    print("buying", offer.domain, "for", (offer.price_micros or 0) / 1e6)
+    print("buying", offer.domain, "for", money(offer.price_micros))
 
     # Domains are registered under the workspace's registrant, the real legal
     # owner. Save it once with client.store.set_registrant(...) using your own
@@ -52,8 +55,6 @@ def main() -> None:
         raise SystemExit("the quote has no total; not ordering")
     due_now = quote.due_now_micros
 
-    def money(micros: int | None) -> str:
-        return "unknown" if micros is None else f"{micros / 1e6:.2f} {status.currency}"
 
     for line in quote.lines:
         print(f"  {line.type} {line.domain}: {money(line.amount_micros)}")
@@ -74,7 +75,7 @@ def main() -> None:
         if exc.code != "price_changed" or not isinstance(exc.body, dict):
             raise
         fresh = StoreQuote.model_validate(exc.body["details"]["quote"])
-        total = (fresh.due_now_micros or 0) / 1e6
+        total = money(fresh.due_now_micros)
         raise SystemExit(f"price changed, new total {total}") from exc
 
     while order.status in ("charging", "processing"):
