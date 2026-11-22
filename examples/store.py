@@ -48,14 +48,19 @@ def main() -> None:
             },
         ]
     )
-    due_now = quote.due_now_micros or 0
+    if quote.due_now_micros is None:
+        raise SystemExit("the quote has no total; not ordering")
+    due_now = quote.due_now_micros
+
+    def money(micros: int | None) -> str:
+        return "unknown" if micros is None else f"{micros / 1e6:.2f} {status.currency}"
+
     for line in quote.lines:
-        print(f"  {line.type} {line.domain}: {(line.amount_micros or 0) / 1e6}")
-    print(f"due now: {due_now / 1e6} {status.currency}")
+        print(f"  {line.type} {line.domain}: {money(line.amount_micros)}")
+    print(f"due now: {money(due_now)}")
     print(f"mailbox: ana@{offer.domain}")
-    print(f"then {(quote.recurring_monthly_micros or 0) / 1e6} a month for mailboxes")
-    renewal = (quote.yearly_domain_renewal_micros or 0) / 1e6
-    print(f"and {renewal} a year to renew the domain")
+    print(f"then {money(quote.recurring_monthly_micros)} a month for mailboxes")
+    print(f"and {money(quote.yearly_domain_renewal_micros)} a year to renew the domain")
     if input("Place this order? Type 'yes' to confirm: ").strip().lower() != "yes":
         raise SystemExit("not ordered")
 
