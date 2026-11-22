@@ -9,7 +9,7 @@ assembled from news fragments in `changelog/` by
 
 <!-- towncrier release notes start -->
 
-## [v0.4.0] - 2026-11-15
+## [v0.4.0] - 2026-11-22
 
 ### Added
 
@@ -39,6 +39,12 @@ assembled from news fragments in `changelog/` by
 - Campaigns gained `timezone_mode` (`campaign` or `recipient`, to send on each lead's own clock) and `warmup_graduation` on create, update and the `Campaign` model. `campaigns.estimate` accepts `warmup_graduation` and the ramp schedule (`ramp_enabled`, `ramp_start`, `ramp_increment`, `ramp_ceiling`), and its `bottleneck` can now be `campaign_ramp`.
 - Gateway: added the `EMAIL_BOUNCED` event constant, sent on `org:*` when a bounce or complaint is recorded against a campaign send. It needs `view_campaigns`.
 - `leads.enrich` takes `web_search`, and enrichment runs report it; lead sites gain `read_via` and `unread`. Segment fields carry `option_labels` (the new `Location` fields are `world_region`, `country`, `timezone` and `location_known`). The forms domain status reports `txt_name`, `txt_value` and the `edge_records` still needed for HTTPS. Plans carry `price_yearly`, `monthly_allowance_usd`, `monthly_send_pool` and `agency_ai_allowance_usd`. Outreach settings carry `external_warmup`.
+- Added the `store` resource to buy domains and Google Workspace or Microsoft 365 mailboxes and run them: `status`, `search_domains`, `set_registrant`, `create_quote`, `create_order` (pass `expected_due_now_micros` so a changed price is refused, not charged), `list_orders`, `retrieve_order`, domains (`list_domains`, `retrieve_domain`, `update_domain`, `renew_domain`, `transfer_out_domain`, `connect_domain` for a domain registered elsewhere, `check_domain_connection`, `regenerate_domain_connection`, `delete_domain`), DNS records (`create_dns_record`, `update_dns_record`, `delete_dns_record`, `check_dns`), `microsoft_consent`, mailboxes (`list_mailboxes`, `update_mailbox`, `set_mailbox_photo`, `cancel_mailbox`, `resume_mailbox`, `mailbox_sign_in`) and profile photos (`upload_photo`, `copy_profile_photo`, `retrieve_photo`). Reads need the new `READ_STORE` permission and changes need `MANAGE_STORE`; routes that charge also need the member's `manage_billing`. The transfer code and the mailbox password are kept out of `repr`.
+- Added campaign review: `campaigns.review` for the readiness report (leads by review state, fields the emails print that leads have empty, AI copy written ahead), `set_review` to turn the approval hold on or off, `list_review_leads` (auto-paginating), `approve_review_leads`, `reopen_review_leads` and `write_review_ai` for paged AI write-ahead passes, plus per-lead copy with `lead_emails`, `personalize_lead_email`, `reset_lead_email` and `write_lead_email_ai`. `Campaign` gains `review_leads`, and a lead hold's `source` can be `review`.
+- Added `agency.store_overview` for purchased domains and mailboxes across an agency's clients, and `emails.list_partner_mailboxes` for each mailbox's enablement in a workspace a partner manages.
+- Apollo and Salesforce import sources and forms take `segment_ids` to pin every contact they bring in into chosen segments. Mailboxes carry `purchased` and `purchase_cancelled_at`, the mailbox sync policy reports `full_check_seconds`, and the agency AI top-up range reports the card processing fee as `fee_bps`.
+- Added the `read_store` and `manage_store` scopes (bits 32 and 33, both delegated by `manage_emails`); the `READ_ONLY_SCOPES`, `FULL_ACCESS_SCOPES` and `ALL_SCOPES` masks include them as the server's presets do. Gateway: added `STORE_ORDER_UPDATED`, `STORE_DOMAIN_UPDATED` and `STORE_MAILBOX_UPDATED`, which need `manage_emails`.
+- Added `ErrorCode` constants for the store refusals (`price_changed`, `payment_processing`, `plan_required`, `registrant_required`, `store_disabled`, `store_managed_by_partner`, `domain_unavailable`, `dns_record_conflict` and the rest), partner-managed workspaces (`organization_suspended`, `organization_cancelled`, `partner_managed_mailbox`), `purchased_mailbox`, `lead_step_sent`, and the AI spending refusals `ai_allowance_used` and `ai_overage_limit_reached`.
 
 ### Changed
 
