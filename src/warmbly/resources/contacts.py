@@ -1004,7 +1004,9 @@ class Contacts(SyncAPIResource):
             contacts: The contact ids to edit (at most 10000).
             select_all: Switch the selection from *contacts* to *filters*.
             filters: The same body :meth:`search` takes, so the set edited is
-                the set the list was showing.
+                the set the list was showing. The ``category`` argument of
+                :meth:`search` is a query parameter, not part of that body;
+                carry it here as ``category_ids``.
             exclude: Contact ids to drop from a select-all.
             skip_active_in_other_campaigns: Leave out of *add_campaigns* a
                 contact whose sequence is still running in another campaign.
@@ -1052,7 +1054,8 @@ class Contacts(SyncAPIResource):
             contact_ids: The contact ids to delete, sent as a plain array when
                 no search selection is given.
             select_all: Switch the selection from ids to *filters*.
-            filters: The same body :meth:`search` takes.
+            filters: The same body :meth:`search` takes. Carry a
+                :meth:`search` ``category`` as ``category_ids`` here.
             exclude: Contact ids to drop from a select-all.
         """
         body: Any
@@ -1963,7 +1966,9 @@ class AsyncContacts(AsyncAPIResource):
             contacts: The contact ids to edit (at most 10000).
             select_all: Switch the selection from *contacts* to *filters*.
             filters: The same body :meth:`search` takes, so the set edited is
-                the set the list was showing.
+                the set the list was showing. The ``category`` argument of
+                :meth:`search` is a query parameter, not part of that body;
+                carry it here as ``category_ids``.
             exclude: Contact ids to drop from a select-all.
             skip_active_in_other_campaigns: Leave out of *add_campaigns* a
                 contact whose sequence is still running in another campaign.
@@ -2011,7 +2016,8 @@ class AsyncContacts(AsyncAPIResource):
             contact_ids: The contact ids to delete, sent as a plain array when
                 no search selection is given.
             select_all: Switch the selection from ids to *filters*.
-            filters: The same body :meth:`search` takes.
+            filters: The same body :meth:`search` takes. Carry a
+                :meth:`search` ``category`` as ``category_ids`` here.
             exclude: Contact ids to drop from a select-all.
         """
         body: Any

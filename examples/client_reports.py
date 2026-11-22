@@ -17,6 +17,9 @@ def main() -> None:
     report = client.reports.create(
         name="Acme: monthly outreach",
         date_range="last_30_days",
+        # Only Acme's campaigns: the default scope is the whole workspace,
+        # which would show other clients' results to anyone with the link.
+        access={"scope": "restricted", "campaign_ids": ["<acme-campaign-id>"]},
         sections={"overview": True, "daily_chart": True, "campaigns": True},
     )
 

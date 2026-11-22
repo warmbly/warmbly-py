@@ -55,10 +55,9 @@ def main() -> None:
         run = client.leads.retrieve_enrichment(run.id)
     print(f"{run.emails_found} addresses, {run.people_found} people found")
 
-    # Turn the leads that have an address into contacts and enrol them.
+    # Turn the leads just enriched into contacts and enrol them.
     added = client.leads.add_to_contacts(
-        all_=True,
-        filter={"has_email": True, "in_contacts": False},
+        lead_ids=ids,
         who="both",
         verified_only=True,
         campaign_ids=["<campaign-id>"],

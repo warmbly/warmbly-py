@@ -476,10 +476,13 @@ class SyncAPIClient(BaseClient):
                 merged["cursor"] = cursor
             page_options = options
             extra = (options or {}).get("query")
-            if cursor is not None and cursor_replaces and extra:
+            if cursor is not None and extra:
+                # Extra query params are merged last, so a cursor (or a position
+                # it supersedes) there would pin every page to the first one.
+                dropped = {"cursor", *cursor_replaces}
                 page_options = cast(RequestOptions, dict(options or {}))
                 page_options["query"] = {
-                    k: v for k, v in extra.items() if k not in cursor_replaces
+                    k: v for k, v in extra.items() if k not in dropped
                 }
             prepared = self._prepare("GET", path, query=merged, options=page_options)
             response = self._send(prepared)
@@ -643,10 +646,13 @@ class AsyncAPIClient(BaseClient):
                 merged["cursor"] = cursor
             page_options = options
             extra = (options or {}).get("query")
-            if cursor is not None and cursor_replaces and extra:
+            if cursor is not None and extra:
+                # Extra query params are merged last, so a cursor (or a position
+                # it supersedes) there would pin every page to the first one.
+                dropped = {"cursor", *cursor_replaces}
                 page_options = cast(RequestOptions, dict(options or {}))
                 page_options["query"] = {
-                    k: v for k, v in extra.items() if k not in cursor_replaces
+                    k: v for k, v in extra.items() if k not in dropped
                 }
             prepared = self._prepare("GET", path, query=merged, options=page_options)
             response = await self._send(prepared)

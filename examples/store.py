@@ -29,19 +29,11 @@ def main() -> None:
         raise SystemExit("nothing available; try another name")
     print("buying", offer.domain, "for", (offer.price_micros or 0) / 1e6)
 
-    # Domains are registered under the workspace's registrant.
+    # Domains are registered under the workspace's registrant, the real legal
+    # owner. Save it once with client.store.set_registrant(...) using your own
+    # details; this example never invents one.
     if status.registrant is None:
-        client.store.set_registrant(
-            first_name="Ana",
-            last_name="Diaz",
-            email="ana@acme.example",
-            phone="+1.4155550100",
-            address1="1 Main St",
-            city="San Francisco",
-            state="CA",
-            postal_code="94105",
-            country="US",
-        )
+        raise SystemExit("save the workspace's registrant first (set_registrant)")
 
     quote = client.store.create_quote(
         items=[
@@ -57,7 +49,12 @@ def main() -> None:
         ]
     )
     due_now = quote.due_now_micros or 0
-    print("due now:", due_now / 1e6)
+    for line in quote.lines:
+        print(f"  {line.type} {line.domain}: {(line.amount_micros or 0) / 1e6}")
+    print(f"due now: {due_now / 1e6} {status.currency}")
+    print(f"then {(quote.recurring_monthly_micros or 0) / 1e6} a month for mailboxes")
+    if input("Place this order? Type 'yes' to confirm: ").strip().lower() != "yes":
+        raise SystemExit("not ordered")
 
     # Order exactly the total that was shown. If the quote expired and the
     # price moved, nothing is charged and the error carries a fresh quote.

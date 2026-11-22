@@ -29,6 +29,8 @@ def main(campaign_id: str) -> None:
         print(f"{field.leads} leads have no {field.field}")
     for issue in summary.template_errors:
         print(f"step {issue.position} does not render: {issue.message}")
+    if summary.template_errors:
+        raise SystemExit("fix the copy before approving anyone")
 
     # Write the first email's AI copy ahead, one pass at a time.
     after: str | None = None
@@ -39,7 +41,11 @@ def main(campaign_id: str) -> None:
             else campaigns.write_review_ai(campaign_id, waiting_only=True)
         )
         print(f"wrote {result.written}, {result.remaining} left")
-        if result.stopped or not result.remaining or not result.next:
+        if result.stopped:
+            # Out of balance or over the usage cap: leads are still missing
+            # copy, so keep them held rather than approve them.
+            raise SystemExit(f"AI pass stopped early: {result.stopped}")
+        if not result.remaining or not result.next:
             break
         after = result.next
 

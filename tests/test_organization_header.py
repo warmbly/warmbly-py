@@ -179,3 +179,40 @@ async def test_async_cursor_replaces_also_drops_the_option_query() -> None:
         )
         assert [s.id async for s in pages] == ["s1", "s2"]
     assert "before" not in route.calls[1].request.url.params
+
+
+def _two_pages() -> list[httpx.Response]:
+    return [
+        httpx.Response(
+            200,
+            json={
+                "data": [{"id": "k1"}],
+                "pagination": {"next_cursor": "c2", "has_more": True},
+            },
+        ),
+        httpx.Response(200, json={"data": [{"id": "k2"}], "pagination": {}}),
+    ]
+
+
+@respx.mock
+def test_a_cursor_in_the_option_query_does_not_pin_later_pages() -> None:
+    route = respx.get(f"{BASE_URL}/api-keys").mock(side_effect=_two_pages())
+    with Warmbly(api_key="wmbly_test", base_url=BASE_URL, max_retries=0) as client:
+        pages = client.api_keys.list(options={"query": {"cursor": "c1", "x": "1"}})
+        assert [k.id for k in pages] == ["k1", "k2"]
+    first, second = (call.request.url.params for call in route.calls)
+    assert first.get("cursor") == "c1"
+    assert second.get("cursor") == "c2"
+    assert second.get("x") == "1"
+
+
+@pytest.mark.anyio
+@respx.mock
+async def test_async_a_cursor_in_the_option_query_does_not_pin_later_pages() -> None:
+    route = respx.get(f"{BASE_URL}/api-keys").mock(side_effect=_two_pages())
+    async with AsyncWarmbly(
+        api_key="wmbly_test", base_url=BASE_URL, max_retries=0
+    ) as client:
+        pages = client.api_keys.list(options={"query": {"cursor": "c1"}})
+        assert [k.id async for k in pages] == ["k1", "k2"]
+    assert route.calls[1].request.url.params.get("cursor") == "c2"

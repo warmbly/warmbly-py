@@ -59,6 +59,7 @@ assembled from news fragments in `changelog/` by
 
 ### Fixed
 
+- A `cursor` passed through `options={"query": ...}` on a list call no longer pins every page to the first one; auto-pagination now advances past it.
 - A `409 idempotency_outcome_unknown` is raised at once instead of being retried with the same key, which could only get the same answer.
 - Gateway `retry_after_ms` hints that are not positive finite numbers are ignored in favour of normal backoff, and `contacts.bulk_delete` now forwards `exclude` even without `select_all` or `filters`.
 

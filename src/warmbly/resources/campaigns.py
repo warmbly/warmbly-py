@@ -2603,8 +2603,12 @@ class Campaigns(SyncAPIResource):
     ) -> CampaignReviewChange:
         """Approve waiting leads so their first email can go out.
 
-        Approving a lead that is not waiting changes nothing, so a retry is
-        safe. Requires the ``send_campaigns`` scope.
+        Approving a lead that is not waiting changes nothing, so a retry of a
+        ``contact_ids`` call is safe. With ``select_all=True`` a fresh call
+        also approves leads that started waiting since the first one; the
+        SDK's own retries reuse one idempotency key, and to retry by hand
+        pass the same ``options={"idempotency_key": ...}`` both times.
+        Requires the ``send_campaigns`` scope.
 
         Args:
             contact_ids: The leads to approve.
@@ -4236,8 +4240,12 @@ class AsyncCampaigns(AsyncAPIResource):
     ) -> CampaignReviewChange:
         """Approve waiting leads so their first email can go out.
 
-        Approving a lead that is not waiting changes nothing, so a retry is
-        safe. Requires the ``send_campaigns`` scope.
+        Approving a lead that is not waiting changes nothing, so a retry of a
+        ``contact_ids`` call is safe. With ``select_all=True`` a fresh call
+        also approves leads that started waiting since the first one; the
+        SDK's own retries reuse one idempotency key, and to retry by hand
+        pass the same ``options={"idempotency_key": ...}`` both times.
+        Requires the ``send_campaigns`` scope.
 
         Args:
             contact_ids: The leads to approve.
