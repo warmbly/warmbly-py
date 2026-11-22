@@ -2607,7 +2607,11 @@ class Campaigns(SyncAPIResource):
         ``contact_ids`` call is safe. With ``select_all=True`` a fresh call
         also approves leads that started waiting since the first one; the
         SDK's own retries reuse one idempotency key, and to retry by hand
-        pass the same ``options={"idempotency_key": ...}`` both times.
+        pass the same ``options={"idempotency_key": ...}`` both times. A
+        ``409`` ``idempotency_outcome_unknown`` means the first attempt may
+        already have approved leads and the same key only repeats that
+        answer: check :meth:`review` before starting again with a new key
+        (see the retries guide).
         Requires the ``send_campaigns`` scope.
 
         Args:
@@ -4244,7 +4248,11 @@ class AsyncCampaigns(AsyncAPIResource):
         ``contact_ids`` call is safe. With ``select_all=True`` a fresh call
         also approves leads that started waiting since the first one; the
         SDK's own retries reuse one idempotency key, and to retry by hand
-        pass the same ``options={"idempotency_key": ...}`` both times.
+        pass the same ``options={"idempotency_key": ...}`` both times. A
+        ``409`` ``idempotency_outcome_unknown`` means the first attempt may
+        already have approved leads and the same key only repeats that
+        answer: check :meth:`review` before starting again with a new key
+        (see the retries guide).
         Requires the ``send_campaigns`` scope.
 
         Args:
