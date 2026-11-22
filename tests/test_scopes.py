@@ -7,7 +7,17 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from warmbly import mask_to_scopes, scopes_to_mask
-from warmbly._utils._scopes import ALL_SCOPES, SCOPES
+from warmbly._utils._scopes import (
+    AGENCY_KEY_GRANTABLE_SCOPES,
+    AGENCY_KEY_WORKSPACE_SCOPES,
+    AGENCY_SCOPES,
+    ALL_SCOPES,
+    APP_GRANTABLE_SCOPES,
+    FULL_ACCESS_SCOPES,
+    READ_ONLY_SCOPES,
+    ROLE_PERMISSIONS,
+    SCOPES,
+)
 
 _SCOPE_NAMES = sorted(SCOPES.keys())
 
@@ -45,7 +55,7 @@ def test_mask_is_pure_or_of_bits(subset: list[str]) -> None:
 
 def test_scopes_to_mask_preserves_declaration_order() -> None:
     # mask_to_scopes iterates SCOPES, so output follows declaration order.
-    recovered = mask_to_scopes(ALL_SCOPES)
+    recovered = mask_to_scopes(ALL_SCOPES | AGENCY_SCOPES)
     assert recovered == list(SCOPES.keys())
 
 
@@ -76,17 +86,52 @@ def test_duplicate_names_collapse() -> None:
 
 
 def test_all_scopes_value() -> None:
-    assert sum(SCOPES.values()) == ALL_SCOPES
-    assert scopes_to_mask(SCOPES.keys()) == ALL_SCOPES
+    assert sum(SCOPES.values()) == ALL_SCOPES | AGENCY_SCOPES
+    assert scopes_to_mask(SCOPES.keys()) == ALL_SCOPES | AGENCY_SCOPES
+    assert not ALL_SCOPES & AGENCY_SCOPES
 
 
-def test_all_scopes_grants_everything() -> None:
-    assert set(mask_to_scopes(ALL_SCOPES)) == set(SCOPES.keys())
+def test_all_scopes_grants_every_workspace_scope() -> None:
+    assert set(mask_to_scopes(ALL_SCOPES)) == {
+        name for name in SCOPES if not name.startswith("agency_")
+    }
 
 
-def test_all_scopes_is_24_bits() -> None:
-    assert len(SCOPES) == 24
-    assert bin(ALL_SCOPES).count("1") == 24
+def test_scope_bit_counts() -> None:
+    assert len(SCOPES) == 34
+    assert bin(ALL_SCOPES).count("1") == 29
+    assert mask_to_scopes(AGENCY_SCOPES) == [
+        "agency_read",
+        "agency_manage_clients",
+        "agency_read_usage",
+        "agency_transfer_ai",
+        "agency_migrate",
+    ]
+    assert SCOPES["connect_emails"] == 1 << 24
+    assert SCOPES["agency_migrate"] == 1 << 31
+    assert SCOPES["read_store"] == 4294967296
+    assert SCOPES["manage_store"] == 8589934592
+
+
+def test_store_scopes_match_the_server_masks() -> None:
+    # The server documents these values in docs/api/permissions.
+    assert READ_ONLY_SCOPES == 4295655455
+    assert FULL_ACCESS_SCOPES == 14008975359
+    assert ALL_SCOPES == 14025752575
+    assert AGENCY_KEY_WORKSPACE_SCOPES == 14008965119
+    assert APP_GRANTABLE_SCOPES & SCOPES["manage_store"]
+    assert ROLE_PERMISSIONS["read_store"] == ("manage_emails",)
+    assert ROLE_PERMISSIONS["manage_store"] == ("manage_emails",)
+
+
+def test_presets_match_the_server() -> None:
+    assert not FULL_ACCESS_SCOPES & SCOPES["connect_emails"]
+    assert FULL_ACCESS_SCOPES & SCOPES["manage_reports"]
+    assert FULL_ACCESS_SCOPES & SCOPES["import_tools"]
+    assert not AGENCY_KEY_WORKSPACE_SCOPES & (
+        SCOPES["api_keys"] | SCOPES["realtime_subscribe"] | SCOPES["connect_emails"]
+    )
+    assert AGENCY_KEY_GRANTABLE_SCOPES == AGENCY_KEY_WORKSPACE_SCOPES | AGENCY_SCOPES
 
 
 # ---------------------------------------------------------------------------

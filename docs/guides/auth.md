@@ -131,6 +131,37 @@ client = Warmbly(
 See the [Retries guide](retries.md) for the retry policy and the
 [Async guide](async.md) for the asynchronous client.
 
+## Agency API keys
+
+An agency (a company running many client workspaces) can create agency API
+keys, prefixed `wmagency_`. On the agency's own routes they work as is:
+
+```python
+from warmbly import Warmbly
+
+agency = Warmbly(api_key="wmagency_...")
+for client_workspace in agency.agency.list_clients(agency_id):
+    print(client_workspace)
+```
+
+Every other resource acts in one workspace, so an agency key names the client
+workspace with the `organization` option, sent as the `Warmbly-Organization`
+header (or set `WARMBLY_ORGANIZATION`). Without it the server answers
+`400 agency_key_organization_required`:
+
+```python
+acme = Warmbly(api_key="wmagency_...", organization="<client workspace id>")
+acme.campaigns.list()
+
+# Or per call:
+agency.campaigns.list(options={"headers": {"Warmbly-Organization": "<id>"}})
+```
+
+An agency key never manages workspace API keys or OAuth applications, never
+opens a realtime socket, and never connects mailboxes with credentials. The
+`agency_*` scopes are only ever held by agency keys; see `AGENCY_SCOPES` and
+`AGENCY_KEY_GRANTABLE_SCOPES`.
+
 ## Scopes and permission bitmasks
 
 Warmbly expresses permissions both as readable scope strings (such as

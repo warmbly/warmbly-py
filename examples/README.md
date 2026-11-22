@@ -19,6 +19,7 @@ python examples/quickstart.py
 | [`oauth_flow.py`](./oauth_flow.py) | Full authorization-code + PKCE flow, refresh, revoke |
 | [`oauth_token_manager.py`](./oauth_token_manager.py) | Persistent storage + automatic token refresh |
 | [`campaigns.py`](./campaigns.py) | Create a campaign, add steps, start/stop, read logs |
+| [`campaign_review.py`](./campaign_review.py) | Hold new leads for review: readiness, AI copy written ahead, personalize, approve |
 | [`email_accounts.py`](./email_accounts.py) | Manage mailboxes, warmup controls, send an email |
 | [`contacts.py`](./contacts.py) | Search, bulk add, CSV import/export, notes |
 | [`unibox.py`](./unibox.py) | Read the inbox, label, AI-draft, reply, schedule sends |
@@ -30,8 +31,12 @@ python examples/quickstart.py
 | [`realtime_gateway_async.py`](./realtime_gateway_async.py) | Subscribe to live events (asyncio) |
 | [`realtime_gateway_sync.py`](./realtime_gateway_sync.py) | The same, with the blocking sync client |
 | [`webhooks.py`](./webhooks.py) | Verify inbound webhook signatures and manage endpoints |
+| [`client_reports.py`](./client_reports.py) | Share results with a client: a report, a public link, a schedule |
+| [`store.py`](./store.py) | Buy a domain and mailboxes: search, quote, order, follow progress |
+| [`agency.py`](./agency.py) | Agency API keys: clients, usage, and acting inside a client workspace |
 
 > These call the real API. Run them against a test organization, and note that
 > `campaigns.start(...)`, `emails.send(...)`, and `unibox.reply(...)` actually
-> send mail. The AI endpoints (`generation.*`, `contacts.research()`,
-> `unibox.draft_reply()`) spend credits.
+> send mail, and `store.create_order(...)` charges the workspace. The AI
+> endpoints (`generation.*`, `contacts.research()`, `unibox.draft_reply()`)
+> spend credits.

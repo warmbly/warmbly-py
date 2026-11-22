@@ -28,12 +28,14 @@ from .._utils import drop_not_given
 __all__ = [
     "AgentDraft",
     "AgentDraftDiscarded",
+    "AgentDraftUpserted",
     "AsyncUnibox",
     "ComposeCandidates",
     "ComposeDraft",
     "ComposeDraftDeleted",
     "ComposeDraftSaved",
     "ComposeResult",
+    "FolderMove",
     "GeneratedDraft",
     "Message",
     "MessagePreview",
@@ -112,7 +114,11 @@ class UniboxOverview(BaseModel):
 
     ``folders`` carries an ``{"folder", "unread", "total"}`` entry per
     canonical folder (``inbox``, ``sent``, ``drafts``, ``archive``, ``spam``,
-    ``trash``).
+    ``trash``). ``automated`` and ``automated_unread`` count conversations no
+    person wrote in; they are left out of the other counts, so ``unread``,
+    ``today``, ``week``, the inbox folder and the mailbox and tag entries do
+    not include them. ``drafts`` counts each visible thread once across
+    mailbox drafts and pending agent drafts.
     """
 
     total: int | None = None
@@ -121,7 +127,10 @@ class UniboxOverview(BaseModel):
     week: int | None = None
     snoozed: int | None = None
     awaiting_reply: int | None = None
+    automated: int | None = None
+    automated_unread: int | None = None
     awaiting_agent_draft: int | None = None
+    drafts: int | None = None
     scheduled_pending: int | None = None
     scheduled_pending_max: int | None = None
     folders: Sequence[dict[str, Any]] = []
@@ -229,18 +238,54 @@ class ComposeDraftDeleted(BaseModel):
 
 
 class AgentDraft(BaseModel):
-    """A reply the inbox agent drafted and is holding for human review."""
+    """A reply drafted by the inbox agent, or written by an API key through
+    :meth:`Unibox.upsert_thread_draft`, and held for human review.
+
+    ``source_message_id`` is the inbound message the draft answers and
+    ``in_reply_to`` that message's RFC ``Message-ID``, referenced on send.
+    ``model`` is the writer: the agent's model, or the ``source`` label an API
+    key gave. ``confidence`` is 0 to 1. ``status`` is ``pending``,
+    ``approved`` or ``discarded``; the approved send goes out as the mailbox's
+    owner (``owner_user_id``).
+    """
 
     id: str
     organization_id: str | None = None
-    thread_id: str | None = None
-    email_id: str | None = None
     email_account_id: str | None = None
+    owner_user_id: str | None = None
+    thread_id: str | None = None
+    source_message_id: str | None = None
+    contact_id: str | None = None
+    campaign_id: str | None = None
+    to_addr: str | None = None
     subject: str | None = None
+    in_reply_to: str | None = None
     body: str | None = None
+    intent_class: str | None = None
+    confidence: float | None = None
+    model: str | None = None
     status: str | None = None
     created_at: str | None = None
     updated_at: str | None = None
+
+
+class AgentDraftUpserted(BaseModel):
+    """The result of writing a reply draft for a thread.
+
+    ``created`` is ``False`` when an existing pending draft was replaced.
+    """
+
+    id: str
+    status: str | None = None
+    created: bool | None = None
+
+
+class FolderMove(BaseModel):
+    """The filing a :meth:`Unibox.move_folder` call applied."""
+
+    email_ids: Sequence[str] = []
+    thread_ids: Sequence[str] = []
+    folder: str | None = None
 
 
 class AgentDraftDiscarded(BaseModel):
@@ -307,6 +352,11 @@ def _list_query(
     agent_drafts: NotGivenOr[bool],
     uncategorized: NotGivenOr[bool],
     category_ids: NotGivenOr[Sequence[str]],
+    tag_ids: NotGivenOr[Sequence[str]],
+    automated: NotGivenOr[bool],
+    include_archived: NotGivenOr[bool],
+    campaign_id: NotGivenOr[str],
+    contact_id: NotGivenOr[str],
     since: NotGivenOr[str],
     until: NotGivenOr[str],
 ) -> dict[str, Any]:
@@ -333,6 +383,13 @@ def _list_query(
         "category_ids": (
             ",".join(category_ids) if is_given(category_ids) else NOT_GIVEN
         ),
+        "tag_ids": ",".join(tag_ids) if is_given(tag_ids) else NOT_GIVEN,
+        "automated": (
+            ("true" if automated else "false") if is_given(automated) else NOT_GIVEN
+        ),
+        "include_archived": "true" if include_archived is True else NOT_GIVEN,
+        "campaign_id": campaign_id,
+        "contact_id": contact_id,
         "since": since,
         "until": until,
     }
@@ -440,6 +497,11 @@ class Unibox(SyncAPIResource):
         agent_drafts: NotGivenOr[bool] = NOT_GIVEN,
         uncategorized: NotGivenOr[bool] = NOT_GIVEN,
         category_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        tag_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        automated: NotGivenOr[bool] = NOT_GIVEN,
+        include_archived: NotGivenOr[bool] = NOT_GIVEN,
+        campaign_id: NotGivenOr[str] = NOT_GIVEN,
+        contact_id: NotGivenOr[str] = NOT_GIVEN,
         since: NotGivenOr[str] = NOT_GIVEN,
         until: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
@@ -464,6 +526,14 @@ class Unibox(SyncAPIResource):
             agent_drafts: Only threads with a pending inbox-agent draft.
             uncategorized: Only threads carrying no conversation labels.
             category_ids: Only threads carrying any of these labels.
+            tag_ids: Only mail in mailboxes carrying any of these mailbox
+                tag ids. Ids that are not UUIDs are dropped.
+            automated: ``True`` lists only conversations no person wrote in,
+                ``False`` leaves them out; omit for both.
+            include_archived: Also return conversations that were filed
+                (archived).
+            campaign_id: Only conversations of this campaign.
+            contact_id: Only conversations with this contact.
             since: Lower bound on the message date (RFC 3339).
             until: Upper bound on the message date (RFC 3339).
         """
@@ -485,6 +555,11 @@ class Unibox(SyncAPIResource):
                 agent_drafts=agent_drafts,
                 uncategorized=uncategorized,
                 category_ids=category_ids,
+                tag_ids=tag_ids,
+                automated=automated,
+                include_archived=include_archived,
+                campaign_id=campaign_id,
+                contact_id=contact_id,
                 since=since,
                 until=until,
             ),
@@ -841,6 +916,105 @@ class Unibox(SyncAPIResource):
             options=options,
         )
 
+    # -- filing and thread drafts --------------------------------------------
+    def move_folder(
+        self,
+        *,
+        folder: str,
+        email_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        thread_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> FolderMove:
+        """Re-file messages or whole conversations into a folder.
+
+        The body names the destination, not a change, so a retry converges.
+        Where the mailbox has ``relay_folder_moves`` on (the default), the move
+        is relayed to the provider after the response, best-effort.
+
+        Requires the ``WRITE_UNIBOX`` permission.
+
+        Args:
+            folder: ``"inbox"``, ``"archive"`` or ``"trash"``. ``sent``,
+                ``drafts`` and ``spam`` are placements a provider reaches and
+                are refused with a ``400``.
+            email_ids: Message ids to file (max 500).
+            thread_ids: Conversations to file (max 500). Prefer these when you
+                have one: filing part of a conversation leaves it listed,
+                because a thread shows wherever any message of it still sits.
+        """
+        return self._patch(
+            "/unibox/folder",
+            cast_to=FolderMove,
+            body=drop_not_given(
+                {
+                    "email_ids": (
+                        list(email_ids) if is_given(email_ids) else NOT_GIVEN
+                    ),
+                    "thread_ids": (
+                        list(thread_ids) if is_given(thread_ids) else NOT_GIVEN
+                    ),
+                    "folder": folder,
+                }
+            ),
+            options=options,
+        )
+
+    def upsert_thread_draft(
+        self,
+        *,
+        thread_id: str,
+        body: str,
+        source: str,
+        intent_class: NotGivenOr[str] = NOT_GIVEN,
+        confidence: NotGivenOr[float] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> AgentDraftUpserted:
+        """Hand in a reply you wrote, for the team to review in Drafts.
+
+        The draft answers the newest message on the thread that came from
+        someone else. It replaces the body of the thread's pending draft, or
+        creates a pending draft addressed to that sender with the subject
+        ``Re: ...``; if the pending draft answered an *older* message it is
+        pointed at the newest one under a new ``id``, so an approval of the
+        version that answered the older message sends nothing. It never sends
+        and never changes an approved or discarded draft, and repeating the
+        call is safe.
+
+        Requires the ``WRITE_UNIBOX`` permission. A key limited to certain
+        mailboxes can only draft on threads that arrive in them.
+
+        Args:
+            thread_id: The thread to answer (at most 998 characters).
+            body: The reply, plain text, up to 8000 characters.
+            source: A short label naming the tool that wrote it (letters,
+                digits, dot, dash or underscore; at most 40), kept as the
+                draft's ``model``.
+            intent_class: An optional classification (at most 40 characters).
+            confidence: An optional score from 0 to 1.
+
+        Raises:
+            NotFoundError: ``thread_not_found`` when the workspace has no
+                inbound message on the thread.
+            ConflictError: ``already_sent`` when an approved draft already
+                answers the newest inbound message, or ``draft_discarded``
+                when a discarded one does. Nothing is changed. A reply that
+                arrives later gets a fresh pending draft.
+        """
+        return self._put(
+            "/unibox/ai-drafts/by-thread",
+            cast_to=AgentDraftUpserted,
+            body=drop_not_given(
+                {
+                    "thread_id": thread_id,
+                    "body": body,
+                    "source": source,
+                    "intent_class": intent_class,
+                    "confidence": confidence,
+                }
+            ),
+            options=options,
+        )
+
     # -- snoozes -------------------------------------------------------------
     def list_snoozes(
         self, *, options: RequestOptions | None = None
@@ -925,6 +1099,11 @@ class AsyncUnibox(AsyncAPIResource):
         agent_drafts: NotGivenOr[bool] = NOT_GIVEN,
         uncategorized: NotGivenOr[bool] = NOT_GIVEN,
         category_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        tag_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        automated: NotGivenOr[bool] = NOT_GIVEN,
+        include_archived: NotGivenOr[bool] = NOT_GIVEN,
+        campaign_id: NotGivenOr[str] = NOT_GIVEN,
+        contact_id: NotGivenOr[str] = NOT_GIVEN,
         since: NotGivenOr[str] = NOT_GIVEN,
         until: NotGivenOr[str] = NOT_GIVEN,
         options: RequestOptions | None = None,
@@ -949,6 +1128,14 @@ class AsyncUnibox(AsyncAPIResource):
             agent_drafts: Only threads with a pending inbox-agent draft.
             uncategorized: Only threads carrying no conversation labels.
             category_ids: Only threads carrying any of these labels.
+            tag_ids: Only mail in mailboxes carrying any of these mailbox
+                tag ids. Ids that are not UUIDs are dropped.
+            automated: ``True`` lists only conversations no person wrote in,
+                ``False`` leaves them out; omit for both.
+            include_archived: Also return conversations that were filed
+                (archived).
+            campaign_id: Only conversations of this campaign.
+            contact_id: Only conversations with this contact.
             since: Lower bound on the message date (RFC 3339).
             until: Upper bound on the message date (RFC 3339).
         """
@@ -970,6 +1157,11 @@ class AsyncUnibox(AsyncAPIResource):
                 agent_drafts=agent_drafts,
                 uncategorized=uncategorized,
                 category_ids=category_ids,
+                tag_ids=tag_ids,
+                automated=automated,
+                include_archived=include_archived,
+                campaign_id=campaign_id,
+                contact_id=contact_id,
                 since=since,
                 until=until,
             ),
@@ -1329,6 +1521,105 @@ class AsyncUnibox(AsyncAPIResource):
         return await self._post(
             f"/unibox/agent-drafts/{draft_id}/discard",
             cast_to=AgentDraftDiscarded,
+            options=options,
+        )
+
+    # -- filing and thread drafts --------------------------------------------
+    async def move_folder(
+        self,
+        *,
+        folder: str,
+        email_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        thread_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> FolderMove:
+        """Re-file messages or whole conversations into a folder.
+
+        The body names the destination, not a change, so a retry converges.
+        Where the mailbox has ``relay_folder_moves`` on (the default), the move
+        is relayed to the provider after the response, best-effort.
+
+        Requires the ``WRITE_UNIBOX`` permission.
+
+        Args:
+            folder: ``"inbox"``, ``"archive"`` or ``"trash"``. ``sent``,
+                ``drafts`` and ``spam`` are placements a provider reaches and
+                are refused with a ``400``.
+            email_ids: Message ids to file (max 500).
+            thread_ids: Conversations to file (max 500). Prefer these when you
+                have one: filing part of a conversation leaves it listed,
+                because a thread shows wherever any message of it still sits.
+        """
+        return await self._patch(
+            "/unibox/folder",
+            cast_to=FolderMove,
+            body=drop_not_given(
+                {
+                    "email_ids": (
+                        list(email_ids) if is_given(email_ids) else NOT_GIVEN
+                    ),
+                    "thread_ids": (
+                        list(thread_ids) if is_given(thread_ids) else NOT_GIVEN
+                    ),
+                    "folder": folder,
+                }
+            ),
+            options=options,
+        )
+
+    async def upsert_thread_draft(
+        self,
+        *,
+        thread_id: str,
+        body: str,
+        source: str,
+        intent_class: NotGivenOr[str] = NOT_GIVEN,
+        confidence: NotGivenOr[float] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> AgentDraftUpserted:
+        """Hand in a reply you wrote, for the team to review in Drafts.
+
+        The draft answers the newest message on the thread that came from
+        someone else. It replaces the body of the thread's pending draft, or
+        creates a pending draft addressed to that sender with the subject
+        ``Re: ...``; if the pending draft answered an *older* message it is
+        pointed at the newest one under a new ``id``, so an approval of the
+        version that answered the older message sends nothing. It never sends
+        and never changes an approved or discarded draft, and repeating the
+        call is safe.
+
+        Requires the ``WRITE_UNIBOX`` permission. A key limited to certain
+        mailboxes can only draft on threads that arrive in them.
+
+        Args:
+            thread_id: The thread to answer (at most 998 characters).
+            body: The reply, plain text, up to 8000 characters.
+            source: A short label naming the tool that wrote it (letters,
+                digits, dot, dash or underscore; at most 40), kept as the
+                draft's ``model``.
+            intent_class: An optional classification (at most 40 characters).
+            confidence: An optional score from 0 to 1.
+
+        Raises:
+            NotFoundError: ``thread_not_found`` when the workspace has no
+                inbound message on the thread.
+            ConflictError: ``already_sent`` when an approved draft already
+                answers the newest inbound message, or ``draft_discarded``
+                when a discarded one does. Nothing is changed. A reply that
+                arrives later gets a fresh pending draft.
+        """
+        return await self._put(
+            "/unibox/ai-drafts/by-thread",
+            cast_to=AgentDraftUpserted,
+            body=drop_not_given(
+                {
+                    "thread_id": thread_id,
+                    "body": body,
+                    "source": source,
+                    "intent_class": intent_class,
+                    "confidence": confidence,
+                }
+            ),
             options=options,
         )
 

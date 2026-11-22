@@ -16,17 +16,22 @@ permissively because provider shapes vary and the catalog grows.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
+
+from pydantic import Field
 
 from .._models import BaseModel
 from .._pagination import AsyncPaginator, SyncCursorPage
 from .._resource import AsyncAPIResource, SyncAPIResource
-from .._types import NOT_GIVEN, NotGivenOr, RequestOptions
+from .._types import NOT_GIVEN, NotGiven, NotGivenOr, RequestOptions
 from .._utils import drop_not_given
 
 __all__ = [
     "AsyncIntegrations",
+    "ClaySettings",
+    "CommunityApp",
+    "InboundUrlRotated",
     "IntegrationBooking",
     "IntegrationCatalogEntry",
     "IntegrationConnection",
@@ -48,7 +53,8 @@ class IntegrationCatalogEntry(BaseModel):
     """A provider available to connect from the integrations catalog.
 
     ``configured`` reports whether this deployment has the credentials needed
-    to offer the provider at all.
+    to offer the provider at all. ``rank`` is the provider's popularity on this
+    instance, 1 being the most used.
     """
 
     provider: str
@@ -67,6 +73,7 @@ class IntegrationCatalogEntry(BaseModel):
     supports_push: bool | None = None
     capability: dict[str, Any] | None = None
     configured: bool | None = None
+    rank: int | None = None
 
 
 class IntegrationConnection(BaseModel):
@@ -89,7 +96,7 @@ class IntegrationConnection(BaseModel):
     health: str | None = None
     health_detail: str | None = None
     health_checked_at: str | None = None
-    inbound_webhook_url: str | None = None
+    inbound_webhook_url: str | None = Field(default=None, repr=False)
     last_synced_at: str | None = None
     last_error: str | None = None
     last_error_at: str | None = None
@@ -184,9 +191,73 @@ class IntegrationWebhookSecret(BaseModel):
     ``signature_header`` on inbound provider webhooks.
     """
 
-    signing_secret: str | None = None
+    signing_secret: str | None = Field(default=None, repr=False)
     signature_header: str | None = None
     scheme: str | None = None
+
+
+class InboundUrlRotated(BaseModel):
+    """A connection's new inbound webhook URL.
+
+    The URL embeds the connection's inbound secret, so it is left out of the
+    model's ``repr``; the previous URL stopped working the moment this was
+    issued.
+    """
+
+    inbound_webhook_url: str | None = Field(default=None, repr=False)
+
+
+class ClaySettings(BaseModel):
+    """Everything the Clay page shows for one connection.
+
+    ``defaults`` decides where rows a Clay table sends land (``campaign_id``,
+    ``category_ids``, ``segment_ids``, ``dedup``, ``subscribed``).
+    ``outbound`` reports the table Warmbly sends events to (``webhook_url_set``,
+    ``webhook_host``, ``auth_token_set``, ``events``); the URL and token
+    themselves are never returned. ``stats`` counts inbound rows (``received``,
+    ``created``, ``updated``, ``skipped``, ``failed``, ``last_received_at``,
+    ``last_error``).
+    """
+
+    connection_id: str | None = None
+    label: str | None = None
+    status: str | None = None
+    health: str | None = None
+    inbound_url_minted: bool | None = None
+    defaults: dict[str, Any] | None = None
+    outbound: dict[str, Any] | None = None
+    stats: dict[str, Any] | None = None
+    available_events: Sequence[str] = []
+
+
+class CommunityApp(BaseModel):
+    """A published app in the community directory.
+
+    ``scopes`` is the API permission bitmask the app asks for and
+    ``permissions`` spells it out as ``{name, value, description, category}``
+    entries. ``listed`` means it shows in discovery (featured or widely
+    used); ``installed`` is whether this workspace already uses it.
+    """
+
+    application_id: str
+    slug: str | None = None
+    name: str | None = None
+    tagline: str | None = None
+    description: str | None = None
+    category: str | None = None
+    logo_url: str | None = None
+    website_url: str | None = None
+    install_url: str | None = None
+    support_url: str | None = None
+    privacy_url: str | None = None
+    developer: str | None = None
+    scopes: int | None = None
+    permissions: Sequence[dict[str, Any]] = []
+    status: str | None = None
+    listed: bool | None = None
+    installs: int | None = None
+    installed: bool | None = None
+    published_at: str | None = None
 
 
 class IntegrationTestResult(BaseModel):
@@ -484,6 +555,135 @@ class Integrations(SyncAPIResource):
             options=options,
         )
 
+    def list_community_apps(
+        self,
+        *,
+        limit: NotGivenOr[int] = NOT_GIVEN,
+        cursor: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> SyncCursorPage[CommunityApp]:
+        """List community directory apps, featured first then most installed.
+
+        Auto-paginating. Permissions: ``INTEGRATIONS``.
+
+        Args:
+            limit: Page size, 1 to 200 (default 100).
+            cursor: An opaque cursor from a previous page.
+        """
+        return self._get_api_list(
+            "/integrations/community",
+            model=CommunityApp,
+            query={"limit": limit, "cursor": cursor},
+            options=options,
+        )
+
+    def retrieve_community_app(
+        self, slug: str, *, options: RequestOptions | None = None
+    ) -> CommunityApp:
+        """Open a published app by its link slug, whether or not it is listed.
+
+        Permissions: ``INTEGRATIONS``.
+        """
+        return self._get(
+            f"/integrations/community/{slug}",
+            cast_to=CommunityApp,
+            options=options,
+        )
+
+    def rotate_inbound_url(
+        self, connection_id: str, *, options: RequestOptions | None = None
+    ) -> InboundUrlRotated:
+        """Mint a new inbound URL for a Calendly or Cal.com connection.
+
+        The previous URL stops working immediately; update the provider's
+        webhook to the new one. Other providers answer ``400``. Needs a paid
+        plan and the ``INTEGRATIONS`` permission.
+        """
+        return self._post(
+            f"/integrations/connections/{connection_id}/rotate-inbound-url",
+            cast_to=InboundUrlRotated,
+            options=options,
+        )
+
+    def set_signing_key(
+        self,
+        connection_id: str,
+        *,
+        signing_key: str,
+        options: RequestOptions | None = None,
+    ) -> IntegrationConnectionDetail:
+        """Set the key a Calendly or Cal.com connection's deliveries are signed with.
+
+        An empty *signing_key* goes back to the URL secret alone. The key is
+        write-only; the response carries only the connection. Needs a paid
+        plan and the ``INTEGRATIONS`` permission.
+        """
+        return self._put(
+            f"/integrations/connections/{connection_id}/signing-key",
+            cast_to=IntegrationConnectionDetail,
+            body={"signing_key": signing_key},
+            options=options,
+        )
+
+    def clay_settings(
+        self, connection_id: str, *, options: RequestOptions | None = None
+    ) -> ClaySettings:
+        """Read a Clay connection's inbound defaults, outbound table and stats.
+
+        Permissions: ``INTEGRATIONS``.
+        """
+        return self._get(
+            f"/integrations/clay/{connection_id}",
+            cast_to=ClaySettings,
+            options=options,
+        )
+
+    def update_clay_settings(
+        self,
+        connection_id: str,
+        *,
+        defaults: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        webhook_url: NotGivenOr[str] = NOT_GIVEN,
+        auth_token: NotGivenOr[str] = NOT_GIVEN,
+        events: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> ClaySettings:
+        """Save the inbound defaults, the outbound table and its events.
+
+        Every field given replaces its value, so a retry converges.
+        *webhook_url* and *auth_token* are write-only: the response reports
+        only whether they are set.
+
+        Permissions: ``INTEGRATIONS``.
+
+        Args:
+            connection_id: The Clay connection.
+            defaults: Where inbound rows land: ``campaign_id``,
+                ``category_ids``, ``segment_ids``, ``dedup`` and
+                ``subscribed``.
+            webhook_url: The Clay table's webhook source URL.
+            auth_token: The table's auth token, if it has one.
+            events: The events to send to the table (see
+                ``available_events``).
+        """
+        return self._patch(
+            f"/integrations/clay/{connection_id}",
+            cast_to=ClaySettings,
+            body=drop_not_given(
+                {
+                    "defaults": (
+                        NOT_GIVEN if isinstance(defaults, NotGiven) else dict(defaults)
+                    ),
+                    "webhook_url": webhook_url,
+                    "auth_token": auth_token,
+                    "events": (
+                        NOT_GIVEN if isinstance(events, NotGiven) else list(events)
+                    ),
+                }
+            ),
+            options=options,
+        )
+
     def bookings(
         self, *, options: RequestOptions | None = None
     ) -> SyncCursorPage[IntegrationBooking]:
@@ -743,6 +943,135 @@ class AsyncIntegrations(AsyncAPIResource):
             f"/integrations/connections/{connection_id}/push",
             cast_to=PushResult,
             body={"contact_ids": list(contact_ids)},
+            options=options,
+        )
+
+    def list_community_apps(
+        self,
+        *,
+        limit: NotGivenOr[int] = NOT_GIVEN,
+        cursor: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> AsyncPaginator[CommunityApp]:
+        """List community directory apps, featured first then most installed.
+
+        Auto-paginating. Permissions: ``INTEGRATIONS``.
+
+        Args:
+            limit: Page size, 1 to 200 (default 100).
+            cursor: An opaque cursor from a previous page.
+        """
+        return self._get_api_list(
+            "/integrations/community",
+            model=CommunityApp,
+            query={"limit": limit, "cursor": cursor},
+            options=options,
+        )
+
+    async def retrieve_community_app(
+        self, slug: str, *, options: RequestOptions | None = None
+    ) -> CommunityApp:
+        """Open a published app by its link slug, whether or not it is listed.
+
+        Permissions: ``INTEGRATIONS``.
+        """
+        return await self._get(
+            f"/integrations/community/{slug}",
+            cast_to=CommunityApp,
+            options=options,
+        )
+
+    async def rotate_inbound_url(
+        self, connection_id: str, *, options: RequestOptions | None = None
+    ) -> InboundUrlRotated:
+        """Mint a new inbound URL for a Calendly or Cal.com connection.
+
+        The previous URL stops working immediately; update the provider's
+        webhook to the new one. Other providers answer ``400``. Needs a paid
+        plan and the ``INTEGRATIONS`` permission.
+        """
+        return await self._post(
+            f"/integrations/connections/{connection_id}/rotate-inbound-url",
+            cast_to=InboundUrlRotated,
+            options=options,
+        )
+
+    async def set_signing_key(
+        self,
+        connection_id: str,
+        *,
+        signing_key: str,
+        options: RequestOptions | None = None,
+    ) -> IntegrationConnectionDetail:
+        """Set the key a Calendly or Cal.com connection's deliveries are signed with.
+
+        An empty *signing_key* goes back to the URL secret alone. The key is
+        write-only; the response carries only the connection. Needs a paid
+        plan and the ``INTEGRATIONS`` permission.
+        """
+        return await self._put(
+            f"/integrations/connections/{connection_id}/signing-key",
+            cast_to=IntegrationConnectionDetail,
+            body={"signing_key": signing_key},
+            options=options,
+        )
+
+    async def clay_settings(
+        self, connection_id: str, *, options: RequestOptions | None = None
+    ) -> ClaySettings:
+        """Read a Clay connection's inbound defaults, outbound table and stats.
+
+        Permissions: ``INTEGRATIONS``.
+        """
+        return await self._get(
+            f"/integrations/clay/{connection_id}",
+            cast_to=ClaySettings,
+            options=options,
+        )
+
+    async def update_clay_settings(
+        self,
+        connection_id: str,
+        *,
+        defaults: NotGivenOr[Mapping[str, Any]] = NOT_GIVEN,
+        webhook_url: NotGivenOr[str] = NOT_GIVEN,
+        auth_token: NotGivenOr[str] = NOT_GIVEN,
+        events: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> ClaySettings:
+        """Save the inbound defaults, the outbound table and its events.
+
+        Every field given replaces its value, so a retry converges.
+        *webhook_url* and *auth_token* are write-only: the response reports
+        only whether they are set.
+
+        Permissions: ``INTEGRATIONS``.
+
+        Args:
+            connection_id: The Clay connection.
+            defaults: Where inbound rows land: ``campaign_id``,
+                ``category_ids``, ``segment_ids``, ``dedup`` and
+                ``subscribed``.
+            webhook_url: The Clay table's webhook source URL.
+            auth_token: The table's auth token, if it has one.
+            events: The events to send to the table (see
+                ``available_events``).
+        """
+        return await self._patch(
+            f"/integrations/clay/{connection_id}",
+            cast_to=ClaySettings,
+            body=drop_not_given(
+                {
+                    "defaults": (
+                        NOT_GIVEN if isinstance(defaults, NotGiven) else dict(defaults)
+                    ),
+                    "webhook_url": webhook_url,
+                    "auth_token": auth_token,
+                    "events": (
+                        NOT_GIVEN if isinstance(events, NotGiven) else list(events)
+                    ),
+                }
+            ),
             options=options,
         )
 

@@ -132,6 +132,32 @@ client.campaigns.create(
     cause the second to be deduplicated against the first. Use a fresh key per
     logical operation.
 
+### When the outcome is unknown
+
+If the first request with a key reached the operation and then failed with a
+`5xx` (or never finished), the server cannot tell whether the change happened,
+so it refuses to run that key again and answers `409` with
+`ErrorCode.IDEMPOTENCY_OUTCOME_UNKNOWN`. Because the SDK retries a write with
+the same key, this is what a retried `5xx` can turn into. It is raised as a
+[`ConflictError`][warmbly.ConflictError] straight away: the SDK retries other
+`409` responses while attempts remain, but not this one, since the same key
+would only get the same answer:
+
+```python
+from warmbly import ConflictError, ErrorCode
+
+try:
+    client.campaigns.start(campaign_id)
+except ConflictError as exc:
+    if exc.code == ErrorCode.IDEMPOTENCY_OUTCOME_UNKNOWN:
+        # Check the campaign's state first; retry with a new key only if the
+        # change did not happen.
+        ...
+```
+
+A `429` leaves the key unused, so a retry after a rate limit runs the request
+normally.
+
 ## Timeouts
 
 The default timeout is an `httpx.Timeout` of **60 s** overall with a **5 s**

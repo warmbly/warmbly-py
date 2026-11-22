@@ -19,6 +19,8 @@ from ._exceptions import (
     AuthenticationError,
     BadRequestError,
     ConflictError,
+    ErrorCode,
+    ErrorReason,
     GatewayError,
     InternalServerError,
     NotFoundError,
@@ -34,7 +36,11 @@ from ._exceptions import (
 from ._models import BaseModel
 from ._types import NOT_GIVEN, NotGiven, Omit, RequestOptions, Timeout
 from ._utils import (
+    AGENCY_KEY_GRANTABLE_SCOPES,
+    AGENCY_KEY_WORKSPACE_SCOPES,
+    AGENCY_SCOPES,
     ALL_SCOPES,
+    APP_GRANTABLE_SCOPES,
     FULL_ACCESS_SCOPES,
     READ_ONLY_SCOPES,
     SCOPES,
@@ -78,6 +84,10 @@ __all__ = [  # noqa: RUF022 - grouped by category for readability
     "mask_to_scopes",
     "SCOPES",
     "ALL_SCOPES",
+    "AGENCY_KEY_GRANTABLE_SCOPES",
+    "AGENCY_KEY_WORKSPACE_SCOPES",
+    "AGENCY_SCOPES",
+    "APP_GRANTABLE_SCOPES",
     "READ_ONLY_SCOPES",
     "FULL_ACCESS_SCOPES",
     # Exceptions
@@ -93,6 +103,8 @@ __all__ = [  # noqa: RUF022 - grouped by category for readability
     "PermissionDeniedError",
     "NotFoundError",
     "ConflictError",
+    "ErrorCode",
+    "ErrorReason",
     "UnprocessableEntityError",
     "RateLimitError",
     "InternalServerError",

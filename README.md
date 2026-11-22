@@ -77,6 +77,7 @@ The SDK supports all three Warmbly auth modes; each is sent as a bearer token.
 |---|---|
 | **API key** | `Warmbly(api_key="wmbly_...")` or `WARMBLY_API_KEY` env var |
 | **OAuth2 access token** | `Warmbly(api_key="wmat_...")` (any bearer token works) |
+| **Agency API key** | `Warmbly(api_key="wmagency_...", organization="<client workspace id>")`; `organization` names the client workspace (or set `WARMBLY_ORGANIZATION`) and is not needed for `client.agency` |
 | **OAuth2 flow** | `from warmbly.oauth import OAuth2Client`: see the [OAuth guide](https://warmbly-py.readthedocs.io/guides/oauth) |
 
 ### OAuth2 in three lines
@@ -205,11 +206,12 @@ Each API group hangs off the client as an attribute:
 
 | | |
 | --- | --- |
-| **Sending** | `campaigns`, `emails`, `templates`, `generation`, `outreach`, `deliverability`, `warmup_routing`, `suppressions` |
-| **Audience** | `contacts`, `segments`, `forms`, `folders`, `tags`, `categories` |
-| **Inbox & CRM** | `unibox`, `crm`, `meetings`, `automations`, `lead_sync` |
-| **Insight** | `analytics`, `advisor`, `audit_logs`, `tasks` |
+| **Sending** | `campaigns`, `emails`, `templates`, `email_images`, `generation`, `outreach`, `deliverability`, `warmup_routing`, `suppressions`, `placement`, `store` |
+| **Audience** | `contacts`, `segments`, `forms`, `leads`, `migrations`, `folders`, `tags`, `categories` |
+| **Inbox & CRM** | `unibox`, `crm`, `meetings`, `automations`, `lead_sync`, `salesforce`, `apollo` |
+| **Insight** | `analytics`, `reports`, `advisor`, `audit_logs`, `tasks` |
 | **Platform** | `me`, `api_keys`, `oauth_applications`, `teams`, `webhooks`, `integrations`, `plans`, `timezones` |
+| **Agency** | `agency` (agency API keys only) |
 | **AI** | `ai_skills`, `ai_tools` |
 
 `client.ai_tools` is the REST tool surface for agents that do not speak MCP:

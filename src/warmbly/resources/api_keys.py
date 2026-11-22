@@ -52,7 +52,7 @@ class ApiKey(BaseModel):
 
 
 class ApiKeyDeleted(BaseModel):
-    """The result of revoking an API key."""
+    """The result of revoking or permanently deleting an API key."""
 
     status: str | None = None
 
@@ -205,6 +205,25 @@ class ApiKeys(SyncAPIResource):
             f"/api-keys/{api_key_id}",
             cast_to=ApiKeyDeleted,
             query=query,
+            options=options,
+        )
+
+    def delete_permanently(
+        self, api_key_id: str, *, options: RequestOptions | None = None
+    ) -> ApiKeyDeleted:
+        """Permanently delete a key that is already revoked or expired.
+
+        Removes the key's row and its usage logs. A key that could still
+        authenticate answers ``409``: revoke it first with :meth:`delete`,
+        which is what records that a credential was ended and why. Requires the
+        ``API_KEYS`` permission, and an OAuth app token is refused.
+
+        Returns:
+            A result whose ``status`` is ``"deleted"``.
+        """
+        return self._delete(
+            f"/api-keys/{api_key_id}/permanent",
+            cast_to=ApiKeyDeleted,
             options=options,
         )
 
@@ -382,6 +401,25 @@ class AsyncApiKeys(AsyncAPIResource):
             f"/api-keys/{api_key_id}",
             cast_to=ApiKeyDeleted,
             query=query,
+            options=options,
+        )
+
+    async def delete_permanently(
+        self, api_key_id: str, *, options: RequestOptions | None = None
+    ) -> ApiKeyDeleted:
+        """Permanently delete a key that is already revoked or expired.
+
+        Removes the key's row and its usage logs. A key that could still
+        authenticate answers ``409``: revoke it first with :meth:`delete`,
+        which is what records that a credential was ended and why. Requires the
+        ``API_KEYS`` permission, and an OAuth app token is refused.
+
+        Returns:
+            A result whose ``status`` is ``"deleted"``.
+        """
+        return await self._delete(
+            f"/api-keys/{api_key_id}/permanent",
+            cast_to=ApiKeyDeleted,
             options=options,
         )
 

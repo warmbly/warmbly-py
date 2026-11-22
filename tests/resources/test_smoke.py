@@ -212,6 +212,32 @@ def test_plans_list(client: Warmbly) -> None:
     assert [p.id for p in plans] == ["pro"]
 
 
+@respx.mock
+def test_plans_carry_agency_pool_and_allowance(client: Warmbly) -> None:
+    respx.get(f"{BASE_URL}/plans").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "plans": [
+                    {
+                        "id": "agency-pro",
+                        "price": 499.0,
+                        "price_yearly": 4990.0,
+                        "monthly_allowance_usd": 25.0,
+                        "monthly_send_pool": 250000,
+                        "agency_ai_allowance_usd": 100.0,
+                    }
+                ]
+            },
+        )
+    )
+    (plan,) = list(client.plans.list())
+    assert plan.price_yearly == 4990.0
+    assert plan.monthly_allowance_usd == 25.0
+    assert plan.monthly_send_pool == 250000
+    assert plan.agency_ai_allowance_usd == 100.0
+
+
 # -- timezones --------------------------------------------------------------
 
 

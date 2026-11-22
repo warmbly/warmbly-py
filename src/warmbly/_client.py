@@ -28,15 +28,19 @@ from ._exceptions import WarmblyError
 from ._types import Timeout
 from .resources import (
     Advisor,
+    Agency,
     AISkills,
     AITools,
     Analytics,
     ApiKeys,
+    Apollo,
     AsyncAdvisor,
+    AsyncAgency,
     AsyncAISkills,
     AsyncAITools,
     AsyncAnalytics,
     AsyncApiKeys,
+    AsyncApollo,
     AsyncAuditLogs,
     AsyncAutomations,
     AsyncCampaigns,
@@ -44,18 +48,25 @@ from .resources import (
     AsyncContacts,
     AsyncCrm,
     AsyncDeliverability,
+    AsyncEmailImages,
     AsyncEmails,
     AsyncFolders,
     AsyncForms,
     AsyncGeneration,
     AsyncIntegrations,
+    AsyncLeads,
     AsyncLeadSync,
     AsyncMe,
     AsyncMeetings,
+    AsyncMigrations,
     AsyncOAuthApplications,
     AsyncOutreach,
+    AsyncPlacement,
     AsyncPlans,
+    AsyncReports,
+    AsyncSalesforce,
     AsyncSegments,
+    AsyncStore,
     AsyncSuppressions,
     AsyncTags,
     AsyncTasks,
@@ -72,18 +83,25 @@ from .resources import (
     Contacts,
     Crm,
     Deliverability,
+    EmailImages,
     Emails,
     Folders,
     Forms,
     Generation,
     Integrations,
+    Leads,
     LeadSync,
     Me,
     Meetings,
+    Migrations,
     OAuthApplications,
     Outreach,
+    Placement,
     Plans,
+    Reports,
+    Salesforce,
     Segments,
+    Store,
     Suppressions,
     Tags,
     Tasks,
@@ -111,6 +129,21 @@ def _resolve_api_key(api_key: str | None) -> str:
     return api_key
 
 
+#: The header an agency API key names its client workspace in.
+ORGANIZATION_HEADER = "Warmbly-Organization"
+
+
+def _resolve_organization(organization: str | None) -> str | None:
+    return organization or os.environ.get("WARMBLY_ORGANIZATION") or None
+
+
+def _auth_headers(api_key: str, organization: str | None) -> dict[str, str]:
+    headers = {"Authorization": f"Bearer {api_key}"}
+    if organization:
+        headers[ORGANIZATION_HEADER] = organization
+    return headers
+
+
 def _resolve_base_url(base_url: str | None) -> str:
     return base_url or os.environ.get("WARMBLY_BASE_URL", PRODUCTION_BASE_URL)
 
@@ -119,8 +152,16 @@ class Warmbly(SyncAPIClient):
     """Synchronous Warmbly API client.
 
     Args:
-        api_key: A Warmbly API key (``wmbly_...``) or OAuth2 access token
-            (``wmat_...``). Falls back to the ``WARMBLY_API_KEY`` env var.
+        api_key: A Warmbly API key (``wmbly_...``), an agency API key
+            (``wmagency_...``) or an OAuth2 access token (``wmat_...``). Falls
+            back to the ``WARMBLY_API_KEY`` env var.
+        organization: The client workspace an agency API key acts in, sent as
+            the ``Warmbly-Organization`` header on every request. Workspace
+            routes refuse an agency key without it
+            (``agency_key_organization_required``); the ``agency`` resource
+            does not need it. Falls back to the ``WARMBLY_ORGANIZATION`` env
+            var. Leave unset for workspace keys and OAuth tokens. Override per
+            call with ``options={"headers": {"Warmbly-Organization": ...}}``.
         base_url: API base URL. Falls back to ``WARMBLY_BASE_URL`` then the
             production endpoint.
         timeout: Per-request timeout in seconds or an :class:`httpx.Timeout`.
@@ -129,17 +170,20 @@ class Warmbly(SyncAPIClient):
     """
 
     api_key: str
+    organization: str | None
 
     def __init__(
         self,
         *,
         api_key: str | None = None,
+        organization: str | None = None,
         base_url: str | None = None,
         timeout: float | Timeout | None = DEFAULT_TIMEOUT,
         max_retries: int = DEFAULT_MAX_RETRIES,
         http_client: httpx.Client | None = None,
     ) -> None:
         self.api_key = _resolve_api_key(api_key)
+        self.organization = _resolve_organization(organization)
         super().__init__(
             base_url=_resolve_base_url(base_url),
             timeout=timeout,
@@ -149,7 +193,7 @@ class Warmbly(SyncAPIClient):
 
     @property
     def auth_headers(self) -> dict[str, str]:
-        return {"Authorization": f"Bearer {self.api_key}"}
+        return _auth_headers(self.api_key, self.organization)
 
     @cached_property
     def me(self) -> Me:
@@ -206,6 +250,10 @@ class Warmbly(SyncAPIClient):
     @cached_property
     def meetings(self) -> Meetings:
         return Meetings(self)
+
+    @cached_property
+    def placement(self) -> Placement:
+        return Placement(self)
 
     @cached_property
     def plans(self) -> Plans:
@@ -280,6 +328,38 @@ class Warmbly(SyncAPIClient):
         return Suppressions(self)
 
     @cached_property
+    def store(self) -> Store:
+        return Store(self)
+
+    @cached_property
+    def migrations(self) -> Migrations:
+        return Migrations(self)
+
+    @cached_property
+    def reports(self) -> Reports:
+        return Reports(self)
+
+    @cached_property
+    def agency(self) -> Agency:
+        return Agency(self)
+
+    @cached_property
+    def apollo(self) -> Apollo:
+        return Apollo(self)
+
+    @cached_property
+    def salesforce(self) -> Salesforce:
+        return Salesforce(self)
+
+    @cached_property
+    def leads(self) -> Leads:
+        return Leads(self)
+
+    @cached_property
+    def email_images(self) -> EmailImages:
+        return EmailImages(self)
+
+    @cached_property
     def ai_tools(self) -> AITools:
         return AITools(self)
 
@@ -292,17 +372,20 @@ class AsyncWarmbly(AsyncAPIClient):
     """
 
     api_key: str
+    organization: str | None
 
     def __init__(
         self,
         *,
         api_key: str | None = None,
+        organization: str | None = None,
         base_url: str | None = None,
         timeout: float | Timeout | None = DEFAULT_TIMEOUT,
         max_retries: int = DEFAULT_MAX_RETRIES,
         http_client: httpx.AsyncClient | None = None,
     ) -> None:
         self.api_key = _resolve_api_key(api_key)
+        self.organization = _resolve_organization(organization)
         super().__init__(
             base_url=_resolve_base_url(base_url),
             timeout=timeout,
@@ -312,7 +395,7 @@ class AsyncWarmbly(AsyncAPIClient):
 
     @property
     def auth_headers(self) -> dict[str, str]:
-        return {"Authorization": f"Bearer {self.api_key}"}
+        return _auth_headers(self.api_key, self.organization)
 
     @cached_property
     def me(self) -> AsyncMe:
@@ -369,6 +452,10 @@ class AsyncWarmbly(AsyncAPIClient):
     @cached_property
     def meetings(self) -> AsyncMeetings:
         return AsyncMeetings(self)
+
+    @cached_property
+    def placement(self) -> AsyncPlacement:
+        return AsyncPlacement(self)
 
     @cached_property
     def plans(self) -> AsyncPlans:
@@ -441,6 +528,38 @@ class AsyncWarmbly(AsyncAPIClient):
     @cached_property
     def suppressions(self) -> AsyncSuppressions:
         return AsyncSuppressions(self)
+
+    @cached_property
+    def store(self) -> AsyncStore:
+        return AsyncStore(self)
+
+    @cached_property
+    def migrations(self) -> AsyncMigrations:
+        return AsyncMigrations(self)
+
+    @cached_property
+    def reports(self) -> AsyncReports:
+        return AsyncReports(self)
+
+    @cached_property
+    def agency(self) -> AsyncAgency:
+        return AsyncAgency(self)
+
+    @cached_property
+    def apollo(self) -> AsyncApollo:
+        return AsyncApollo(self)
+
+    @cached_property
+    def salesforce(self) -> AsyncSalesforce:
+        return AsyncSalesforce(self)
+
+    @cached_property
+    def leads(self) -> AsyncLeads:
+        return AsyncLeads(self)
+
+    @cached_property
+    def email_images(self) -> AsyncEmailImages:
+        return AsyncEmailImages(self)
 
     @cached_property
     def ai_tools(self) -> AsyncAITools:

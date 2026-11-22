@@ -131,12 +131,16 @@ class WebhookEventType(BaseModel):
     """An event type endpoints may subscribe to.
 
     ``firehose`` marks high-volume events that are opt-in for a reason.
+    ``deprecated`` events stay valid in ``event_types`` so saved subscriptions
+    keep saving, but are never delivered; the description names the
+    replacement.
     """
 
     type: str | None = None
     category: str | None = None
     description: str | None = None
     firehose: bool | None = None
+    deprecated: bool | None = None
 
 
 class WebhookThrottleDrop(BaseModel):
