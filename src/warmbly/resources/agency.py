@@ -101,6 +101,12 @@ __all__ = [
     "AgencyPoweredBy",
     "AgencyRecord",
     "AgencyStaff",
+    "AgencyStoreAttention",
+    "AgencyStoreClient",
+    "AgencyStoreNextRenewal",
+    "AgencyStoreOverview",
+    "AgencyStoreRenewal",
+    "AgencyStoreTotals",
     "AgencyUsage",
     "AsyncAgency",
 ]
@@ -277,12 +283,91 @@ class AgencyAIClient(BaseModel):
 
 
 class AgencyAITopUpInfo(BaseModel):
-    """The range a purchase of agency AI balance may take."""
+    """The range a purchase of agency AI balance may take.
+
+    ``fee_bps`` is the card processing fee charged on top of the amount, in
+    basis points (``300`` is 3%).
+    """
 
     min_usd: float | None = None
     max_usd: float | None = None
     presets_usd: Sequence[int] = []
     default_usd: int | None = None
+    fee_bps: int | None = None
+
+
+class AgencyStoreAttention(BaseModel):
+    """One kind of problem in a client's purchases and how many.
+
+    ``kind`` is ``connect_failed``, ``billing_failed``, ``renewal_failed``,
+    ``auto_renew_off`` or ``order_failed``.
+    """
+
+    kind: str | None = None
+    count: int | None = None
+
+
+class AgencyStoreNextRenewal(BaseModel):
+    """A client's soonest domain renewal."""
+
+    domain_id: str | None = None
+    domain: str | None = None
+    expires_at: str | None = None
+    auto_renew: bool | None = None
+
+
+class AgencyStoreClient(BaseModel):
+    """One client workspace's purchased domains and mailboxes.
+
+    Amounts are in micros of the store currency (1,000,000 is one unit).
+    """
+
+    organization_id: str
+    name: str | None = None
+    avatar_url: str | None = None
+    domains: int | None = None
+    mailboxes_live: int | None = None
+    mailboxes_connected: int | None = None
+    monthly_spend_micros: int | None = None
+    renewals_30d: int | None = None
+    next_renewal: AgencyStoreNextRenewal | None = None
+    orders_open: int | None = None
+    attention: Sequence[AgencyStoreAttention] = []
+
+
+class AgencyStoreRenewal(BaseModel):
+    """One domain renewal due in the next 30 days, across the clients."""
+
+    organization_id: str | None = None
+    organization_name: str | None = None
+    domain_id: str | None = None
+    domain: str | None = None
+    expires_at: str | None = None
+    auto_renew: bool | None = None
+    renew_micros: int | None = None
+
+
+class AgencyStoreTotals(BaseModel):
+    """The clients' purchases added up."""
+
+    domains: int | None = None
+    mailboxes_live: int | None = None
+    monthly_spend_micros: int | None = None
+    renewals_30d: int | None = None
+    attention: int | None = None
+
+
+class AgencyStoreOverview(BaseModel):
+    """Purchased domains and mailboxes across the agency's clients.
+
+    ``enabled`` is ``False`` when the instance has no store. Clients are
+    ordered problems first; workspaces a partner manages are left out.
+    """
+
+    enabled: bool | None = None
+    clients: Sequence[AgencyStoreClient] = []
+    renewals: Sequence[AgencyStoreRenewal] = []
+    totals: AgencyStoreTotals | None = None
 
 
 class AgencyAIBalance(BaseModel):
@@ -849,6 +934,19 @@ class Agency(SyncAPIResource):
             f"/agency/{agency_id}/overview", cast_to=AgencyOverview, options=options
         )
 
+    def store_overview(
+        self, agency_id: str, *, options: RequestOptions | None = None
+    ) -> AgencyStoreOverview:
+        """Purchased domains and mailboxes across the clients.
+
+        Covers every client whose mailboxes the caller manages, with upcoming
+        renewals and what needs attention. Needs ``AGENCY_READ`` and
+        ``READ_STORE``.
+        """
+        return self._get(
+            f"/agency/{agency_id}/store", cast_to=AgencyStoreOverview, options=options
+        )
+
     def list_mailboxes(
         self,
         agency_id: str,
@@ -1363,6 +1461,19 @@ class AsyncAgency(AsyncAPIResource):
         """
         return await self._get(
             f"/agency/{agency_id}/overview", cast_to=AgencyOverview, options=options
+        )
+
+    async def store_overview(
+        self, agency_id: str, *, options: RequestOptions | None = None
+    ) -> AgencyStoreOverview:
+        """Purchased domains and mailboxes across the clients.
+
+        Covers every client whose mailboxes the caller manages, with upcoming
+        renewals and what needs attention. Needs ``AGENCY_READ`` and
+        ``READ_STORE``.
+        """
+        return await self._get(
+            f"/agency/{agency_id}/store", cast_to=AgencyStoreOverview, options=options
         )
 
     def list_mailboxes(

@@ -50,6 +50,9 @@ _TIMEOUT = 5.0
         "DIRECT_EMAIL_OPENED",
         "DIRECT_EMAIL_CLICKED",
         "EMAIL_BOUNCED",
+        "STORE_ORDER_UPDATED",
+        "STORE_DOMAIN_UPDATED",
+        "STORE_MAILBOX_UPDATED",
     ],
 )
 def test_new_event_constants_match_server_names(name: str) -> None:
@@ -68,6 +71,18 @@ def test_email_bounced_rides_the_email_and_campaign_free_intents() -> None:
     assert intent_matches(GatewayEvent.EMAIL_BOUNCED, ["EMAIL"])
     assert intent_matches(GatewayEvent.EMAIL_BOUNCED, ["bounced"])
     assert not intent_matches(GatewayEvent.EMAIL_BOUNCED, ["CAMPAIGN"])
+
+
+def test_store_events_need_manage_emails_and_share_the_store_intent() -> None:
+    for name in (
+        GatewayEvent.STORE_ORDER_UPDATED,
+        GatewayEvent.STORE_DOMAIN_UPDATED,
+        GatewayEvent.STORE_MAILBOX_UPDATED,
+    ):
+        assert EVENT_PERMISSIONS[name] == "manage_emails"
+        assert intent_matches(name, ["STORE"])
+        assert not intent_matches(name, ["EMAIL"])
+    assert intent_matches(GatewayEvent.STORE_MAILBOX_UPDATED, ["store.mailbox"])
 
 
 # -- intent helpers ----------------------------------------------------------

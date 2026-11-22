@@ -80,7 +80,8 @@ class ContactOutreach(BaseModel):
 class LeadHold(BaseModel):
     """A lead's flow parked inside one campaign.
 
-    ``source`` is ``manual``, ``out_of_office``, ``inbox_tagging`` or ``crm``.
+    ``source`` is ``manual``, ``out_of_office``, ``inbox_tagging``, ``crm``,
+    ``cc`` or ``review`` (waiting for approval in a review campaign).
     ``until`` is ``None`` for a hold with no end, which only a person lifts.
     """
 

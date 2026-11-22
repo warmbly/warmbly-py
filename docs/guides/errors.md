@@ -167,6 +167,12 @@ Named constants for the documented codes live on
 `exc.code == ErrorCode.INSUFFICIENT_CREDITS`); the server may add codes at any
 time, so keep a fallback for unknown values.
 
+Some refusals carry more than a `code`. The store's `price_changed` (409) puts
+a fresh quote at `exc.body["details"]["quote"]`, and its
+`payment_method_required` (402) puts a card setup page at
+`exc.body["setup_url"]`. `contact_invalid` (400) names the refused registrant
+fields in `exc.body["details"]["fields"]`.
+
 The backend error envelope looks like `{"error", "message", "code",
 "request_id"}`; `.message` and `.code` are pulled from it automatically, and
 `.request_id` comes from the response header.

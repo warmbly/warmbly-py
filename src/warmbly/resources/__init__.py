@@ -42,6 +42,7 @@ from .plans import AsyncPlans, Plans
 from .reports import AsyncReports, Reports
 from .salesforce import AsyncSalesforce, Salesforce
 from .segments import AsyncSegments, Segments
+from .store import AsyncStore, Store
 from .suppressions import AsyncSuppressions, Suppressions
 from .tasks import AsyncTasks, Tasks
 from .teams import AsyncTeams, Teams
@@ -97,6 +98,7 @@ __all__ = [
     "AsyncReports",
     "AsyncSalesforce",
     "AsyncSegments",
+    "AsyncStore",
     "AsyncSuppressions",
     "AsyncTags",
     "AsyncTasks",
@@ -132,6 +134,7 @@ __all__ = [
     "Reports",
     "Salesforce",
     "Segments",
+    "Store",
     "Suppressions",
     "Tags",
     "Tasks",

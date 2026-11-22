@@ -61,6 +61,7 @@ __all__ = [
     "MailboxSyncPolicy",
     "MailboxSyncSettings",
     "MailboxSyncState",
+    "PartnerMailboxEnablement",
     "SendAsIdentity",
     "SendIdentity",
     "SendLifecycleState",
@@ -91,7 +92,10 @@ class EmailAccount(BaseModel):
     ``warmup_retention_days`` of ``0`` means the instance setting. When
     ``relay_folder_moves`` is on, filing a conversation in the unibox moves it
     in the mailbox too. ``track_direct_mail`` opts hand-written unibox sends
-    into open and click tracking.
+    into open and click tracking. ``purchased`` marks a mailbox bought in the
+    store (see :attr:`Warmbly.store`), which cannot be removed or signed in
+    again while it is paid for; ``purchase_cancelled_at`` is when its
+    subscription ended.
     """
 
     id: str
@@ -112,6 +116,8 @@ class EmailAccount(BaseModel):
     domain_grant_id: str | None = None
     vendor_connection_id: str | None = None
     vendor: str | None = None
+    purchased: bool | None = None
+    purchase_cancelled_at: str | None = None
     avatar_url: str | None = None
     last_id: int | None = None
     campaign_limit: int | None = None
@@ -312,11 +318,27 @@ class MailboxSyncState(BaseModel):
     last_synced_at: str | None = None
 
 
+class PartnerMailboxEnablement(BaseModel):
+    """What the partner managing the workspace lets one mailbox do.
+
+    ``enablement`` is ``off``, ``warmup_only`` or ``sending_warmup`` (only
+    the last may send campaigns). ``managed`` is ``True`` while the partner
+    holds the mailbox, so members cannot remove or reconnect it.
+    """
+
+    email_account_id: str
+    enablement: str | None = None
+    managed: bool | None = None
+
+
 class MailboxSyncPolicy(BaseModel):
     """The fair-use budget a mailbox syncs under.
 
     Resolved from the instance settings when the mailbox was loaded onto a
     worker, so a policy change reaches a mailbox on its next load.
+    ``full_check_seconds`` is the interval between full checks of the
+    mailbox (between push or IDLE wakeups), ``None`` for the worker's
+    default.
     """
 
     backfill_days: int | None = None
@@ -324,6 +346,7 @@ class MailboxSyncPolicy(BaseModel):
     daily_messages: int | None = None
     org_daily_messages: int | None = None
     skip_folders: Sequence[str] = []
+    full_check_seconds: int | None = None
 
 
 class MailboxSyncFolder(BaseModel):
@@ -1044,6 +1067,19 @@ class Emails(SyncAPIResource):
             model=EmailAccount,
             query={"q": q, "tag": tag, "limit": limit, "cursor": cursor},
             options=options,
+        )
+
+    def list_partner_mailboxes(
+        self, *, options: RequestOptions | None = None
+    ) -> SyncCursorPage[PartnerMailboxEnablement]:
+        """List each mailbox's enablement in a workspace a partner manages.
+
+        Read-only; the partner sets it. Empty for any other workspace. The
+        list is not paginated; it is returned as a single page. Requires the
+        ``READ_EMAILS`` permission.
+        """
+        return self._get_api_list(
+            "/emails/partner", model=PartnerMailboxEnablement, options=options
         )
 
     def retrieve(
@@ -2221,6 +2257,19 @@ class AsyncEmails(AsyncAPIResource):
             model=EmailAccount,
             query={"q": q, "tag": tag, "limit": limit, "cursor": cursor},
             options=options,
+        )
+
+    def list_partner_mailboxes(
+        self, *, options: RequestOptions | None = None
+    ) -> AsyncPaginator[PartnerMailboxEnablement]:
+        """List each mailbox's enablement in a workspace a partner manages.
+
+        Read-only; the partner sets it. Empty for any other workspace. The
+        list is not paginated; it is returned as a single page. Requires the
+        ``READ_EMAILS`` permission.
+        """
+        return self._get_api_list(
+            "/emails/partner", model=PartnerMailboxEnablement, options=options
         )
 
     async def retrieve(

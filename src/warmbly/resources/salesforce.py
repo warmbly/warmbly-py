@@ -281,6 +281,7 @@ class SalesforceImportSource(BaseModel):
     source_label: str | None = None
     campaign_id: str | None = None
     category_ids: Sequence[str] = []
+    segment_ids: Sequence[str] = []
     recurring: bool | None = None
     enabled: bool | None = None
     status: str | None = None
@@ -349,6 +350,7 @@ def _source_body(
     source_label: NotGivenOr[str],
     campaign_id: NotGivenOr[str | None],
     category_ids: NotGivenOr[Sequence[str]],
+    segment_ids: NotGivenOr[Sequence[str]],
     recurring: NotGivenOr[bool],
     enabled: NotGivenOr[bool],
 ) -> dict[str, Any]:
@@ -363,6 +365,9 @@ def _source_body(
             "campaign_id": campaign_id,
             "category_ids": (
                 NOT_GIVEN if isinstance(category_ids, NotGiven) else list(category_ids)
+            ),
+            "segment_ids": (
+                NOT_GIVEN if isinstance(segment_ids, NotGiven) else list(segment_ids)
             ),
             "recurring": recurring,
             "enabled": enabled,
@@ -543,6 +548,7 @@ class Salesforce(SyncAPIResource):
         source_label: NotGivenOr[str] = NOT_GIVEN,
         campaign_id: NotGivenOr[str | None] = NOT_GIVEN,
         category_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        segment_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         recurring: NotGivenOr[bool] = NOT_GIVEN,
         enabled: NotGivenOr[bool] = NOT_GIVEN,
         options: RequestOptions | None = None,
@@ -561,6 +567,8 @@ class Salesforce(SyncAPIResource):
             source_label: The list view or Campaign's label.
             campaign_id: A Warmbly campaign the imported contacts join.
             category_ids: Categories to assign.
+            segment_ids: Segments to pin every imported contact into (at most
+                20), so they stay members whatever the segment's conditions.
             recurring: Re-read the source every 30 minutes.
             enabled: Whether a recurring source runs.
         """
@@ -575,6 +583,7 @@ class Salesforce(SyncAPIResource):
                 source_label=source_label,
                 campaign_id=campaign_id,
                 category_ids=category_ids,
+                segment_ids=segment_ids,
                 recurring=recurring,
                 enabled=enabled,
             ),
@@ -590,6 +599,7 @@ class Salesforce(SyncAPIResource):
         source_label: NotGivenOr[str] = NOT_GIVEN,
         campaign_id: NotGivenOr[str | None] = NOT_GIVEN,
         category_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        segment_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         recurring: NotGivenOr[bool] = NOT_GIVEN,
         enabled: NotGivenOr[bool] = NOT_GIVEN,
         options: RequestOptions | None = None,
@@ -613,6 +623,7 @@ class Salesforce(SyncAPIResource):
                 source_label=source_label,
                 campaign_id=campaign_id,
                 category_ids=category_ids,
+                segment_ids=segment_ids,
                 recurring=recurring,
                 enabled=enabled,
             ),
@@ -880,6 +891,7 @@ class AsyncSalesforce(AsyncAPIResource):
         source_label: NotGivenOr[str] = NOT_GIVEN,
         campaign_id: NotGivenOr[str | None] = NOT_GIVEN,
         category_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        segment_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         recurring: NotGivenOr[bool] = NOT_GIVEN,
         enabled: NotGivenOr[bool] = NOT_GIVEN,
         options: RequestOptions | None = None,
@@ -898,6 +910,8 @@ class AsyncSalesforce(AsyncAPIResource):
             source_label: The list view or Campaign's label.
             campaign_id: A Warmbly campaign the imported contacts join.
             category_ids: Categories to assign.
+            segment_ids: Segments to pin every imported contact into (at most
+                20), so they stay members whatever the segment's conditions.
             recurring: Re-read the source every 30 minutes.
             enabled: Whether a recurring source runs.
         """
@@ -912,6 +926,7 @@ class AsyncSalesforce(AsyncAPIResource):
                 source_label=source_label,
                 campaign_id=campaign_id,
                 category_ids=category_ids,
+                segment_ids=segment_ids,
                 recurring=recurring,
                 enabled=enabled,
             ),
@@ -927,6 +942,7 @@ class AsyncSalesforce(AsyncAPIResource):
         source_label: NotGivenOr[str] = NOT_GIVEN,
         campaign_id: NotGivenOr[str | None] = NOT_GIVEN,
         category_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        segment_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         recurring: NotGivenOr[bool] = NOT_GIVEN,
         enabled: NotGivenOr[bool] = NOT_GIVEN,
         options: RequestOptions | None = None,
@@ -950,6 +966,7 @@ class AsyncSalesforce(AsyncAPIResource):
                 source_label=source_label,
                 campaign_id=campaign_id,
                 category_ids=category_ids,
+                segment_ids=segment_ids,
                 recurring=recurring,
                 enabled=enabled,
             ),

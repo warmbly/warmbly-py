@@ -66,6 +66,7 @@ from .resources import (
     AsyncReports,
     AsyncSalesforce,
     AsyncSegments,
+    AsyncStore,
     AsyncSuppressions,
     AsyncTags,
     AsyncTasks,
@@ -100,6 +101,7 @@ from .resources import (
     Reports,
     Salesforce,
     Segments,
+    Store,
     Suppressions,
     Tags,
     Tasks,
@@ -326,6 +328,10 @@ class Warmbly(SyncAPIClient):
         return Suppressions(self)
 
     @cached_property
+    def store(self) -> Store:
+        return Store(self)
+
+    @cached_property
     def migrations(self) -> Migrations:
         return Migrations(self)
 
@@ -522,6 +528,10 @@ class AsyncWarmbly(AsyncAPIClient):
     @cached_property
     def suppressions(self) -> AsyncSuppressions:
         return AsyncSuppressions(self)
+
+    @cached_property
+    def store(self) -> AsyncStore:
+        return AsyncStore(self)
 
     @cached_property
     def migrations(self) -> AsyncMigrations:

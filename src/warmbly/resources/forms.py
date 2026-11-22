@@ -64,6 +64,7 @@ class Form(BaseModel):
     redirect_url: str | None = None
     campaign_id: str | None = None
     category_ids: Sequence[str] = []
+    segment_ids: Sequence[str] = []
     allowed_domains: Sequence[str] = []
     captcha_enabled: bool | None = None
     logo_url: str | None = None
@@ -230,6 +231,7 @@ def _form_body(
     redirect_url: NotGivenOr[str],
     campaign_id: NotGivenOr[str | None],
     category_ids: NotGivenOr[Sequence[str]],
+    segment_ids: NotGivenOr[Sequence[str]],
     allowed_domains: NotGivenOr[Sequence[str]],
     captcha_enabled: NotGivenOr[bool],
 ) -> dict[str, Any]:
@@ -244,6 +246,7 @@ def _form_body(
             "redirect_url": redirect_url,
             "campaign_id": campaign_id,
             "category_ids": category_ids,
+            "segment_ids": segment_ids,
             "allowed_domains": allowed_domains,
             "captcha_enabled": captcha_enabled,
         }
@@ -281,6 +284,7 @@ class Forms(SyncAPIResource):
         redirect_url: NotGivenOr[str] = NOT_GIVEN,
         campaign_id: NotGivenOr[str | None] = NOT_GIVEN,
         category_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        segment_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         allowed_domains: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         captcha_enabled: NotGivenOr[bool] = NOT_GIVEN,
         options: RequestOptions | None = None,
@@ -302,6 +306,7 @@ class Forms(SyncAPIResource):
             campaign_id: A campaign to add every new contact to; pass ``None``
                 to detach.
             category_ids: Categories to file new contacts under.
+            segment_ids: Segments to pin every new contact into (at most 20).
             allowed_domains: Domains the form may be embedded on.
             captcha_enabled: Require a captcha, where the install has one.
         """
@@ -317,6 +322,7 @@ class Forms(SyncAPIResource):
                 redirect_url=redirect_url,
                 campaign_id=campaign_id,
                 category_ids=category_ids,
+                segment_ids=segment_ids,
                 allowed_domains=allowed_domains,
                 captcha_enabled=captcha_enabled,
             ),
@@ -509,6 +515,7 @@ class AsyncForms(AsyncAPIResource):
         redirect_url: NotGivenOr[str] = NOT_GIVEN,
         campaign_id: NotGivenOr[str | None] = NOT_GIVEN,
         category_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        segment_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         allowed_domains: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         captcha_enabled: NotGivenOr[bool] = NOT_GIVEN,
         options: RequestOptions | None = None,
@@ -530,6 +537,7 @@ class AsyncForms(AsyncAPIResource):
             campaign_id: A campaign to add every new contact to; pass ``None``
                 to detach.
             category_ids: Categories to file new contacts under.
+            segment_ids: Segments to pin every new contact into (at most 20).
             allowed_domains: Domains the form may be embedded on.
             captcha_enabled: Require a captcha, where the install has one.
         """
@@ -545,6 +553,7 @@ class AsyncForms(AsyncAPIResource):
                 redirect_url=redirect_url,
                 campaign_id=campaign_id,
                 category_ids=category_ids,
+                segment_ids=segment_ids,
                 allowed_domains=allowed_domains,
                 captcha_enabled=captcha_enabled,
             ),

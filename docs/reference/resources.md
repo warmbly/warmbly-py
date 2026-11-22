@@ -70,6 +70,13 @@ for campaign in client.campaigns.list():
 
 ::: warmbly.resources.suppressions.Suppressions
 
+## Store
+
+Buy domains and Google Workspace or Microsoft 365 mailboxes, manage their DNS,
+and follow orders until the mailboxes connect.
+
+::: warmbly.resources.store.Store
+
 ## Leads
 
 ::: warmbly.resources.leads.Leads

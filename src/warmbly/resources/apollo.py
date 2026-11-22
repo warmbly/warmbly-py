@@ -105,6 +105,7 @@ class ApolloImportSource(BaseModel):
     list_name: str | None = None
     campaign_id: str | None = None
     category_ids: Sequence[str] = []
+    segment_ids: Sequence[str] = []
     verified_only: bool | None = None
     recurring: bool | None = None
     enabled: bool | None = None
@@ -160,6 +161,7 @@ def _source_body(
     list_name: NotGivenOr[str],
     campaign_id: NotGivenOr[str | None],
     category_ids: NotGivenOr[Sequence[str]],
+    segment_ids: NotGivenOr[Sequence[str]],
     verified_only: NotGivenOr[bool],
     recurring: NotGivenOr[bool],
     enabled: NotGivenOr[bool],
@@ -173,6 +175,9 @@ def _source_body(
             "campaign_id": campaign_id,
             "category_ids": (
                 NOT_GIVEN if isinstance(category_ids, NotGiven) else list(category_ids)
+            ),
+            "segment_ids": (
+                NOT_GIVEN if isinstance(segment_ids, NotGiven) else list(segment_ids)
             ),
             "verified_only": verified_only,
             "recurring": recurring,
@@ -276,6 +281,7 @@ class Apollo(SyncAPIResource):
         name: NotGivenOr[str] = NOT_GIVEN,
         campaign_id: NotGivenOr[str | None] = NOT_GIVEN,
         category_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        segment_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         verified_only: NotGivenOr[bool] = NOT_GIVEN,
         recurring: NotGivenOr[bool] = NOT_GIVEN,
         enabled: NotGivenOr[bool] = NOT_GIVEN,
@@ -293,6 +299,8 @@ class Apollo(SyncAPIResource):
             name: A display name for the import.
             campaign_id: A Warmbly campaign the imported contacts join.
             category_ids: Categories to assign.
+            segment_ids: Segments to pin every imported contact into (at most
+                20), so they stay members whatever the segment's conditions.
             verified_only: Skip unverified addresses.
             recurring: Keep re-reading the list.
             enabled: Whether a recurring source runs.
@@ -306,6 +314,7 @@ class Apollo(SyncAPIResource):
                 list_name=list_name,
                 campaign_id=campaign_id,
                 category_ids=category_ids,
+                segment_ids=segment_ids,
                 verified_only=verified_only,
                 recurring=recurring,
                 enabled=enabled,
@@ -321,6 +330,7 @@ class Apollo(SyncAPIResource):
         name: NotGivenOr[str] = NOT_GIVEN,
         campaign_id: NotGivenOr[str | None] = NOT_GIVEN,
         category_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        segment_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         verified_only: NotGivenOr[bool] = NOT_GIVEN,
         recurring: NotGivenOr[bool] = NOT_GIVEN,
         enabled: NotGivenOr[bool] = NOT_GIVEN,
@@ -343,6 +353,7 @@ class Apollo(SyncAPIResource):
                 list_name=NOT_GIVEN,
                 campaign_id=campaign_id,
                 category_ids=category_ids,
+                segment_ids=segment_ids,
                 verified_only=verified_only,
                 recurring=recurring,
                 enabled=enabled,
@@ -559,6 +570,7 @@ class AsyncApollo(AsyncAPIResource):
         name: NotGivenOr[str] = NOT_GIVEN,
         campaign_id: NotGivenOr[str | None] = NOT_GIVEN,
         category_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        segment_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         verified_only: NotGivenOr[bool] = NOT_GIVEN,
         recurring: NotGivenOr[bool] = NOT_GIVEN,
         enabled: NotGivenOr[bool] = NOT_GIVEN,
@@ -576,6 +588,8 @@ class AsyncApollo(AsyncAPIResource):
             name: A display name for the import.
             campaign_id: A Warmbly campaign the imported contacts join.
             category_ids: Categories to assign.
+            segment_ids: Segments to pin every imported contact into (at most
+                20), so they stay members whatever the segment's conditions.
             verified_only: Skip unverified addresses.
             recurring: Keep re-reading the list.
             enabled: Whether a recurring source runs.
@@ -589,6 +603,7 @@ class AsyncApollo(AsyncAPIResource):
                 list_name=list_name,
                 campaign_id=campaign_id,
                 category_ids=category_ids,
+                segment_ids=segment_ids,
                 verified_only=verified_only,
                 recurring=recurring,
                 enabled=enabled,
@@ -604,6 +619,7 @@ class AsyncApollo(AsyncAPIResource):
         name: NotGivenOr[str] = NOT_GIVEN,
         campaign_id: NotGivenOr[str | None] = NOT_GIVEN,
         category_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        segment_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
         verified_only: NotGivenOr[bool] = NOT_GIVEN,
         recurring: NotGivenOr[bool] = NOT_GIVEN,
         enabled: NotGivenOr[bool] = NOT_GIVEN,
@@ -626,6 +642,7 @@ class AsyncApollo(AsyncAPIResource):
                 list_name=NOT_GIVEN,
                 campaign_id=campaign_id,
                 category_ids=category_ids,
+                segment_ids=segment_ids,
                 verified_only=verified_only,
                 recurring=recurring,
                 enabled=enabled,

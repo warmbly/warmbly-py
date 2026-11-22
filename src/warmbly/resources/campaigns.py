@@ -37,6 +37,7 @@ __all__ = [
     "CampaignABAnalysis",
     "CampaignABVariant",
     "CampaignABVariantDeleted",
+    "CampaignAIReadiness",
     "CampaignAdvanced",
     "CampaignAttachment",
     "CampaignAttachmentDeleted",
@@ -56,8 +57,14 @@ __all__ = [
     "CampaignLeadZone",
     "CampaignLog",
     "CampaignMailboxPlan",
+    "CampaignMissingField",
     "CampaignOrgAllowance",
     "CampaignPreflight",
+    "CampaignReviewChange",
+    "CampaignReviewCounts",
+    "CampaignReviewLead",
+    "CampaignReviewSummary",
+    "CampaignReviewWriteResult",
     "CampaignRunState",
     "CampaignSegmentLink",
     "CampaignSegments",
@@ -68,6 +75,7 @@ __all__ = [
     "CampaignSenders",
     "CampaignStep",
     "CampaignStepDeleted",
+    "CampaignStepIssue",
     "CampaignTemplatePreview",
     "CampaignTestEmail",
     "CampaignTrackingDomainStatus",
@@ -75,7 +83,13 @@ __all__ = [
     "Campaigns",
     "CampaignsOverview",
     "LayoutSaved",
+    "LeadEmailAIBlock",
+    "LeadEmailCopy",
+    "LeadEmailFrom",
+    "LeadEmailStep",
+    "LeadEmails",
     "LeadHold",
+    "LeadStepOverride",
     "WarmupCopyGroupPlacement",
     "WarmupCopyPlacement",
     "WarmupStepPlacement",
@@ -104,6 +118,8 @@ class Campaign(BaseModel):
     among mailboxes on that domain) or ``rotate`` (place each step through the
     campaign's rotation like a first email). ``entry_delay_minutes`` holds a
     contact's first email back that long after they enter the campaign.
+    ``review_leads`` holds each new lead until a member approves its first
+    email; change it with :meth:`Campaigns.set_review`.
     """
 
     id: str
@@ -149,6 +165,7 @@ class Campaign(BaseModel):
     ramp_level: int | None = None
     ramp_level_date: str | None = None
     warmup_graduation: bool | None = None
+    review_leads: bool | None = None
     esp_match_mode: str | None = None
     max_new_leads_per_day: int | None = None
     prioritize_new_leads: bool | None = None
@@ -526,8 +543,10 @@ class LeadHold(BaseModel):
     """A pause on one lead's flow inside one campaign.
 
     ``until`` is ``None`` for a hold with no end, which only a resume lifts.
-    ``source`` is ``manual``, ``out_of_office``, ``inbox_tagging``, ``crm`` or
-    ``cc`` (the contact is copied on another lead's thread in the campaign).
+    ``source`` is ``manual``, ``out_of_office``, ``inbox_tagging``, ``crm``,
+    ``cc`` (the contact is copied on another lead's thread in the campaign) or
+    ``review`` (waiting for a member to approve it in a review campaign; only
+    an approval or turning review off lifts it).
     """
 
     since: str | None = None
@@ -763,6 +782,195 @@ class CampaignLeadTimezones(BaseModel):
     unknown: int | None = None
     resolving: int | None = None
     zones: Sequence[CampaignLeadZone] = []
+
+
+class CampaignReviewLead(BaseModel):
+    """One lead on a campaign's review list.
+
+    ``status`` is ``waiting`` (held for review; nothing goes out until it is
+    approved), ``ready`` (not emailed yet and nothing keeps it from
+    starting), ``held`` (not emailed yet and paused for another reason) or
+    ``started`` (emailed, or a send is in flight). ``personalized`` counts the
+    steps that carry this lead's own copy. ``missing`` names the fields the
+    campaign's emails print that this lead has empty (``FirstName``,
+    ``LastName``, ``Company``, ``Phone``).
+    """
+
+    contact_id: str
+    email: str | None = None
+    first_name: str | None = None
+    last_name: str | None = None
+    company: str | None = None
+    status: str | None = None
+    hold: LeadHold | None = None
+    personalized: int | None = None
+    missing: Sequence[str] = []
+    added_at: str | None = None
+
+
+class CampaignReviewCounts(BaseModel):
+    """How a campaign's leads split by review state."""
+
+    total: int | None = None
+    waiting: int | None = None
+    ready: int | None = None
+    held: int | None = None
+    started: int | None = None
+    personalized: int | None = None
+
+
+class CampaignMissingField(BaseModel):
+    """A field the emails print that ``leads`` unstarted leads have empty."""
+
+    field: str | None = None
+    leads: int | None = None
+
+
+class CampaignAIReadiness(BaseModel):
+    """How much of the first email's AI copy is written ahead.
+
+    ``blocks`` is how many AI blocks the first email has. ``written`` counts
+    unstarted leads whose first email has every block written, ``pending``
+    those with at least one still to write. ``estimated_cost_usd`` is about
+    what writing the pending blocks costs. ``auto`` is ``True`` while the
+    instance writes them on its own (an active campaign with AI available).
+    """
+
+    step_id: str | None = None
+    blocks: int | None = None
+    written: int | None = None
+    pending: int | None = None
+    estimated_cost_usd: float | None = None
+    auto: bool | None = None
+
+
+class CampaignStepIssue(BaseModel):
+    """An email step whose copy does not render as written."""
+
+    step_id: str | None = None
+    position: int | None = None
+    message: str | None = None
+
+
+class CampaignReviewSummary(BaseModel):
+    """A campaign's readiness report, as the dashboard's Review tab shows it.
+
+    ``undeliverable`` counts leads whose address verification rejected and
+    ``unsubscribed`` those who opted out (sending skips them).
+    ``template_errors`` names email steps whose copy does not render.
+    """
+
+    campaign_id: str
+    review_leads: bool | None = None
+    counts: CampaignReviewCounts | None = None
+    missing: Sequence[CampaignMissingField] = []
+    undeliverable: int | None = None
+    unsubscribed: int | None = None
+    ai: CampaignAIReadiness | None = None
+    template_errors: Sequence[CampaignStepIssue] = []
+
+
+class CampaignReviewChange(BaseModel):
+    """How many leads a review write moved.
+
+    ``held`` counts leads put into review, ``released`` leads approved.
+    """
+
+    campaign_id: str
+    review_leads: bool | None = None
+    held: int | None = None
+    released: int | None = None
+
+
+class CampaignReviewWriteResult(BaseModel):
+    """One pass of writing AI copy ahead for several leads.
+
+    ``remaining`` counts leads in the request's scope still to write after
+    this pass. ``stopped`` names why the pass ended early
+    (``insufficient_credits`` or ``usage_cap_exceeded``). Send ``next`` as
+    ``after`` on the following pass, so leads that failed are not retried in
+    a loop.
+    """
+
+    written: int | None = None
+    failed: int | None = None
+    remaining: int | None = None
+    stopped: str | None = None
+    next: str | None = None
+
+
+class LeadEmailCopy(BaseModel):
+    """A subject and body, as a lead's own copy or the template it renders from."""
+
+    subject: str | None = None
+    body_html: str | None = None
+    body_plain: str | None = None
+
+
+class LeadEmailAIBlock(BaseModel):
+    """One AI block in a step, and whether its copy is written yet."""
+
+    id: str | None = None
+    name: str | None = None
+    written: bool | None = None
+
+
+class LeadEmailFrom(BaseModel):
+    """The mailbox a lead's emails go out from."""
+
+    name: str | None = None
+    email: str | None = None
+
+
+class LeadEmailStep(BaseModel):
+    """One email step rendered for one lead, as it will be sent.
+
+    ``source`` is the template this lead's copy renders from: their own copy,
+    the A/B arm drawn for them, or the step's. ``threaded`` is a follow-up
+    that replies in the lead's thread. ``personalized`` is ``True`` when the
+    lead has their own copy, and ``step_changed`` when the shared copy was
+    edited after it. ``variant_id`` is the A/B variant this lead gets.
+    """
+
+    step_id: str
+    position: int | None = None
+    name: str | None = None
+    subject: str | None = None
+    body_html: str | None = None
+    body_plain: str | None = None
+    source: LeadEmailCopy | None = None
+    threaded: bool | None = None
+    personalized: bool | None = None
+    edited_at: str | None = None
+    step_changed: bool | None = None
+    variant_id: str | None = None
+    ai_blocks: Sequence[LeadEmailAIBlock] = []
+    missing: Sequence[str] = []
+    errors: Sequence[str] = []
+    sent: bool | None = None
+    sent_at: str | None = None
+
+
+class LeadEmails(BaseModel):
+    """Every email step of a campaign rendered for one lead."""
+
+    campaign_id: str
+    lead: CampaignReviewLead | None = None
+    from_: LeadEmailFrom | None = Field(default=None, alias="from")
+    steps: Sequence[LeadEmailStep] = []
+
+
+class LeadStepOverride(BaseModel):
+    """One lead's own copy of one email step."""
+
+    campaign_id: str
+    contact_id: str | None = None
+    step_id: str | None = None
+    subject: str | None = None
+    body_html: str | None = None
+    body_plain: str | None = None
+    edited_by: str | None = None
+    updated_at: str | None = None
 
 
 def _campaign_body(
@@ -2308,6 +2516,275 @@ class Campaigns(SyncAPIResource):
             options=options,
         )
 
+    def review(
+        self, campaign_id: str, *, options: RequestOptions | None = None
+    ) -> CampaignReviewSummary:
+        """Get the campaign's review readiness report.
+
+        Counts leads by review state, lists the fields the emails print that
+        unstarted leads have empty, and reports how much of the first email's
+        AI copy is written ahead. Requires the ``read_campaigns`` scope.
+        """
+        return self._get(
+            f"/campaigns/{campaign_id}/review",
+            cast_to=CampaignReviewSummary,
+            options=options,
+        )
+
+    def set_review(
+        self,
+        campaign_id: str,
+        *,
+        enabled: bool,
+        options: RequestOptions | None = None,
+    ) -> CampaignReviewChange:
+        """Turn review mode on or off.
+
+        With review on, each new lead is held until a member approves it, so
+        nothing goes out to it before then. Turning it on holds the leads not
+        yet emailed; turning it off approves every waiting lead, which puts
+        mail in motion. The request states an absolute mode, so a retry
+        changes nothing more.
+
+        Requires the ``write_campaigns`` scope, and ``send_campaigns`` as well
+        to turn review off.
+        """
+        return self._put(
+            f"/campaigns/{campaign_id}/review",
+            cast_to=CampaignReviewChange,
+            body={"enabled": enabled},
+            options=options,
+        )
+
+    def list_review_leads(
+        self,
+        campaign_id: str,
+        *,
+        status: NotGivenOr[str] = NOT_GIVEN,
+        missing: NotGivenOr[str] = NOT_GIVEN,
+        q: NotGivenOr[str] = NOT_GIVEN,
+        limit: NotGivenOr[int] = NOT_GIVEN,
+        cursor: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> SyncCursorPage[CampaignReviewLead]:
+        """List the campaign's leads with their review state (auto-paginating).
+
+        Ordered by email address. Requires the ``read_campaigns`` and
+        ``read_contacts`` scopes.
+
+        Args:
+            status: ``all`` (the default), ``waiting``, ``ready``, ``held`` or
+                ``started``.
+            missing: Keep leads with this field empty: ``FirstName``,
+                ``LastName``, ``Company`` or ``Phone``.
+            q: Search the lead's email, name and company.
+            limit: Page size.
+        """
+        return self._get_api_list(
+            f"/campaigns/{campaign_id}/review/leads",
+            model=CampaignReviewLead,
+            query={
+                "status": status,
+                "missing": missing,
+                "q": q,
+                "limit": limit,
+                "cursor": cursor,
+            },
+            options=options,
+        )
+
+    def approve_review_leads(
+        self,
+        campaign_id: str,
+        *,
+        contact_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        select_all: NotGivenOr[bool] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> CampaignReviewChange:
+        """Approve waiting leads so their first email can go out.
+
+        Approving a lead that is not waiting changes nothing, so a retry is
+        safe. Requires the ``send_campaigns`` scope.
+
+        Args:
+            contact_ids: The leads to approve.
+            select_all: Approve every waiting lead instead (sent as ``all``).
+        """
+        body = drop_not_given(
+            {
+                "contact_ids": (
+                    NOT_GIVEN
+                    if isinstance(contact_ids, NotGiven)
+                    else list(contact_ids)
+                ),
+                "all": select_all,
+            }
+        )
+        return self._post(
+            f"/campaigns/{campaign_id}/review/approve",
+            cast_to=CampaignReviewChange,
+            body=body,
+            options=options,
+        )
+
+    def reopen_review_leads(
+        self,
+        campaign_id: str,
+        *,
+        contact_ids: Sequence[str],
+        options: RequestOptions | None = None,
+    ) -> CampaignReviewChange:
+        """Put leads not yet emailed back into review.
+
+        Reopening a lead that is already waiting changes nothing, so a retry
+        is safe. To hold every lead, turn review on with :meth:`set_review`.
+        Requires the ``write_campaigns`` scope.
+        """
+        return self._post(
+            f"/campaigns/{campaign_id}/review/reopen",
+            cast_to=CampaignReviewChange,
+            body={"contact_ids": list(contact_ids)},
+            options=options,
+        )
+
+    def write_review_ai(
+        self,
+        campaign_id: str,
+        *,
+        step_id: NotGivenOr[str] = NOT_GIVEN,
+        contact_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        waiting_only: NotGivenOr[bool] = NOT_GIVEN,
+        after: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> CampaignReviewWriteResult:
+        """Write AI copy ahead for one pass of leads still missing it.
+
+        Each pass skips what is already written, so a retry charges nothing
+        twice. Call it again with the returned ``next`` as ``after`` while
+        ``remaining`` is above zero. AI usage is charged to the workspace
+        balance; a pass that runs out stops early and names why in
+        ``stopped``.
+
+        Requires the ``write_campaigns`` scope, and the member's ``use_ai``.
+
+        Args:
+            step_id: The email step to write (the first email when omitted).
+            contact_ids: Only these leads. Omit it to write every lead; an
+                empty list is refused.
+            waiting_only: Only leads waiting for review.
+            after: The previous pass's ``next`` cursor.
+        """
+        body = drop_not_given(
+            {
+                "step_id": step_id,
+                "contact_ids": (
+                    NOT_GIVEN
+                    if isinstance(contact_ids, NotGiven)
+                    else list(contact_ids)
+                ),
+                "waiting_only": waiting_only,
+                "after": after,
+            }
+        )
+        return self._post(
+            f"/campaigns/{campaign_id}/review/write",
+            cast_to=CampaignReviewWriteResult,
+            body=body,
+            options=options,
+        )
+
+    def lead_emails(
+        self,
+        campaign_id: str,
+        contact_id: str,
+        *,
+        options: RequestOptions | None = None,
+    ) -> LeadEmails:
+        """Render every email step for one lead, as it will be sent.
+
+        Requires the ``read_campaigns`` and ``read_contacts`` scopes.
+        """
+        return self._get(
+            f"/campaigns/{campaign_id}/leads/{contact_id}/emails",
+            cast_to=LeadEmails,
+            options=options,
+        )
+
+    def personalize_lead_email(
+        self,
+        campaign_id: str,
+        contact_id: str,
+        step_id: str,
+        *,
+        subject: str,
+        body_html: str,
+        body_plain: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> LeadStepOverride:
+        """Store this lead's own copy of one email step.
+
+        It replaces the step's copy for this lead only, as a whole, so a retry
+        lands on the same row. A step already sent to the lead is refused with
+        ``lead_step_sent``. Requires the ``write_campaigns`` and
+        ``read_contacts`` scopes.
+
+        Args:
+            subject: The subject (ignored for a threaded follow-up).
+            body_html: The HTML body. Merge tags and AI blocks still render.
+            body_plain: The plain-text body.
+        """
+        return self._put(
+            f"/campaigns/{campaign_id}/leads/{contact_id}/emails/{step_id}",
+            cast_to=LeadStepOverride,
+            body=drop_not_given(
+                {"subject": subject, "body_html": body_html, "body_plain": body_plain}
+            ),
+            options=options,
+        )
+
+    def reset_lead_email(
+        self,
+        campaign_id: str,
+        contact_id: str,
+        step_id: str,
+        *,
+        options: RequestOptions | None = None,
+    ) -> None:
+        """Drop this lead's own copy, so the step's copy goes out again.
+
+        Resetting a copy that is not there succeeds. Requires the
+        ``write_campaigns`` and ``read_contacts`` scopes.
+        """
+        return self._delete(
+            f"/campaigns/{campaign_id}/leads/{contact_id}/emails/{step_id}",
+            cast_to=type(None),
+            options=options,
+        )
+
+    def write_lead_email_ai(
+        self,
+        campaign_id: str,
+        contact_id: str,
+        step_id: str,
+        *,
+        rewrite: NotGivenOr[bool] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> LeadEmails:
+        """Write one lead's AI copy for one step now, and return their emails.
+
+        The copy is kept where the send reads it, so a retry writes and
+        charges nothing more. ``rewrite=True`` replaces copy already written
+        and is charged again. Requires the ``write_campaigns`` and
+        ``read_contacts`` scopes, and the member's ``use_ai``.
+        """
+        body = drop_not_given({"rewrite": rewrite})
+        return self._post(
+            f"/campaigns/{campaign_id}/leads/{contact_id}/emails/{step_id}/write",
+            cast_to=LeadEmails,
+            body=body or None,
+            options=options,
+        )
+
 
 class AsyncCampaigns(AsyncAPIResource):
     """Asynchronous ``campaigns`` resource."""
@@ -3669,5 +4146,274 @@ class AsyncCampaigns(AsyncAPIResource):
         return await self._get(
             f"/campaigns/{campaign_id}/warmup-placement",
             cast_to=CampaignWarmupPlacement,
+            options=options,
+        )
+
+    async def review(
+        self, campaign_id: str, *, options: RequestOptions | None = None
+    ) -> CampaignReviewSummary:
+        """Get the campaign's review readiness report.
+
+        Counts leads by review state, lists the fields the emails print that
+        unstarted leads have empty, and reports how much of the first email's
+        AI copy is written ahead. Requires the ``read_campaigns`` scope.
+        """
+        return await self._get(
+            f"/campaigns/{campaign_id}/review",
+            cast_to=CampaignReviewSummary,
+            options=options,
+        )
+
+    async def set_review(
+        self,
+        campaign_id: str,
+        *,
+        enabled: bool,
+        options: RequestOptions | None = None,
+    ) -> CampaignReviewChange:
+        """Turn review mode on or off.
+
+        With review on, each new lead is held until a member approves it, so
+        nothing goes out to it before then. Turning it on holds the leads not
+        yet emailed; turning it off approves every waiting lead, which puts
+        mail in motion. The request states an absolute mode, so a retry
+        changes nothing more.
+
+        Requires the ``write_campaigns`` scope, and ``send_campaigns`` as well
+        to turn review off.
+        """
+        return await self._put(
+            f"/campaigns/{campaign_id}/review",
+            cast_to=CampaignReviewChange,
+            body={"enabled": enabled},
+            options=options,
+        )
+
+    def list_review_leads(
+        self,
+        campaign_id: str,
+        *,
+        status: NotGivenOr[str] = NOT_GIVEN,
+        missing: NotGivenOr[str] = NOT_GIVEN,
+        q: NotGivenOr[str] = NOT_GIVEN,
+        limit: NotGivenOr[int] = NOT_GIVEN,
+        cursor: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> AsyncPaginator[CampaignReviewLead]:
+        """List the campaign's leads with their review state (auto-paginating).
+
+        Ordered by email address. Requires the ``read_campaigns`` and
+        ``read_contacts`` scopes.
+
+        Args:
+            status: ``all`` (the default), ``waiting``, ``ready``, ``held`` or
+                ``started``.
+            missing: Keep leads with this field empty: ``FirstName``,
+                ``LastName``, ``Company`` or ``Phone``.
+            q: Search the lead's email, name and company.
+            limit: Page size.
+        """
+        return self._get_api_list(
+            f"/campaigns/{campaign_id}/review/leads",
+            model=CampaignReviewLead,
+            query={
+                "status": status,
+                "missing": missing,
+                "q": q,
+                "limit": limit,
+                "cursor": cursor,
+            },
+            options=options,
+        )
+
+    async def approve_review_leads(
+        self,
+        campaign_id: str,
+        *,
+        contact_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        select_all: NotGivenOr[bool] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> CampaignReviewChange:
+        """Approve waiting leads so their first email can go out.
+
+        Approving a lead that is not waiting changes nothing, so a retry is
+        safe. Requires the ``send_campaigns`` scope.
+
+        Args:
+            contact_ids: The leads to approve.
+            select_all: Approve every waiting lead instead (sent as ``all``).
+        """
+        body = drop_not_given(
+            {
+                "contact_ids": (
+                    NOT_GIVEN
+                    if isinstance(contact_ids, NotGiven)
+                    else list(contact_ids)
+                ),
+                "all": select_all,
+            }
+        )
+        return await self._post(
+            f"/campaigns/{campaign_id}/review/approve",
+            cast_to=CampaignReviewChange,
+            body=body,
+            options=options,
+        )
+
+    async def reopen_review_leads(
+        self,
+        campaign_id: str,
+        *,
+        contact_ids: Sequence[str],
+        options: RequestOptions | None = None,
+    ) -> CampaignReviewChange:
+        """Put leads not yet emailed back into review.
+
+        Reopening a lead that is already waiting changes nothing, so a retry
+        is safe. To hold every lead, turn review on with :meth:`set_review`.
+        Requires the ``write_campaigns`` scope.
+        """
+        return await self._post(
+            f"/campaigns/{campaign_id}/review/reopen",
+            cast_to=CampaignReviewChange,
+            body={"contact_ids": list(contact_ids)},
+            options=options,
+        )
+
+    async def write_review_ai(
+        self,
+        campaign_id: str,
+        *,
+        step_id: NotGivenOr[str] = NOT_GIVEN,
+        contact_ids: NotGivenOr[Sequence[str]] = NOT_GIVEN,
+        waiting_only: NotGivenOr[bool] = NOT_GIVEN,
+        after: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> CampaignReviewWriteResult:
+        """Write AI copy ahead for one pass of leads still missing it.
+
+        Each pass skips what is already written, so a retry charges nothing
+        twice. Call it again with the returned ``next`` as ``after`` while
+        ``remaining`` is above zero. AI usage is charged to the workspace
+        balance; a pass that runs out stops early and names why in
+        ``stopped``.
+
+        Requires the ``write_campaigns`` scope, and the member's ``use_ai``.
+
+        Args:
+            step_id: The email step to write (the first email when omitted).
+            contact_ids: Only these leads. Omit it to write every lead; an
+                empty list is refused.
+            waiting_only: Only leads waiting for review.
+            after: The previous pass's ``next`` cursor.
+        """
+        body = drop_not_given(
+            {
+                "step_id": step_id,
+                "contact_ids": (
+                    NOT_GIVEN
+                    if isinstance(contact_ids, NotGiven)
+                    else list(contact_ids)
+                ),
+                "waiting_only": waiting_only,
+                "after": after,
+            }
+        )
+        return await self._post(
+            f"/campaigns/{campaign_id}/review/write",
+            cast_to=CampaignReviewWriteResult,
+            body=body,
+            options=options,
+        )
+
+    async def lead_emails(
+        self,
+        campaign_id: str,
+        contact_id: str,
+        *,
+        options: RequestOptions | None = None,
+    ) -> LeadEmails:
+        """Render every email step for one lead, as it will be sent.
+
+        Requires the ``read_campaigns`` and ``read_contacts`` scopes.
+        """
+        return await self._get(
+            f"/campaigns/{campaign_id}/leads/{contact_id}/emails",
+            cast_to=LeadEmails,
+            options=options,
+        )
+
+    async def personalize_lead_email(
+        self,
+        campaign_id: str,
+        contact_id: str,
+        step_id: str,
+        *,
+        subject: str,
+        body_html: str,
+        body_plain: NotGivenOr[str] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> LeadStepOverride:
+        """Store this lead's own copy of one email step.
+
+        It replaces the step's copy for this lead only, as a whole, so a retry
+        lands on the same row. A step already sent to the lead is refused with
+        ``lead_step_sent``. Requires the ``write_campaigns`` and
+        ``read_contacts`` scopes.
+
+        Args:
+            subject: The subject (ignored for a threaded follow-up).
+            body_html: The HTML body. Merge tags and AI blocks still render.
+            body_plain: The plain-text body.
+        """
+        return await self._put(
+            f"/campaigns/{campaign_id}/leads/{contact_id}/emails/{step_id}",
+            cast_to=LeadStepOverride,
+            body=drop_not_given(
+                {"subject": subject, "body_html": body_html, "body_plain": body_plain}
+            ),
+            options=options,
+        )
+
+    async def reset_lead_email(
+        self,
+        campaign_id: str,
+        contact_id: str,
+        step_id: str,
+        *,
+        options: RequestOptions | None = None,
+    ) -> None:
+        """Drop this lead's own copy, so the step's copy goes out again.
+
+        Resetting a copy that is not there succeeds. Requires the
+        ``write_campaigns`` and ``read_contacts`` scopes.
+        """
+        return await self._delete(
+            f"/campaigns/{campaign_id}/leads/{contact_id}/emails/{step_id}",
+            cast_to=type(None),
+            options=options,
+        )
+
+    async def write_lead_email_ai(
+        self,
+        campaign_id: str,
+        contact_id: str,
+        step_id: str,
+        *,
+        rewrite: NotGivenOr[bool] = NOT_GIVEN,
+        options: RequestOptions | None = None,
+    ) -> LeadEmails:
+        """Write one lead's AI copy for one step now, and return their emails.
+
+        The copy is kept where the send reads it, so a retry writes and
+        charges nothing more. ``rewrite=True`` replaces copy already written
+        and is charged again. Requires the ``write_campaigns`` and
+        ``read_contacts`` scopes, and the member's ``use_ai``.
+        """
+        body = drop_not_given({"rewrite": rewrite})
+        return await self._post(
+            f"/campaigns/{campaign_id}/leads/{contact_id}/emails/{step_id}/write",
+            cast_to=LeadEmails,
+            body=body or None,
             options=options,
         )

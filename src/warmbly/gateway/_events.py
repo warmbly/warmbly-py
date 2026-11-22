@@ -128,6 +128,20 @@ class GatewayEvent:
     #: object names) and optionally ``contact_id``.
     CRM_SYNCED = "CRM_SYNCED"
 
+    # Domain and mailbox store.
+    #: A store order moved (``charging``, ``processing``, ``completed``,
+    #: ``partially_failed``, ``failed``). Carries ``org_id``, ``id`` and
+    #: ``status``; refetch with ``client.store.retrieve_order``. Needs
+    #: ``manage_emails``.
+    STORE_ORDER_UPDATED = "STORE_ORDER_UPDATED"
+    #: A purchased or connected domain changed state. Carries ``org_id``,
+    #: ``id``, ``status`` and optionally ``order_id``. Needs ``manage_emails``.
+    STORE_DOMAIN_UPDATED = "STORE_DOMAIN_UPDATED"
+    #: A purchased mailbox changed state. Carries ``org_id``, ``id``,
+    #: ``status`` and optionally ``order_id``, ``domain_id``,
+    #: ``email_account_id`` and ``connect_state``. Needs ``manage_emails``.
+    STORE_MAILBOX_UPDATED = "STORE_MAILBOX_UPDATED"
+
     # Bulk-operation events.
     BULK_STARTED = "BULK_STARTED"
     BULK_PROGRESS = "BULK_PROGRESS"
@@ -186,6 +200,9 @@ EVENT_PERMISSIONS: dict[str, str] = {
     GatewayEvent.WARMUP_ACTIVITY: "manage_emails",
     GatewayEvent.CONTACT_IMPORT_PROGRESS: "view_contacts",
     GatewayEvent.EMAIL_BOUNCED: "view_campaigns",
+    GatewayEvent.STORE_ORDER_UPDATED: "manage_emails",
+    GatewayEvent.STORE_DOMAIN_UPDATED: "manage_emails",
+    GatewayEvent.STORE_MAILBOX_UPDATED: "manage_emails",
 }
 
 _INTENT_SEPARATORS = re.compile(r"[.:\s-]+")

@@ -183,6 +183,11 @@ rather than finishing. `GatewayEvent.FORM_SUBMISSION_CREATED` and
 `GatewayEvent.ACCOUNT_SYNC_STATE` reports a mailbox's import progress and any
 fair-use hold on it.
 
+`GatewayEvent.STORE_ORDER_UPDATED`, `STORE_DOMAIN_UPDATED` and
+`STORE_MAILBOX_UPDATED` say a store purchase changed state. They carry ids and
+`status` only, so refetch the order, domain or mailbox with `client.store`. They
+need `manage_emails`, and `intents=["STORE"]` selects all three.
+
 ### `wait_for`: await a single event
 
 Instead of a long-lived handler, you can suspend until the next matching event

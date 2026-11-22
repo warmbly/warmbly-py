@@ -27,7 +27,7 @@ __all__ = [
     "scopes_to_mask",
 ]
 
-# The 32 permission bits, in declaration order (matches the backend bitmask).
+# The 34 permission bits, in declaration order (matches the backend bitmask).
 # The ``agency_*`` bits are held only by agency API keys (``wmagency_``).
 SCOPES: dict[str, int] = {
     "read_emails": 1 << 0,
@@ -62,6 +62,8 @@ SCOPES: dict[str, int] = {
     "agency_transfer_ai": 1 << 29,
     "import_tools": 1 << 30,
     "agency_migrate": 1 << 31,
+    "read_store": 1 << 32,
+    "manage_store": 1 << 33,
 }
 
 Scope = Literal[
@@ -97,6 +99,8 @@ Scope = Literal[
     "agency_transfer_ai",
     "import_tools",
     "agency_migrate",
+    "read_store",
+    "manage_store",
 ]
 
 AGENCY_SCOPES: int = sum(
@@ -159,6 +163,8 @@ ROLE_PERMISSIONS: dict[str, tuple[str, ...]] = {
     "connect_emails": ("manage_emails",),
     "manage_reports": ("view_analytics", "manage_campaigns"),
     "import_tools": ("manage_contacts",),
+    "read_store": ("manage_emails",),
+    "manage_store": ("manage_emails",),
 }
 """The team-role permissions a member needs to delegate each scope.
 

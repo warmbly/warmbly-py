@@ -12,7 +12,10 @@ from warmbly._utils._scopes import (
     AGENCY_KEY_WORKSPACE_SCOPES,
     AGENCY_SCOPES,
     ALL_SCOPES,
+    APP_GRANTABLE_SCOPES,
     FULL_ACCESS_SCOPES,
+    READ_ONLY_SCOPES,
+    ROLE_PERMISSIONS,
     SCOPES,
 )
 
@@ -95,8 +98,8 @@ def test_all_scopes_grants_every_workspace_scope() -> None:
 
 
 def test_scope_bit_counts() -> None:
-    assert len(SCOPES) == 32
-    assert bin(ALL_SCOPES).count("1") == 27
+    assert len(SCOPES) == 34
+    assert bin(ALL_SCOPES).count("1") == 29
     assert mask_to_scopes(AGENCY_SCOPES) == [
         "agency_read",
         "agency_manage_clients",
@@ -106,6 +109,19 @@ def test_scope_bit_counts() -> None:
     ]
     assert SCOPES["connect_emails"] == 1 << 24
     assert SCOPES["agency_migrate"] == 1 << 31
+    assert SCOPES["read_store"] == 4294967296
+    assert SCOPES["manage_store"] == 8589934592
+
+
+def test_store_scopes_match_the_server_masks() -> None:
+    # The server documents these values in docs/api/permissions.
+    assert READ_ONLY_SCOPES == 4295655455
+    assert FULL_ACCESS_SCOPES == 14008975359
+    assert ALL_SCOPES == 14025752575
+    assert AGENCY_KEY_WORKSPACE_SCOPES == 14008965119
+    assert APP_GRANTABLE_SCOPES & SCOPES["manage_store"]
+    assert ROLE_PERMISSIONS["read_store"] == ("manage_emails",)
+    assert ROLE_PERMISSIONS["manage_store"] == ("manage_emails",)
 
 
 def test_presets_match_the_server() -> None:
